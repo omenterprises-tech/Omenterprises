@@ -17,6 +17,7 @@
     "@fontsource/playfair-display": "^5.2.8",
     "@libsql/client": "^0.17.3",
     "better-sqlite3": "^12.9.0",
+    "cloudinary": "^2.10.1",
     "drizzle-orm": "^0.45.2",
     "firebase": "^12.12.1",
     "firebase-admin": "^13.9.0",

@@ -47,6 +47,34 @@ export default function AdminHomeBanners() {
     displayOrder: 0, 
     isActive: true 
   });
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const data = new FormData();
+    data.append("file", file);
+
+    try {
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: data,
+      });
+      const result = await res.json();
+      if (result.url) {
+        setFormData(prev => ({ ...prev, imageUrl: result.url }));
+      } else {
+        alert(result.error || "Failed to upload image");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error uploading image");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -235,19 +263,45 @@ export default function AdminHomeBanners() {
             </div>
             <div className="md:col-span-2">
               <label className="block text-[10px] font-bold text-brand/40 uppercase tracking-widest mb-2 ml-1">Image URL</label>
-              <div className="flex space-x-4">
-                <div className="flex-1">
+              <div className="flex space-x-4 items-center">
+                <div className="flex-1 flex gap-2">
                   <input 
                     type="text" 
                     value={formData.imageUrl}
                     onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
                     placeholder="e.g. /images/silks.jpg"
-                    className="w-full bg-brand/5 border border-brand/10 rounded-xl py-3 px-4 text-sm font-bold text-brand focus:outline-none focus:border-[#FF9800]/30 focus:ring-4 focus:ring-[#FF9800]/10 transition-all"
+                    className="flex-1 bg-brand/5 border border-brand/10 rounded-xl py-3 px-4 text-sm font-bold text-brand focus:outline-none focus:border-[#FF9800]/30 focus:ring-4 focus:ring-[#FF9800]/10 transition-all"
                     required
                   />
+                  <div className="relative">
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      id="banner-image-file"
+                      className="hidden"
+                      disabled={isUploading}
+                    />
+                    <label 
+                      htmlFor="banner-image-file"
+                      className={`h-full flex items-center justify-center gap-1.5 px-4 bg-brand text-white text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer hover:bg-brand-hover active:scale-[0.98] transition-all whitespace-nowrap min-h-[46px] ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="animate-spin h-3.5 w-3.5" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={14} />
+                          Upload file
+                        </>
+                      )}
+                    </label>
+                  </div>
                 </div>
                 {formData.imageUrl && (
-                  <div className="w-12 h-12 rounded-xl bg-brand/5 border border-brand/10 overflow-hidden">
+                  <div className="w-12 h-12 rounded-xl bg-brand/5 border border-brand/10 overflow-hidden shrink-0">
                     <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
                   </div>
                 )}

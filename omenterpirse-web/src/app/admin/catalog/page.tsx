@@ -17,7 +17,8 @@ import {
   Tag, 
   DollarSign,
   AlertTriangle,
-  Grid
+  Grid,
+  Loader2
 } from "lucide-react";
 
 function getColorStyles(colorName: string) {
@@ -104,12 +105,39 @@ export default function MasterCatalogPage() {
   const [activeModal, setActiveModal] = useState<"brand" | "length" | "model" | "variation" | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  // Form Fields
   const [newBrandName, setNewBrandName] = useState("");
   const [newBrandImage, setNewBrandImage] = useState("");
   const [newLength, setNewLength] = useState("");
   const [newModelName, setNewModelName] = useState("");
   const [newModelDesc, setNewModelDesc] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleBrandImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const data = new FormData();
+    data.append("file", file);
+
+    try {
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: data,
+      });
+      const result = await res.json();
+      if (result.url) {
+        setNewBrandImage(result.url);
+      } else {
+        alert(result.error || "Failed to upload image");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error uploading image");
+    } finally {
+      setIsUploading(false);
+    }
+  };
   
   // Variation Form Fields
   const [varThickness, setVarThickness] = useState("");
@@ -750,13 +778,41 @@ export default function MasterCatalogPage() {
               className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
               required
             />
-            <input
-              type="url"
-              placeholder="Brand Logo Image URL (optional)"
-              value={newBrandImage}
-              onChange={(e) => setNewBrandImage(e.target.value)}
-              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Brand Logo Image URL (optional)"
+                value={newBrandImage}
+                onChange={(e) => setNewBrandImage(e.target.value)}
+                className="flex-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
+              />
+              <div className="relative">
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={handleBrandImageUpload}
+                  id="catalog-brand-image-file"
+                  className="hidden"
+                  disabled={isUploading}
+                />
+                <label 
+                  htmlFor="catalog-brand-image-file"
+                  className={`h-full flex items-center justify-center gap-1.5 px-4 bg-[#0D47A1] text-white text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer hover:bg-[#0D47A1]/95 active:scale-[0.98] transition-all whitespace-nowrap min-h-[46px] ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="animate-spin h-3.5 w-3.5" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={14} />
+                      Upload
+                    </>
+                  )}
+                </label>
+              </div>
+            </div>
             <div className="flex gap-3">
               <button type="button" onClick={closeModal} className="flex-1 py-2.5 bg-gray-100 text-xs font-bold text-gray-600 rounded-xl">Cancel</button>
               <button type="submit" className="flex-1 py-2.5 bg-[#FF9800] text-xs font-bold text-white rounded-xl">

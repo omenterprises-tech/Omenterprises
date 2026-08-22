@@ -11,8 +11,8 @@ const transporter = nodemailer.createTransport({
   port: 587,
   secure: false, // TLS
   auth: {
-    user: "bhavishyagudivaka18@gmail.com",
-    pass: "wqbj eqhr pbwu jkrj",
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
   },
   tls: {
     rejectUnauthorized: false,
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
       // Send OTP via SMTP (Nodemailer)
       try {
         await transporter.sendMail({
-          from: '"OM Enterprises Support" <bhavishyagudivaka18@gmail.com>',
+          from: `"OM Enterprises Support" <${process.env.SMTP_USER}>`,
           to: email.trim().toLowerCase(),
           subject: "OM Enterprises - Login Verification OTP",
           html: `

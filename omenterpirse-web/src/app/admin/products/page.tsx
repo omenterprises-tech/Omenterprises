@@ -56,6 +56,7 @@ export default function ProductManagement() {
   const [colorImageInput, setColorImageInput] = useState<string>("");
   const [customColorHex, setCustomColorHex] = useState<string>("#C5A059");
   const [categoriesList, setCategoriesList] = useState<{ id: number; name: string; slug: string }[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => { 
     fetchProducts(); 
@@ -160,15 +161,31 @@ export default function ProductManagement() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      addColorImage(base64String);
-    };
-    reader.readAsDataURL(file);
+
+    setIsUploading(true);
+    const data = new FormData();
+    data.append("file", file);
+
+    try {
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: data,
+      });
+      const result = await res.json();
+      if (result.url) {
+        addColorImage(result.url);
+      } else {
+        alert(result.error || "Failed to upload image");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error uploading image");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const addImage = () => {
@@ -806,12 +823,22 @@ export default function ProductManagement() {
                       accept="image/*" 
                       onChange={handleFileUpload} 
                       className="hidden" 
+                      disabled={isUploading}
                     />
                     <label 
                       htmlFor="color-image-upload" 
-                      className="bg-[#C5A059] text-white px-5 py-2.5 rounded-xl font-bold text-xs hover:bg-[#D5B069] transition-all flex items-center gap-1.5 cursor-pointer shadow-sm whitespace-nowrap"
+                      className={`bg-[#C5A059] text-white px-5 py-2.5 rounded-xl font-bold text-xs hover:bg-[#D5B069] transition-all flex items-center gap-1.5 cursor-pointer shadow-sm whitespace-nowrap ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
                     >
-                      <Plus size={14} /> Upload Image
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="animate-spin h-3.5 w-3.5" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={14} /> Upload Image
+                        </>
+                      )}
                     </label>
                   </div>
 

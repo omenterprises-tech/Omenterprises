@@ -13,8 +13,8 @@ const transporter = nodemailer.createTransport({
   port: 587,
   secure: false, // TLS
   auth: {
-    user: "bhavishyagudivaka18@gmail.com",
-    pass: "wqbj eqhr pbwu jkrj",
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
   },
   tls: {
     rejectUnauthorized: false,
@@ -209,8 +209,8 @@ export async function POST(req: Request) {
       // Send email to admin in background
       try {
         const mailOptions = {
-          from: '"OM Enterprises Portal" <bhavishyagudivaka18@gmail.com>',
-          to: "bhavishyagudivaka18@gmail.com",
+          from: `"OM Enterprises Portal" <${process.env.SMTP_USER}>`,
+          to: process.env.ADMIN_EMAIL || "support.omenterprises@gmail.com",
           subject: `New Order Received - Order #${orderId}`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
