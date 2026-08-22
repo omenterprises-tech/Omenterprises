@@ -75,25 +75,25 @@ export default function AboutUs() {
                 Get In Touch <Mail size={24} className="text-[#FF9800]" />
               </h3>
               <div className="space-y-4">
-                <div className="flex items-center gap-4 group">
+                <a href="mailto:support.omenterprises@gmail.com" className="flex items-center gap-4 group">
                   <div className="w-10 h-10 rounded-xl bg-brand/5 flex items-center justify-center group-hover:bg-[#FF9800] transition-all duration-500">
                     <Mail size={18} className="text-brand group-hover:text-white" />
                   </div>
                   <div>
                     <p className="text-[9px] font-black uppercase tracking-widest text-brand-dark/40">Email Us</p>
-                    <p className="text-sm font-bold text-brand-dark">om5555enterprises@gmail.com</p>
+                    <p className="text-sm font-bold text-brand-dark hover:text-brand transition-colors">support.omenterprises@gmail.com</p>
                   </div>
-                </div>
+                </a>
                 
-                <div className="flex items-center gap-4 group">
+                <a href="tel:+919849845555" className="flex items-center gap-4 group">
                   <div className="w-10 h-10 rounded-xl bg-brand/5 flex items-center justify-center group-hover:bg-[#FF9800] transition-all duration-500">
                     <Phone size={18} className="text-brand group-hover:text-white" />
                   </div>
                   <div>
                     <p className="text-[9px] font-black uppercase tracking-widest text-[#FF9800]">Call Us</p>
-                    <p className="text-xs font-bold text-brand-dark">+91 9849845555 / 9246999660</p>
+                    <p className="text-xs font-bold text-brand-dark hover:text-brand transition-colors">+91 9849845555 / 9246999660</p>
                   </div>
-                </div>
+                </a>
                 
                 <a href="https://wa.me/919849845555" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 group">
                   <div className="w-10 h-10 rounded-xl bg-brand/5 flex items-center justify-center group-hover:bg-[#25D366] transition-all duration-500">
@@ -101,7 +101,7 @@ export default function AboutUs() {
                   </div>
                   <div>
                     <p className="text-[9px] font-black uppercase tracking-widest text-[#25D366]">WhatsApp Us</p>
-                    <p className="text-xs font-bold text-brand-dark">+91 9849845555 / 9849033511</p>
+                    <p className="text-xs font-bold text-brand-dark hover:text-brand transition-colors">+91 9849845555 / 9849033511</p>
                   </div>
                 </a>
               </div>

@@ -122,17 +122,17 @@ export default function B2BPage() {
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white/5 p-8 rounded-3xl border border-white/10 backdrop-blur-sm flex flex-col items-center">
+            <a href="mailto:support.omenterprises@gmail.com" className="bg-white/5 hover:bg-white/10 transition-colors p-8 rounded-3xl border border-white/10 backdrop-blur-sm flex flex-col items-center group">
               <Mail size={32} className="text-brand-accent mb-4" />
               <h4 className="text-sm font-bold uppercase tracking-widest mb-2 text-white/50">Email</h4>
-              <p className="font-medium">om5555enterprises@gmail.com</p>
-            </div>
+              <p className="font-medium hover:text-brand-accent transition-colors">support.omenterprises@gmail.com</p>
+            </a>
             
-            <div className="bg-white/5 p-8 rounded-3xl border border-white/10 backdrop-blur-sm flex flex-col items-center">
+            <a href="tel:+919849845555" className="bg-white/5 hover:bg-white/10 transition-colors p-8 rounded-3xl border border-white/10 backdrop-blur-sm flex flex-col items-center group">
               <Phone size={32} className="text-brand-accent mb-4" />
               <h4 className="text-sm font-bold uppercase tracking-widest mb-2 text-white/50">Call Us</h4>
-              <p className="font-medium">+91 9849845555 / 9246999660</p>
-            </div>
+              <p className="font-medium hover:text-brand-accent transition-colors">+91 9849845555 / 9246999660</p>
+            </a>
  
             <a href="https://wa.me/919849845555" target="_blank" rel="noopener noreferrer" className="bg-white/5 hover:bg-[#25D366]/20 transition-colors p-8 rounded-3xl border border-white/10 backdrop-blur-sm flex flex-col items-center group">
               <MessageCircle size={32} className="text-brand-accent group-hover:text-[#25D366] transition-colors mb-4" />

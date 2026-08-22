@@ -35,13 +35,17 @@ export default function Footer() {
               <MapPin size={16} className="text-[#FF9800] flex-shrink-0" />
               <span>Showroom: # 1-8-288/1, Sindhi Colony, P.G. Road, Secunderabad - 500 003</span>
             </li>
-            <li className="flex items-center gap-2">
-              <Mail size={16} className="text-[#FF9800] flex-shrink-0" />
-              <span>om5555enterprises@gmail.com</span>
+            <li>
+              <a href="mailto:support.omenterprises@gmail.com" className="flex items-center gap-2 hover:text-[#FF9800] transition-colors">
+                <Mail size={16} className="text-[#FF9800] flex-shrink-0" />
+                <span>support.omenterprises@gmail.com</span>
+              </a>
             </li>
-            <li className="flex items-center gap-2">
-              <PhoneCall size={16} className="text-[#FF9800] flex-shrink-0" />
-              <span>+91 9849845555 / 9246999660</span>
+            <li>
+              <a href="tel:+919849845555" className="flex items-center gap-2 hover:text-[#FF9800] transition-colors">
+                <PhoneCall size={16} className="text-[#FF9800] flex-shrink-0" />
+                <span>+91 9849845555 / 9246999660</span>
+              </a>
             </li>
           </ul>
         </div>

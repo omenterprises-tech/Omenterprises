@@ -57,8 +57,8 @@ export default function TermsAndConditionsPage() {
             <h2 className="text-2xl font-bold text-brand mb-4">6. Contact Information</h2>
             <p>
               Questions about the Terms and Conditions should be sent to us at: <br/><br/>
-              <strong>Email:</strong> om5555enterprises@gmail.com <br/>
-              <strong>Phone:</strong> +91 9849845555 / 9246999660
+              <strong>Email:</strong> <a href="mailto:support.omenterprises@gmail.com" className="text-brand hover:underline">support.omenterprises@gmail.com</a> <br/>
+              <strong>Phone:</strong> <a href="tel:+919849845555" className="text-brand hover:underline">+91 9849845555</a> / 9246999660
             </p>
           </section>
         </div>

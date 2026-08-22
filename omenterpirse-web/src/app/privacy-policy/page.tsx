@@ -62,8 +62,8 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-2xl font-bold text-brand mb-4">5. Contact Us</h2>
             <p>
               If you have any questions about this privacy policy or our privacy practices, please contact us at: <br/><br/>
-              <strong>Email:</strong> om5555enterprises@gmail.com <br/>
-              <strong>Phone:</strong> +91 9849845555 / 9246999660
+              <strong>Email:</strong> <a href="mailto:support.omenterprises@gmail.com" className="text-brand hover:underline">support.omenterprises@gmail.com</a> <br/>
+              <strong>Phone:</strong> <a href="tel:+919849845555" className="text-brand hover:underline">+91 9849845555</a> / 9246999660
             </p>
           </section>
         </div>
