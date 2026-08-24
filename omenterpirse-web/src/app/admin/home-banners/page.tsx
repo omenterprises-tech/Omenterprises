@@ -42,7 +42,7 @@ export default function AdminHomeBanners() {
   // Form State
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState({ 
-    title: "", 
+    title: "Homepage Banner", 
     imageUrl: "", 
     mobileImageUrl: "",
     linkHref: "", 
@@ -128,11 +128,11 @@ export default function AdminHomeBanners() {
 
   const handleCancel = () => {
     setEditingId(null);
-    setFormData({ title: "", imageUrl: "", mobileImageUrl: "", linkHref: "", displayOrder: 0, isActive: true });
+    setFormData({ title: "Homepage Banner", imageUrl: "", mobileImageUrl: "", linkHref: "", displayOrder: 0, isActive: true });
   };
 
   const handleAddNew = () => {
-    setFormData({ title: "", imageUrl: "", mobileImageUrl: "", linkHref: "", displayOrder: items.length, isActive: true });
+    setFormData({ title: "Homepage Banner", imageUrl: "", mobileImageUrl: "", linkHref: "", displayOrder: items.length, isActive: true });
     setEditingId(0);
   };
 
@@ -226,7 +226,7 @@ export default function AdminHomeBanners() {
       <div className="mb-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
         <div>
           <h1 className="text-4xl font-playfair font-bold text-brand">Homepage Banners</h1>
-          <p className="mt-2 text-brand/60 font-medium">Manage the category boxes shown on the homepage.</p>
+          <p className="mt-2 text-brand/60 font-medium">Manage sliding laptop and mobile banners displayed on the homepage.</p>
         </div>
         <button 
           onClick={handleAddNew}
@@ -258,30 +258,16 @@ export default function AdminHomeBanners() {
             {editingId === 0 ? "Add New Banner" : "Edit Banner"}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-[10px] font-bold text-brand/40 uppercase tracking-widest mb-2 ml-1">Title</label>
-              <input 
-                type="text" 
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="e.g. Premium Silks"
-                className="w-full bg-brand/5 border border-brand/10 rounded-xl py-3 px-4 text-sm font-bold text-brand focus:outline-none focus:border-[#FF9800]/30 focus:ring-4 focus:ring-[#FF9800]/10 transition-all"
-                required
-              />
-            </div>
-            <div>
-              {/* Link URL field removed as banners are for display only */}
-              <input type="hidden" value={formData.linkHref} />
-            </div>
+            <input type="hidden" value={formData.linkHref} />
             <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold text-brand/40 uppercase tracking-widest mb-2 ml-1">Desktop View Banner Image URL (Recommended: 21:9 or wider)</label>
+              <label className="block text-[10px] font-bold text-brand/40 uppercase tracking-widest mb-2 ml-1">Laptop View Banner Image URL (Recommended: 21:9 or wider)</label>
               <div className="flex space-x-4 items-center">
                 <div className="flex-1 flex gap-2">
                   <input 
                     type="text" 
                     value={formData.imageUrl}
                     onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                    placeholder="e.g. /images/silks_desktop.jpg"
+                    placeholder="e.g. /images/silks_laptop.jpg"
                     className="flex-1 bg-brand/5 border border-brand/10 rounded-xl py-3 px-4 text-sm font-bold text-brand focus:outline-none focus:border-[#FF9800]/30 focus:ring-4 focus:ring-[#FF9800]/10 transition-all"
                     required
                   />
@@ -290,12 +276,12 @@ export default function AdminHomeBanners() {
                       type="file" 
                       accept="image/*"
                       onChange={(e) => handleImageUpload(e, "imageUrl")}
-                      id="desktop-banner-image-file"
+                      id="laptop-banner-image-file"
                       className="hidden"
                       disabled={isUploading}
                     />
                     <label 
-                      htmlFor="desktop-banner-image-file"
+                      htmlFor="laptop-banner-image-file"
                       className={`h-full flex items-center justify-center gap-1.5 px-4 bg-brand text-white text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer hover:bg-brand-hover active:scale-[0.98] transition-all whitespace-nowrap min-h-[46px] ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
                     >
                       {isUploading ? (
@@ -306,7 +292,7 @@ export default function AdminHomeBanners() {
                       ) : (
                         <>
                           <Plus size={14} />
-                          Upload desktop file
+                          Upload laptop file
                         </>
                       )}
                     </label>
@@ -314,7 +300,7 @@ export default function AdminHomeBanners() {
                 </div>
                 {formData.imageUrl && (
                   <div className="w-16 h-12 rounded-xl bg-brand/5 border border-brand/10 overflow-hidden shrink-0">
-                    <img src={formData.imageUrl} alt="Desktop Preview" className="w-full h-full object-cover" />
+                    <img src={formData.imageUrl} alt="Laptop Preview" className="w-full h-full object-cover" />
                   </div>
                 )}
               </div>

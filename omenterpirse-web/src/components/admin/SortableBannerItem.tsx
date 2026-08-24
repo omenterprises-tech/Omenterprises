@@ -57,8 +57,8 @@ export function SortableBannerItem({ item, onEdit, onDelete }: Props) {
         <div className="flex items-center space-x-4">
           <div className="flex space-x-2 shrink-0">
             <div className="w-16 h-12 bg-gray-100 rounded-lg overflow-hidden border border-brand/5 shadow-sm relative group/thumb flex items-end justify-center">
-              <img src={item.imageUrl} alt="Desktop" className="w-full h-full object-cover" />
-              <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] text-white font-bold text-center py-0.5 uppercase tracking-wider font-mono">Desktop</span>
+              <img src={item.imageUrl} alt="Laptop" className="w-full h-full object-cover" />
+              <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] text-white font-bold text-center py-0.5 uppercase tracking-wider font-mono">Laptop</span>
             </div>
             {item.mobileImageUrl && (
               <div className="w-10 h-12 bg-gray-100 rounded-lg overflow-hidden border border-brand/5 shadow-sm relative group/thumb flex items-end justify-center">
@@ -68,8 +68,7 @@ export function SortableBannerItem({ item, onEdit, onDelete }: Props) {
             )}
           </div>
           <div>
-            <span className="font-bold text-brand block">{item.title}</span>
-            <span className="text-[10px] text-brand/40 font-medium">{item.linkHref}</span>
+            <span className="font-bold text-brand block">Banner #{item.displayOrder + 1}</span>
           </div>
         </div>
       </td>
