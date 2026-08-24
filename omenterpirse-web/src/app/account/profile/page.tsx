@@ -106,7 +106,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Phone (Editable) */}
+            {/* Phone (Read-only) */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-brand/60 uppercase tracking-widest ml-1">Phone Number</label>
               <div className="relative">
@@ -116,14 +116,9 @@ export default function ProfilePage() {
                 <input
                   type="tel"
                   value={phoneNumber}
-                  maxLength={10}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, "").slice(0, 10);
-                    setPhoneNumber(val);
-                  }}
-                  className="w-full bg-brand-light border border-brand/10 rounded-2xl py-4 pl-12 pr-4 text-brand font-medium focus:outline-none focus:border-[#FF9800] focus:ring-1 focus:ring-[#FF9800] transition-all"
+                  disabled
+                  className="w-full bg-gray-50 border border-brand/10 rounded-2xl py-4 pl-12 pr-4 text-brand/50 font-medium cursor-not-allowed select-none"
                   placeholder="10 Digits"
-                  required
                 />
               </div>
             </div>
