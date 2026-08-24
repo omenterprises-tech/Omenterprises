@@ -24,16 +24,28 @@ export default function BannerCarousel({ banners }: { banners: any[] }) {
       >
         {banners.map((banner) => (
           <div key={banner.id} className="min-w-full aspect-[16/9] md:aspect-[21/9] lg:aspect-[25/9] relative">
-            <picture className="w-full h-full">
-              {banner.mobileImageUrl && (
-                <source srcSet={banner.mobileImageUrl} media="(max-width: 768px)" />
-              )}
+            {banner.mobileImageUrl ? (
+              <>
+                {/* Laptop View */}
+                <img 
+                  src={banner.imageUrl} 
+                  alt={banner.title} 
+                  className="hidden md:block w-full h-full object-cover" 
+                />
+                {/* Mobile View */}
+                <img 
+                  src={banner.mobileImageUrl} 
+                  alt={banner.title} 
+                  className="block md:hidden w-full h-full object-cover" 
+                />
+              </>
+            ) : (
               <img 
                 src={banner.imageUrl} 
                 alt={banner.title} 
                 className="w-full h-full object-cover" 
               />
-            </picture>
+            )}
           </div>
         ))}
       </div>
