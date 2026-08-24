@@ -8,7 +8,20 @@ import ProductGrid from "@/components/ProductGrid";
 import HomeTabs from "@/components/HomeTabs";
 import { db } from "@/db";
 import { products, productVariations, pageSections, homeCategoryBanners, homeTabs, navigationMenu, categories } from "@/db/schema";
-import { eq, sql, inArray } from "drizzle-orm";
+import { eq, sql, inArray, asc } from "drizzle-orm";
+import BannerCarousel from "@/components/BannerCarousel";
+
+async function getHomeBanners() {
+  try {
+    return await db.select()
+      .from(homeCategoryBanners)
+      .where(eq(homeCategoryBanners.isActive, true))
+      .orderBy(asc(homeCategoryBanners.displayOrder));
+  } catch (error) {
+    console.error("Error fetching home banners:", error);
+    return [];
+  }
+}
 
 async function getFeaturedProducts() {
   try {
@@ -149,16 +162,21 @@ export default async function Home() {
   const categoriesWithProducts = await getCategoriesWithProducts();
   const homeSections = await getHomeSections();
   const tabs = await getHomeTabs();
+  const banners = await getHomeBanners();
 
   return (
     <div className="min-h-screen bg-brand-light text-brand-dark font-sans selection:bg-brand-accent/30">
       {/* Home Page Banner */}
       <div className="w-full">
-        <img 
-          src="/images/Home_banner_new.jpg" 
-          alt="OM Enterprises Banner" 
-          className="w-full h-auto"
-        />
+        {banners.length > 0 ? (
+          <BannerCarousel banners={banners} />
+        ) : (
+          <img 
+            src="/images/Home_banner_new.jpg" 
+            alt="OM Enterprises Banner" 
+            className="w-full h-auto"
+          />
+        )}
       </div>
 
       <main id="featured-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 space-y-10 pt-8">
