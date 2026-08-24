@@ -9,11 +9,16 @@ export async function POST(request: Request) {
   try {
     const { email, fullName, phoneNumber } = await request.json();
 
-    if (!email || !fullName) {
-      return NextResponse.json({ success: false, error: "Email and Full Name are required" }, { status: 400 });
+    let finalEmail = email;
+    if (!finalEmail && phoneNumber) {
+      finalEmail = `phone_${phoneNumber.trim()}@noemail.com`;
     }
 
-    const lowerEmail = email.trim().toLowerCase();
+    if (!finalEmail || !fullName) {
+      return NextResponse.json({ success: false, error: "Full Name and Email or Phone Number are required" }, { status: 400 });
+    }
+
+    const lowerEmail = finalEmail.trim().toLowerCase();
     let user = null;
     const isAuthAdmin = isAdminNumber(lowerEmail);
 

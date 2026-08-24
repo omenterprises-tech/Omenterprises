@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import Image from "next/image";
-import { ArrowLeft, ShieldCheck, User, Mail, Loader2, Phone } from "lucide-react";
+import { ArrowLeft, User, Loader2, Phone } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 
@@ -12,42 +12,20 @@ function LoginForm() {
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const [mounted, setMounted] = useState(false);
-  const [step, setStep] = useState<"email" | "otp" | "profile">("email");
-  const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [step, setStep] = useState<"phone" | "register">("phone");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [timer, setTimer] = useState(0);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (timer > 0 && step === "otp") {
-      interval = setInterval(() => setTimer((t) => t - 1), 1000);
-    }
-    return () => clearInterval(interval);
-  }, [timer, step]);
-
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEmail(e.target.value);
-    if (error) setError("");
-  };
-
-  const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, "").slice(0, 6);
-    setOtp(value);
-    if (error) setError("");
-  };
-
-  const handleSendOTP = async (e: React.FormEvent) => {
+  const handlePhoneLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !email.includes("@")) {
-      setError("Please enter a valid email address.");
+    if (!phoneNumber.trim() || phoneNumber.trim().length !== 10) {
+      setError("Please enter a valid 10-digit mobile number.");
       return;
     }
     
@@ -55,65 +33,31 @@ function LoginForm() {
     setError("");
     
     try {
-      const res = await fetch("/api/auth/otp", {
+      const res = await fetch("/api/auth/phone-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send", email: email.trim(), portal: "user" }),
+        body: JSON.stringify({ phoneNumber: phoneNumber.trim() }),
       });
       const data = await res.json();
-      if (data.success) {
-        setStep("otp");
-        setTimer(60);
-      } else {
-        throw new Error(data.error || "Failed to send verification code.");
-      }
-    } catch (err: any) {
-      console.error("OTP Send Error:", err);
-      setError(err.message || "Failed to send code. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otp.length !== 6) return;
-    
-    setLoading(true);
-    setError("");
-    
-    try {
-      const res = await fetch("/api/auth/otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          action: "verify", 
-          email: email.trim(), 
-          otp
-        }),
-      });
-      
-      const data = await res.json();
-      
       if (data.success) {
         if (data.isNewUser) {
-          setStep("profile");
+          setStep("register");
         } else {
           router.push(callbackUrl);
           router.refresh();
         }
       } else {
-        setError(data.error || "Login failed. Please try again.");
+        throw new Error(data.error || "Login failed. Please try again.");
       }
     } catch (err: any) {
-      console.error("Verification error:", err);
-      setError(err.message || "Failed to verify. Please try again.");
+      console.error("Phone Login Error:", err);
+      setError(err.message || "Failed to log in. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim() || !phoneNumber.trim()) {
       setError("Both Name and Mobile Number are required.");
@@ -132,7 +76,6 @@ function LoginForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          email: email.trim(), 
           fullName: fullName.trim(),
           phoneNumber: phoneNumber.trim()
         }),
@@ -143,7 +86,7 @@ function LoginForm() {
         router.push(callbackUrl);
         router.refresh();
       } else {
-        setError(data.error || "Failed to complete profile.");
+        setError(data.error || "Failed to complete registration.");
       }
     } catch (err) {
       setError("Failed to complete profile registration.");
@@ -202,13 +145,12 @@ function LoginForm() {
               </div>
             </div>
             <h2 className="text-4xl font-playfair font-bold text-brand mb-4">
-              {step === "profile" ? "Welcome" : "Sign In"}
+              {step === "register" ? "Register" : "Sign In"}
             </h2>
             <div className="px-6">
               <p className="text-brand/50 text-sm leading-relaxed font-medium">
-                {step === "email" && "Enter your email address to access your account."}
-                {step === "otp" && `We've sent a 6-digit verification code to ${email}`}
-                {step === "profile" && "One last step! Tell us your name to personalize your experience."}
+                {step === "phone" && "Enter your mobile number to access your account."}
+                {step === "register" && "New user! Please enter your name to register."}
               </p>
             </div>
           </div>
@@ -220,20 +162,25 @@ function LoginForm() {
             </div>
           )}
 
-          {/* STEP 1: Email Address */}
-          {step === "email" && (
-            <form onSubmit={handleSendOTP} className="space-y-8">
+          {/* PHASE 1: Mobile Number Login */}
+          {step === "phone" && (
+            <form onSubmit={handlePhoneLogin} className="space-y-8">
               <div className="space-y-3">
-                <label className="block text-[10px] font-black text-brand/30 uppercase tracking-[0.3em] ml-2">Email ID</label>
+                <label className="block text-[10px] font-black text-brand/30 uppercase tracking-[0.3em] ml-2">Mobile Number</label>
                 <div className="relative group">
                   <div className="absolute left-5 top-1/2 -translate-y-1/2 flex items-center space-x-3 border-r border-brand/10 pr-4">
-                    <Mail size={16} className="text-[#FF9800]" />
+                    <Phone size={16} className="text-[#FF9800]" />
                   </div>
                   <input 
-                    type="email" 
-                    value={email}
-                    onChange={handleEmailChange}
-                    placeholder="name@example.com" 
+                    type="tel" 
+                    value={phoneNumber}
+                    maxLength={10}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                      setPhoneNumber(val);
+                      if (error) setError("");
+                    }}
+                    placeholder="10-digit number" 
                     className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/30 focus:bg-white focus:shadow-[0_0_40px_rgba(197,160,89,0.1)] rounded-2xl py-5 pl-16 pr-6 text-brand font-bold text-lg placeholder:text-brand/10 transition-all outline-none"
                     required
                   />
@@ -241,7 +188,7 @@ function LoginForm() {
               </div>
               <button 
                 type="submit" 
-                disabled={loading || !email.trim() || !email.includes("@")} 
+                disabled={loading || phoneNumber.length !== 10} 
                 className="w-full bg-[#0D47A1] text-[#FF9800] font-black uppercase tracking-[0.2em] text-xs py-5 rounded-2xl shadow-xl hover:bg-[#FF9800] hover:text-white hover:shadow-[0_20px_40px_rgba(255,152,0,0.15)] disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.98] flex justify-center items-center space-x-3"
               >
                 {loading ? (
@@ -253,54 +200,9 @@ function LoginForm() {
             </form>
           )}
 
-          {/* STEP 2: OTP Verification */}
-          {step === "otp" && (
-            <form onSubmit={handleVerifyOTP} className="space-y-8">
-              <div className="space-y-4">
-                <label className="block text-[10px] font-black text-brand/30 uppercase tracking-[0.3em] ml-2">Verification Code</label>
-                <div className="relative">
-                  <div className="absolute left-6 top-1/2 -translate-y-1/2">
-                    <ShieldCheck className="text-[#FF9800]" size={20} />
-                  </div>
-                  <input 
-                    type="text" 
-                    inputMode="numeric"
-                    value={otp}
-                    onChange={handleOtpChange}
-                    placeholder="------" 
-                    className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/30 focus:bg-white focus:shadow-[0_0_40px_rgba(197,160,89,0.1)] rounded-2xl py-6 px-12 text-brand font-mono font-bold text-center text-4xl tracking-[0.4em] placeholder:text-brand/10 transition-all outline-none"
-                    required
-                  />
-                </div>
-                <div className="flex justify-between mt-6 px-2">
-                  <button type="button" onClick={() => setStep("email")} className="text-[10px] text-brand/40 hover:text-[#FF9800] font-black uppercase tracking-widest transition-all">Change Email</button>
-                  <button 
-                    type="button" 
-                    onClick={handleSendOTP}
-                    disabled={timer > 0 || loading}
-                    className={`text-[10px] font-black uppercase tracking-widest transition-all ${timer > 0 ? "text-brand/20 cursor-not-allowed" : "text-[#FF9800] hover:underline"}`}
-                  >
-                    {timer > 0 ? `Resend in ${timer}s` : "Resend Code"}
-                  </button>
-                </div>
-              </div>
-              <button 
-                type="submit" 
-                disabled={loading || otp.length !== 6} 
-                className="w-full bg-[#0D47A1] text-[#FF9800] font-black uppercase tracking-[0.2em] text-xs py-5 rounded-2xl shadow-xl hover:bg-[#FF9800] hover:text-white hover:shadow-[0_20px_40px_rgba(255,152,0,0.15)] disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.98] flex justify-center items-center space-x-3"
-              >
-                {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <span>Verify & Login</span>
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* STEP 3: Profile Setup */}
-          {step === "profile" && (
-            <form onSubmit={handleSaveProfile} className="space-y-6">
+          {/* PHASE 2: Register Name */}
+          {step === "register" && (
+            <form onSubmit={handleRegister} className="space-y-6">
               <div className="space-y-3">
                 <label className="block text-[10px] font-black text-brand/30 uppercase tracking-[0.3em] ml-2">Full Name</label>
                 <div className="relative">
@@ -310,8 +212,11 @@ function LoginForm() {
                   <input 
                     type="text" 
                     value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="John Doe" 
+                    onChange={(e) => {
+                      setFullName(e.target.value);
+                      if (error) setError("");
+                    }}
+                    placeholder="e.g. John Doe" 
                     className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/30 focus:bg-white focus:shadow-[0_0_40px_rgba(197,160,89,0.1)] rounded-2xl py-5 pl-14 pr-6 text-brand font-bold text-lg transition-all outline-none"
                     required
                   />
@@ -319,36 +224,34 @@ function LoginForm() {
               </div>
 
               <div className="space-y-3">
-                <label className="block text-[10px] font-black text-brand/30 uppercase tracking-[0.3em] ml-2">Mobile Number</label>
-                <div className="relative">
-                  <div className="absolute left-6 top-1/2 -translate-y-1/2">
-                    <Phone className="text-[#FF9800]" size={20} />
-                  </div>
-                  <input 
-                    type="tel" 
-                    value={phoneNumber}
-                    maxLength={10}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, "").slice(0, 10);
-                      setPhoneNumber(val);
-                    }}
-                    className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/30 focus:bg-white focus:shadow-[0_0_40px_rgba(197,160,89,0.1)] rounded-2xl py-5 pl-14 pr-6 text-brand font-bold text-lg transition-all outline-none"
-                    placeholder="10 Digits"
-                    required
-                  />
+                <label className="block text-[10px] font-black text-brand/30 uppercase tracking-[0.3em] ml-2">Mobile Number (Read-only)</label>
+                <div className="relative bg-gray-50 border border-gray-100 rounded-2xl py-5 px-6">
+                  <span className="text-brand/60 font-bold text-lg">{phoneNumber}</span>
                 </div>
               </div>
 
               <button 
                 type="submit" 
-                disabled={loading || !fullName.trim() || !phoneNumber.trim()} 
+                disabled={loading || !fullName.trim()} 
                 className="w-full bg-[#0D47A1] text-[#FF9800] font-black uppercase tracking-[0.2em] text-xs py-5 rounded-2xl shadow-xl hover:bg-[#FF9800] hover:text-white hover:shadow-[0_20px_40px_rgba(255,152,0,0.15)] disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.98] flex justify-center items-center space-x-3"
               >
                 {loading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
-                  <span>Complete Registration</span>
+                  <span>Register & Login</span>
                 )}
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => {
+                  setStep("phone");
+                  setError("");
+                }}
+                className="w-full flex items-center justify-center space-x-2 text-xs font-bold text-brand/50 hover:text-[#FF9800] py-2 transition-all"
+              >
+                <ArrowLeft size={14} />
+                <span>Change phone number</span>
               </button>
             </form>
           )}

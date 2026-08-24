@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Search, Mail, Phone, Calendar, Loader2, ArrowLeft } from "lucide-react";
+import { Users, Search, Phone, Calendar, Loader2, ArrowLeft } from "lucide-react";
 
 type Customer = {
   id: number;
@@ -36,7 +36,6 @@ export default function CustomerManagement() {
 
   const filteredCustomers = customers.filter(c => 
     c.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.phoneNumber && c.phoneNumber.includes(searchTerm))
   );
 
@@ -60,7 +59,7 @@ export default function CustomerManagement() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand/30 group-focus-within:text-[#FF9800] transition-colors" size={18} />
           <input 
             type="text" 
-            placeholder="Search by name or email..."
+            placeholder="Search by name or phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-white border border-brand/10 rounded-2xl py-4 pl-12 pr-6 text-sm font-bold text-brand focus:outline-none focus:ring-4 focus:ring-[#FF9800]/5 transition-all shadow-sm"
@@ -73,7 +72,6 @@ export default function CustomerManagement() {
           <thead>
             <tr className="bg-brand/5 border-b border-brand/10">
               <th className="px-8 py-6 text-[10px] font-black text-brand/40 uppercase tracking-[0.2em]">Customer Details</th>
-              <th className="px-8 py-6 text-[10px] font-black text-brand/40 uppercase tracking-[0.2em]">Email Address</th>
               <th className="px-8 py-6 text-[10px] font-black text-brand/40 uppercase tracking-[0.2em]">Phone Number</th>
               <th className="px-8 py-6 text-[10px] font-black text-brand/40 uppercase tracking-[0.2em]">Role</th>
               <th className="px-8 py-6 text-[10px] font-black text-brand/40 uppercase tracking-[0.2em]">Joined On</th>
@@ -91,12 +89,6 @@ export default function CustomerManagement() {
                       <p className="font-bold text-brand">{customer.fullName || "Guest User"}</p>
                       <p className="text-[10px] text-brand/40 font-bold uppercase tracking-widest mt-0.5">ID: #00{customer.id}</p>
                     </div>
-                  </div>
-                </td>
-                <td className="px-8 py-6">
-                  <div className="flex items-center space-x-2 text-brand/60 group-hover:text-brand transition-colors">
-                    <Mail size={14} className="text-[#FF9800]" />
-                    <span className="font-bold text-sm">{customer.email}</span>
                   </div>
                 </td>
                 <td className="px-8 py-6">

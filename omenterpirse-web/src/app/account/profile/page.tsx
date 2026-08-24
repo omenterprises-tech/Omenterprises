@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { User, Phone, Mail, Save, ArrowLeft, Loader2 } from "lucide-react";
+import { User, Phone, Save, ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 export default function ProfilePage() {
@@ -11,7 +11,6 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [fullName, setFullName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
@@ -23,7 +22,6 @@ export default function ProfilePage() {
         if (data.authenticated) {
           setFullName(data.user.fullName || "");
           setPhoneNumber(data.user.phoneNumber || "");
-          setEmail(data.user.email || "");
         } else {
           router.push("/login");
         }
@@ -126,22 +124,6 @@ export default function ProfilePage() {
                   className="w-full bg-brand-light border border-brand/10 rounded-2xl py-4 pl-12 pr-4 text-brand font-medium focus:outline-none focus:border-[#FF9800] focus:ring-1 focus:ring-[#FF9800] transition-all"
                   placeholder="10 Digits"
                   required
-                />
-              </div>
-            </div>
-
-            {/* Email (Read-only) */}
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-xs font-bold text-brand/60 uppercase tracking-widest ml-1">Email Address</label>
-              <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-brand/40">
-                  <Mail size={18} />
-                </div>
-                <input
-                  type="email"
-                  value={email}
-                  disabled
-                  className="w-full bg-gray-50 border border-brand/10 rounded-2xl py-4 pl-12 pr-4 text-brand/50 font-medium cursor-not-allowed select-none"
                 />
               </div>
             </div>

@@ -491,9 +491,8 @@ export default function CartPage() {
 ${itemsListText}
 
 💰 *SUBTOTAL:* ₹${formatPrice(subtotal)}
-📈 *GST (18%):* ₹${formatPrice(gst)}
 🚚 *DELIVERY CHARGES:* As per Porter
-⭐ *TOTAL AMOUNT:* ₹${formatPrice(total)}
+⭐ *TOTAL AMOUNT:* ₹${formatPrice(total)} (INCL GST)
 
 📍 *DELIVERY ADDRESS:*
 ${shippingAddressStr}
@@ -632,17 +631,13 @@ Please confirm my order. Thank you!`;
                 <span className="text-xs font-bold tracking-widest uppercase">Est. Subtotal</span>
                 <span className="text-sm font-bold tracking-widest text-brand">₹{formatPrice(subtotal)}</span>
               </div>
-              <div className="flex justify-between items-center text-brand/60">
-                <span className="text-xs font-bold tracking-widest uppercase">GST (18%)</span>
-                <span className="text-sm font-bold tracking-widest text-brand">₹{formatPrice(gst)}</span>
-              </div>
               <div className="flex justify-between items-center text-brand/60 pb-4 border-b border-gray-100">
                 <span className="text-xs font-bold tracking-widest uppercase">Est. Shipping</span>
                 <span className="text-brand font-bold text-xs uppercase tracking-wide">Based on Porter charges</span>
               </div>
               <div className="flex justify-between items-center pt-2">
                 <span className="text-sm font-black tracking-widest uppercase text-brand">Total Estimate</span>
-                <span className="text-xl font-black text-brand tracking-widest">₹{formatPrice(total)}</span>
+                <span className="text-xl font-black text-brand tracking-widest">₹{formatPrice(total)} (INCL GST)</span>
               </div>
             </div>
 
@@ -949,16 +944,12 @@ Please confirm my order. Thank you!`;
                         <span>₹{formatPrice(subtotal)}</span>
                       </div>
                       <div className="flex justify-between items-center text-xs font-bold text-brand/60">
-                        <span>GST (18%)</span>
-                        <span>₹{formatPrice(gst)}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs font-bold text-brand/60">
                         <span>Est. Shipping</span>
                         <span className="text-[10px] uppercase font-black tracking-wide text-brand">Based on Porter charges</span>
                       </div>
                       <div className="border-t border-brand/10 pt-2 flex justify-between items-center text-sm font-black text-brand">
                         <span>Total Estimate</span>
-                        <span className="text-brand">₹{formatPrice(total)}</span>
+                        <span className="text-brand">₹{formatPrice(total)} (INCL GST)</span>
                       </div>
                     </div>
                   )}
@@ -1272,16 +1263,12 @@ Please confirm my order. Thank you!`;
                           <span>₹{formatPrice(subtotal)}</span>
                         </div>
                         <div className="flex justify-between items-center text-xs font-bold text-gray-500">
-                          <span>GST (18%)</span>
-                          <span>₹{formatPrice(gst)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs font-bold text-gray-500">
                           <span>Shipping</span>
                           <span className="text-[10px] font-black uppercase tracking-wider text-brand">Based on Porter charges</span>
                         </div>
                         <div className="border-t border-gray-200 pt-2 flex justify-between items-center text-sm font-black text-brand">
                           <span>Total Amount</span>
-                          <span>₹{formatPrice(total)}</span>
+                          <span>₹{formatPrice(total)} (INCL GST)</span>
                         </div>
                       </div>
 
@@ -1298,7 +1285,7 @@ Please confirm my order. Thank you!`;
                           onClick={handleRazorpayPayment}
                           className="flex-[2] py-4 bg-brand text-white hover:bg-brand-hover rounded-xl text-xs font-black uppercase tracking-wider shadow-lg hover:shadow-xl active:scale-[0.98] transition-all"
                         >
-                          Pay ₹{formatPrice(total)}
+                          Pay ₹{formatPrice(total)} (INCL GST)
                         </button>
                       </div>
                     </div>
