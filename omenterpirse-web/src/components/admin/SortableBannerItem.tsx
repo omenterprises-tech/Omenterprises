@@ -9,6 +9,7 @@ interface BannerItem {
   id: number;
   title: string;
   imageUrl: string;
+  mobileImageUrl?: string | null;
   linkHref: string;
   displayOrder: number;
   isActive: boolean;
@@ -54,8 +55,17 @@ export function SortableBannerItem({ item, onEdit, onDelete }: Props) {
       </td>
       <td className="px-8 py-5">
         <div className="flex items-center space-x-4">
-          <div className="w-12 h-16 bg-gray-100 rounded-lg overflow-hidden border border-brand/5 shadow-sm">
-            <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+          <div className="flex space-x-2 shrink-0">
+            <div className="w-16 h-12 bg-gray-100 rounded-lg overflow-hidden border border-brand/5 shadow-sm relative group/thumb flex items-end justify-center">
+              <img src={item.imageUrl} alt="Desktop" className="w-full h-full object-cover" />
+              <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] text-white font-bold text-center py-0.5 uppercase tracking-wider font-mono">Desktop</span>
+            </div>
+            {item.mobileImageUrl && (
+              <div className="w-10 h-12 bg-gray-100 rounded-lg overflow-hidden border border-brand/5 shadow-sm relative group/thumb flex items-end justify-center">
+                <img src={item.mobileImageUrl} alt="Mobile" className="w-full h-full object-cover" />
+                <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] text-white font-bold text-center py-0.5 uppercase tracking-wider font-mono">Mobile</span>
+              </div>
+            )}
           </div>
           <div>
             <span className="font-bold text-brand block">{item.title}</span>

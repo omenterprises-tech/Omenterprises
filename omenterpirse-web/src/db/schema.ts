@@ -112,6 +112,7 @@ export const homeCategoryBanners = sqliteTable("home_category_banners", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   title: text("title").notNull(),
   imageUrl: text("image_url").notNull(),
+  mobileImageUrl: text("mobile_image_url"),
   linkHref: text("link_href").notNull(),
   displayOrder: integer("display_order").notNull().default(0),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),

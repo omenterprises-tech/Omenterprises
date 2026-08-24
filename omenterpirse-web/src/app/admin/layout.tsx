@@ -19,12 +19,14 @@ import {
   Grid,
   Award,
   Ruler,
-  Layers
+  Layers,
+  Image as ImageIcon
 } from "lucide-react";
 
 const sidebarLinks = [
   { name: "Categories", href: "/admin/categories", icon: Grid },
   { name: "Master Catalog", href: "/admin/catalog", icon: Layers },
+  { name: "Banners", href: "/admin/home-banners", icon: ImageIcon },
   { name: "Orders", href: "/admin/orders", icon: Package },
   { name: "Customers", href: "/admin/customers", icon: Users },
 ];

@@ -25,6 +25,7 @@ type BannerItem = {
   id: number;
   title: string;
   imageUrl: string;
+  mobileImageUrl?: string | null;
   linkHref: string;
   displayOrder: number;
   isActive: boolean;
@@ -43,17 +44,23 @@ export default function AdminHomeBanners() {
   const [formData, setFormData] = useState({ 
     title: "", 
     imageUrl: "", 
+    mobileImageUrl: "",
     linkHref: "", 
     displayOrder: 0, 
     isActive: true 
   });
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingMobile, setIsUploadingMobile] = useState(false);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: "imageUrl" | "mobileImageUrl") => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsUploading(true);
+    if (field === "imageUrl") {
+      setIsUploading(true);
+    } else {
+      setIsUploadingMobile(true);
+    }
     const data = new FormData();
     data.append("file", file);
 
@@ -64,7 +71,7 @@ export default function AdminHomeBanners() {
       });
       const result = await res.json();
       if (result.url) {
-        setFormData(prev => ({ ...prev, imageUrl: result.url }));
+        setFormData(prev => ({ ...prev, [field]: result.url }));
       } else {
         alert(result.error || "Failed to upload image");
       }
@@ -72,7 +79,11 @@ export default function AdminHomeBanners() {
       console.error(err);
       alert("Error uploading image");
     } finally {
-      setIsUploading(false);
+      if (field === "imageUrl") {
+        setIsUploading(false);
+      } else {
+        setIsUploadingMobile(false);
+      }
     }
   };
 
@@ -108,6 +119,7 @@ export default function AdminHomeBanners() {
     setFormData({ 
       title: item.title, 
       imageUrl: item.imageUrl, 
+      mobileImageUrl: item.mobileImageUrl || "",
       linkHref: item.linkHref, 
       displayOrder: item.displayOrder, 
       isActive: item.isActive 
@@ -116,11 +128,11 @@ export default function AdminHomeBanners() {
 
   const handleCancel = () => {
     setEditingId(null);
-    setFormData({ title: "", imageUrl: "", linkHref: "", displayOrder: 0, isActive: true });
+    setFormData({ title: "", imageUrl: "", mobileImageUrl: "", linkHref: "", displayOrder: 0, isActive: true });
   };
 
   const handleAddNew = () => {
-    setFormData({ title: "", imageUrl: "", linkHref: "", displayOrder: items.length, isActive: true });
+    setFormData({ title: "", imageUrl: "", mobileImageUrl: "", linkHref: "", displayOrder: items.length, isActive: true });
     setEditingId(0);
   };
 
@@ -262,14 +274,14 @@ export default function AdminHomeBanners() {
               <input type="hidden" value={formData.linkHref} />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold text-brand/40 uppercase tracking-widest mb-2 ml-1">Image URL</label>
+              <label className="block text-[10px] font-bold text-brand/40 uppercase tracking-widest mb-2 ml-1">Desktop View Banner Image URL (Recommended: 21:9 or wider)</label>
               <div className="flex space-x-4 items-center">
                 <div className="flex-1 flex gap-2">
                   <input 
                     type="text" 
                     value={formData.imageUrl}
                     onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                    placeholder="e.g. /images/silks.jpg"
+                    placeholder="e.g. /images/silks_desktop.jpg"
                     className="flex-1 bg-brand/5 border border-brand/10 rounded-xl py-3 px-4 text-sm font-bold text-brand focus:outline-none focus:border-[#FF9800]/30 focus:ring-4 focus:ring-[#FF9800]/10 transition-all"
                     required
                   />
@@ -277,13 +289,13 @@ export default function AdminHomeBanners() {
                     <input 
                       type="file" 
                       accept="image/*"
-                      onChange={handleImageUpload}
-                      id="banner-image-file"
+                      onChange={(e) => handleImageUpload(e, "imageUrl")}
+                      id="desktop-banner-image-file"
                       className="hidden"
                       disabled={isUploading}
                     />
                     <label 
-                      htmlFor="banner-image-file"
+                      htmlFor="desktop-banner-image-file"
                       className={`h-full flex items-center justify-center gap-1.5 px-4 bg-brand text-white text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer hover:bg-brand-hover active:scale-[0.98] transition-all whitespace-nowrap min-h-[46px] ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
                     >
                       {isUploading ? (
@@ -294,15 +306,61 @@ export default function AdminHomeBanners() {
                       ) : (
                         <>
                           <Plus size={14} />
-                          Upload file
+                          Upload desktop file
                         </>
                       )}
                     </label>
                   </div>
                 </div>
                 {formData.imageUrl && (
-                  <div className="w-12 h-12 rounded-xl bg-brand/5 border border-brand/10 overflow-hidden shrink-0">
-                    <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                  <div className="w-16 h-12 rounded-xl bg-brand/5 border border-brand/10 overflow-hidden shrink-0">
+                    <img src={formData.imageUrl} alt="Desktop Preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-bold text-brand/40 uppercase tracking-widest mb-2 ml-1">Mobile View Banner Image URL (Recommended: 16:9 or similar)</label>
+              <div className="flex space-x-4 items-center">
+                <div className="flex-1 flex gap-2">
+                  <input 
+                    type="text" 
+                    value={formData.mobileImageUrl}
+                    onChange={(e) => setFormData({ ...formData, mobileImageUrl: e.target.value })}
+                    placeholder="e.g. /images/silks_mobile.jpg"
+                    className="flex-1 bg-brand/5 border border-brand/10 rounded-xl py-3 px-4 text-sm font-bold text-brand focus:outline-none focus:border-[#FF9800]/30 focus:ring-4 focus:ring-[#FF9800]/10 transition-all"
+                  />
+                  <div className="relative">
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={(e) => handleImageUpload(e, "mobileImageUrl")}
+                      id="mobile-banner-image-file"
+                      className="hidden"
+                      disabled={isUploadingMobile}
+                    />
+                    <label 
+                      htmlFor="mobile-banner-image-file"
+                      className={`h-full flex items-center justify-center gap-1.5 px-4 bg-brand text-white text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer hover:bg-brand-hover active:scale-[0.98] transition-all whitespace-nowrap min-h-[46px] ${isUploadingMobile ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      {isUploadingMobile ? (
+                        <>
+                          <Loader2 className="animate-spin h-3.5 w-3.5" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={14} />
+                          Upload mobile file
+                        </>
+                      )}
+                    </label>
+                  </div>
+                </div>
+                {formData.mobileImageUrl && (
+                  <div className="w-16 h-12 rounded-xl bg-brand/5 border border-brand/10 overflow-hidden shrink-0">
+                    <img src={formData.mobileImageUrl} alt="Mobile Preview" className="w-full h-full object-cover" />
                   </div>
                 )}
               </div>

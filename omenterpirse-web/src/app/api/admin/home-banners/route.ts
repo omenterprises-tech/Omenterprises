@@ -46,6 +46,7 @@ export async function POST(request: Request) {
     const result = await db.insert(homeCategoryBanners).values({
       title: body.title,
       imageUrl: body.imageUrl,
+      mobileImageUrl: body.mobileImageUrl,
       linkHref: body.linkHref,
       displayOrder: body.displayOrder || 0,
       isActive: body.isActive !== undefined ? body.isActive : true,
