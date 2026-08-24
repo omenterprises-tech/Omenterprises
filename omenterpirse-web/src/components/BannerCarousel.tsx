@@ -23,7 +23,7 @@ export default function BannerCarousel({ banners }: { banners: any[] }) {
         style={{ transform: `translateX(-${current * 100}%)` }}
       >
         {banners.map((banner) => (
-          <div key={banner.id} className="min-w-full aspect-[16/9] md:aspect-[21/9] lg:aspect-[25/9] relative">
+          <div key={banner.id} className="min-w-full h-auto md:aspect-[21/9] lg:aspect-[25/9] relative">
             {banner.mobileImageUrl ? (
               <>
                 {/* Laptop View */}
@@ -36,14 +36,14 @@ export default function BannerCarousel({ banners }: { banners: any[] }) {
                 <img 
                   src={banner.mobileImageUrl} 
                   alt={banner.title} 
-                  className="block md:hidden w-full h-full object-contain" 
+                  className="block md:hidden w-full h-auto" 
                 />
               </>
             ) : (
               <img 
                 src={banner.imageUrl} 
                 alt={banner.title} 
-                className="w-full h-full object-cover" 
+                className="w-full h-auto md:h-full md:object-cover" 
               />
             )}
           </div>
