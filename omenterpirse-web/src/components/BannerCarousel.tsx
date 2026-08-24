@@ -36,7 +36,7 @@ export default function BannerCarousel({ banners }: { banners: any[] }) {
                 <img 
                   src={banner.mobileImageUrl} 
                   alt={banner.title} 
-                  className="block md:hidden w-full h-full object-cover" 
+                  className="block md:hidden w-full h-full object-contain" 
                 />
               </>
             ) : (
