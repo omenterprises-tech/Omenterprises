@@ -345,7 +345,7 @@ export default function CartPage() {
   }
 
   const subtotal = getTotalPrice();
-  const gst = subtotal * 0.18;
+  const gst = 0;
   const shipping = 0;
   const total = subtotal + gst + shipping;
 
