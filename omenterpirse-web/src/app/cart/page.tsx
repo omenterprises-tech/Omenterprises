@@ -492,7 +492,7 @@ ${itemsListText}
 
 💰 *SUBTOTAL:* ₹${formatPrice(subtotal)}
 🚚 *DELIVERY CHARGES:* As per Porter
-⭐ *TOTAL AMOUNT:* ₹${formatPrice(total)} (INCL GST)
+⭐ *TOTAL AMOUNT:* ₹${formatPrice(total)} (incl. gst)
 
 📍 *DELIVERY ADDRESS:*
 ${shippingAddressStr}
@@ -637,7 +637,10 @@ Please confirm my order. Thank you!`;
               </div>
               <div className="flex justify-between items-center pt-2">
                 <span className="text-sm font-black tracking-widest uppercase text-brand">Total Estimate</span>
-                <span className="text-xl font-black text-brand tracking-widest">₹{formatPrice(total)} (INCL GST)</span>
+                <span className="text-xl font-black text-brand tracking-widest flex items-baseline gap-1">
+                  ₹{formatPrice(total)}
+                  <span className="text-[10px] font-normal text-brand/60 lowercase tracking-normal font-sans">(incl. gst)</span>
+                </span>
               </div>
             </div>
 
@@ -949,7 +952,10 @@ Please confirm my order. Thank you!`;
                       </div>
                       <div className="border-t border-brand/10 pt-2 flex justify-between items-center text-sm font-black text-brand">
                         <span>Total Estimate</span>
-                        <span className="text-brand">₹{formatPrice(total)} (INCL GST)</span>
+                        <span className="text-brand flex items-baseline gap-1">
+                          ₹{formatPrice(total)}
+                          <span className="text-[10px] font-normal text-brand/60 lowercase tracking-normal font-sans">(incl. gst)</span>
+                        </span>
                       </div>
                     </div>
                   )}
@@ -1268,7 +1274,10 @@ Please confirm my order. Thank you!`;
                         </div>
                         <div className="border-t border-gray-200 pt-2 flex justify-between items-center text-sm font-black text-brand">
                           <span>Total Amount</span>
-                          <span>₹{formatPrice(total)} (INCL GST)</span>
+                          <span className="flex items-baseline gap-1">
+                            ₹{formatPrice(total)}
+                            <span className="text-[10px] font-normal text-brand/60 lowercase tracking-normal font-sans">(incl. gst)</span>
+                          </span>
                         </div>
                       </div>
 
@@ -1285,7 +1294,7 @@ Please confirm my order. Thank you!`;
                           onClick={handleRazorpayPayment}
                           className="flex-[2] py-4 bg-brand text-white hover:bg-brand-hover rounded-xl text-xs font-black uppercase tracking-wider shadow-lg hover:shadow-xl active:scale-[0.98] transition-all"
                         >
-                          Pay ₹{formatPrice(total)} (INCL GST)
+                          Pay ₹{formatPrice(total)} (incl. gst)
                         </button>
                       </div>
                     </div>
