@@ -1,0 +1,297 @@
+import { NextResponse } from "next/server";
+import { db } from "@/db";
+import { crmUsers, crmBusinesses, crmTeamMembers } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
+import { getCrmSession, hashPassword } from "@/lib/crmAuth";
+
+async function resolveBusinessAndRole(userId: number) {
+  // Check if owner
+  const ownerBiz = await db
+    .select()
+    .from(crmBusinesses)
+    .where(eq(crmBusinesses.userId, userId))
+    .limit(1);
+
+  if (ownerBiz.length > 0) {
+    return { business: ownerBiz[0], role: "Owner" };
+  }
+
+  // Check if team member
+  const membership = await db
+    .select()
+    .from(crmTeamMembers)
+    .where(eq(crmTeamMembers.userId, userId))
+    .limit(1);
+
+  if (membership.length > 0) {
+    const teamBiz = await db
+      .select()
+      .from(crmBusinesses)
+      .where(eq(crmBusinesses.id, membership[0].businessId))
+      .limit(1);
+
+    if (teamBiz.length > 0) {
+      return { business: teamBiz[0], role: membership[0].role };
+    }
+  }
+
+  return { business: null, role: null };
+}
+
+export async function GET() {
+  try {
+    const session = await getCrmSession();
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+    }
+
+    const { business, role } = await resolveBusinessAndRole(session.userId);
+    if (!business) {
+      return NextResponse.json({ success: false, error: "Business not found." }, { status: 404 });
+    }
+
+    // 1. Fetch Owner record
+    const ownerUser = await db
+      .select({
+        id: crmUsers.id,
+        fullName: crmUsers.fullName,
+        email: crmUsers.email,
+        phoneNumber: crmUsers.phoneNumber,
+        createdAt: crmUsers.createdAt,
+      })
+      .from(crmUsers)
+      .where(eq(crmUsers.id, business.userId))
+      .limit(1);
+
+    const members: any[] = [];
+
+    if (ownerUser.length > 0) {
+      members.push({
+        id: 0,
+        userId: ownerUser[0].id,
+        name: ownerUser[0].fullName,
+        email: ownerUser[0].email,
+        phone: ownerUser[0].phoneNumber,
+        role: "Owner (Primary)",
+        status: "Active",
+        isOwner: true,
+      });
+    }
+
+    // 2. Fetch all team members for this business
+    const teamList = await db
+      .select({
+        id: crmTeamMembers.id,
+        userId: crmTeamMembers.userId,
+        role: crmTeamMembers.role,
+        status: crmTeamMembers.status,
+        createdAt: crmTeamMembers.createdAt,
+        name: crmUsers.fullName,
+        email: crmUsers.email,
+        phone: crmUsers.phoneNumber,
+      })
+      .from(crmTeamMembers)
+      .innerJoin(crmUsers, eq(crmTeamMembers.userId, crmUsers.id))
+      .where(eq(crmTeamMembers.businessId, business.id));
+
+    for (const t of teamList) {
+      members.push({
+        id: t.id,
+        userId: t.userId,
+        name: t.name,
+        email: t.email,
+        phone: t.phone,
+        role: t.role,
+        status: t.status,
+        isOwner: false,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      members,
+      callerRole: role,
+      canManageTeam: role === "Owner" || role === "Admin",
+    });
+  } catch (error: any) {
+    console.error("Fetch team error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to fetch team members." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const session = await getCrmSession();
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+    }
+
+    const { business, role } = await resolveBusinessAndRole(session.userId);
+    if (!business) {
+      return NextResponse.json({ success: false, error: "Business not found." }, { status: 404 });
+    }
+
+    if (role !== "Owner" && role !== "Admin") {
+      return NextResponse.json(
+        { success: false, error: "Only an Owner or Admin can add team members." },
+        { status: 403 }
+      );
+    }
+
+    const body = await request.json();
+    const { fullName, email, password, role: memberRole, phoneNumber } = body;
+
+    if (!fullName || typeof fullName !== "string" || !fullName.trim()) {
+      return NextResponse.json({ success: false, error: "Member full name is required." }, { status: 400 });
+    }
+
+    if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return NextResponse.json({ success: false, error: "Please provide a valid email address." }, { status: 400 });
+    }
+
+    if (!password || typeof password !== "string" || password.length < 6) {
+      return NextResponse.json({ success: false, error: "Password must be at least 6 characters." }, { status: 400 });
+    }
+
+    const assignedRole = ["Admin", "Manager", "Staff"].includes(memberRole) ? memberRole : "Staff";
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Check if user already exists
+    const existingUsers = await db
+      .select()
+      .from(crmUsers)
+      .where(eq(crmUsers.email, normalizedEmail))
+      .limit(1);
+
+    let memberUserId: number;
+
+    if (existingUsers.length > 0) {
+      memberUserId = existingUsers[0].id;
+
+      // Check if already in this business team
+      const existingMember = await db
+        .select()
+        .from(crmTeamMembers)
+        .where(
+          and(
+            eq(crmTeamMembers.businessId, business.id),
+            eq(crmTeamMembers.userId, memberUserId)
+          )
+        )
+        .limit(1);
+
+      if (existingMember.length > 0 || memberUserId === business.userId) {
+        return NextResponse.json(
+          { success: false, error: "A team member with this email already belongs to your business." },
+          { status: 409 }
+        );
+      }
+
+      // Update their password if admin explicitly sets it
+      const { salt, hash } = hashPassword(password);
+      await db
+        .update(crmUsers)
+        .set({
+          fullName: fullName.trim(),
+          passwordHash: hash,
+          salt: salt,
+          isOnboardingCompleted: true,
+        })
+        .where(eq(crmUsers.id, memberUserId));
+    } else {
+      // Create new crm_user with email and password
+      const { salt, hash } = hashPassword(password);
+      const cleanPhone = (phoneNumber || "").toString().replace(/\D/g, "");
+
+      const createdUser = await db
+        .insert(crmUsers)
+        .values({
+          fullName: fullName.trim(),
+          email: normalizedEmail,
+          phoneNumber: cleanPhone || "0000000000",
+          passwordHash: hash,
+          salt: salt,
+          isOnboardingCompleted: true, // Bypass business setup!
+          createdAt: new Date().toISOString(),
+        })
+        .returning({ id: crmUsers.id });
+
+      memberUserId = createdUser[0].id;
+    }
+
+    // Insert into crm_team_members
+    const newMemberRecord = await db
+      .insert(crmTeamMembers)
+      .values({
+        businessId: business.id,
+        userId: memberUserId,
+        role: assignedRole,
+        status: "Active",
+        createdAt: new Date().toISOString(),
+      })
+      .returning();
+
+    return NextResponse.json({
+      success: true,
+      member: {
+        id: newMemberRecord[0].id,
+        userId: memberUserId,
+        name: fullName.trim(),
+        email: normalizedEmail,
+        role: assignedRole,
+        status: "Active",
+        isOwner: false,
+      },
+    });
+  } catch (error: any) {
+    console.error("Create team member error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to create team member." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await getCrmSession();
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+    }
+
+    const { business, role } = await resolveBusinessAndRole(session.userId);
+    if (!business || (role !== "Owner" && role !== "Admin")) {
+      return NextResponse.json(
+        { success: false, error: "Only an Owner or Admin can remove team members." },
+        { status: 403 }
+      );
+    }
+
+    const url = new URL(request.url);
+    const memberIdParam = url.searchParams.get("id");
+    if (!memberIdParam) {
+      return NextResponse.json({ success: false, error: "Member ID is required." }, { status: 400 });
+    }
+
+    const memberId = parseInt(memberIdParam, 10);
+    await db
+      .delete(crmTeamMembers)
+      .where(
+        and(
+          eq(crmTeamMembers.id, memberId),
+          eq(crmTeamMembers.businessId, business.id)
+        )
+      );
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Delete team member error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to remove team member." },
+      { status: 500 }
+    );
+  }
+}

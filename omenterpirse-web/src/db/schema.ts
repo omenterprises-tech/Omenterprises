@@ -212,6 +212,12 @@ export const crmBusinesses = sqliteTable("crm_businesses", {
   email: text("email").notNull(),
   addressLine1: text("address_line_1"),
   addressLine2: text("address_line_2"),
+  addressLine3: text("address_line_3"),
+  otherInfo: text("other_info"),
+  businessCategory: text("business_category"),
+  taxLabel: text("tax_label").default("GSTIN"),
+  taxNumber: text("tax_number"),
+  state: text("state"),
   logoUrl: text("logo_url"),
   signatureUrl: text("signature_url"),
   signatureType: text("signature_type"),
@@ -221,6 +227,22 @@ export const crmBusinesses = sqliteTable("crm_businesses", {
   currencyPriceFormatted: text("currency_price_formatted").default("₹999,999.12"),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
   updatedAt: text("updated_at").$defaultFn(() => new Date().toISOString()),
+});
+
+export const crmCustomCategories = sqliteTable("crm_custom_categories", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
+});
+
+export const crmTeamMembers = sqliteTable("crm_team_members", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  businessId: integer("business_id").notNull().references(() => crmBusinesses.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  role: text("role").notNull().default("Staff"),
+  status: text("status").notNull().default("Active"),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
 });
 
 

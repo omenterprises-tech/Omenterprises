@@ -541,7 +541,7 @@ export default function CrmOnboardingPage() {
                   onClick={handleStep1Next}
                   className="w-full py-4 bg-brand hover:bg-brand-hover text-white rounded-xl font-bold uppercase tracking-wider text-xs shadow-lg hover:shadow-xl active:scale-[0.99] transition-all flex items-center justify-center space-x-2 cursor-pointer"
                 >
-                  <span>Next: Business Identity</span>
+                  <span>Next</span>
                   <ArrowRight size={16} />
                 </button>
               </div>
@@ -757,7 +757,7 @@ export default function CrmOnboardingPage() {
                   onClick={handleStep2Next}
                   className="flex-[2] py-4 bg-brand hover:bg-brand-hover text-white rounded-xl font-bold uppercase tracking-wider text-xs shadow-lg hover:shadow-xl active:scale-[0.99] transition-all flex items-center justify-center space-x-2 cursor-pointer"
                 >
-                  <span>Next: Date & Currency</span>
+                  <span>Next</span>
                   <ArrowRight size={16} />
                 </button>
               </div>
@@ -856,7 +856,7 @@ export default function CrmOnboardingPage() {
                     </>
                   ) : (
                     <>
-                      <span>Finish & Open CRM</span>
+                      <span>Finish</span>
                       <Check size={16} />
                     </>
                   )}

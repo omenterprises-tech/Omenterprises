@@ -21,6 +21,10 @@ import {
   Zap,
   Briefcase,
   X,
+  Eye,
+  EyeOff,
+  Trash2,
+  AlertCircle,
 } from "lucide-react";
 import { formatDateWithPattern } from "@/lib/crmCurrencyData";
 
@@ -30,12 +34,45 @@ export default function CrmDashboardPage() {
   const [business, setBusiness] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"business" | "team">("business");
+  
+  // Team management state
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [invitePassword, setInvitePassword] = useState("");
+  const [showInvitePassword, setShowInvitePassword] = useState(false);
   const [inviteRole, setInviteRole] = useState("Manager");
+  const [invitePhone, setInvitePhone] = useState("");
+  const [isSubmittingInvite, setIsSubmittingInvite] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+  const [canManageTeam, setCanManageTeam] = useState(true);
   const [teamMembers, setTeamMembers] = useState<
-    { name: string; email: string; role: string; status: string }[]
+    {
+      id: number;
+      userId?: number;
+      name: string;
+      email: string;
+      phone?: string;
+      role: string;
+      status: string;
+      isOwner?: boolean;
+    }[]
   >([]);
+
+  const loadTeam = async () => {
+    try {
+      const teamRes = await fetch("/api/crm/team");
+      const teamData = await teamRes.json();
+      if (teamData.success && teamData.members) {
+        setTeamMembers(teamData.members);
+        if (typeof teamData.canManageTeam === "boolean") {
+          setCanManageTeam(teamData.canManageTeam);
+        }
+      }
+    } catch (teamErr) {
+      console.error("Failed to load team members:", teamErr);
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -54,15 +91,8 @@ export default function CrmDashboardPage() {
         setUser(data.user);
         setBusiness(data.business);
 
-        // Initial team member (owner)
-        setTeamMembers([
-          {
-            name: data.business?.contactName || data.user.fullName,
-            email: data.business?.email || data.user.email,
-            role: "Owner (Primary)",
-            status: "Active",
-          },
-        ]);
+        // Fetch team members from database
+        await loadTeam();
       } catch (err) {
         console.error("Failed to load CRM session:", err);
       } finally {
@@ -82,21 +112,70 @@ export default function CrmDashboardPage() {
     }
   };
 
-  const handleInvite = (e: React.FormEvent) => {
+  const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteEmail.trim()) return;
+    setInviteError("");
 
-    setTeamMembers((prev) => [
-      ...prev,
-      {
-        name: inviteEmail.split("@")[0],
-        email: inviteEmail.trim(),
-        role: inviteRole,
-        status: "Invited",
-      },
-    ]);
-    setInviteEmail("");
-    setIsInviteModalOpen(false);
+    if (!inviteName.trim()) {
+      setInviteError("Please enter member full name.");
+      return;
+    }
+    if (!inviteEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail.trim())) {
+      setInviteError("Please enter a valid email address.");
+      return;
+    }
+    if (!invitePassword || invitePassword.length < 6) {
+      setInviteError("Password must be at least 6 characters long.");
+      return;
+    }
+
+    setIsSubmittingInvite(true);
+    try {
+      const res = await fetch("/api/crm/team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: inviteName.trim(),
+          email: inviteEmail.trim(),
+          password: invitePassword,
+          role: inviteRole,
+          phoneNumber: invitePhone.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to create team member.");
+      }
+
+      // Refresh team members list
+      await loadTeam();
+      setInviteName("");
+      setInviteEmail("");
+      setInvitePassword("");
+      setInvitePhone("");
+      setInviteRole("Manager");
+      setIsInviteModalOpen(false);
+    } catch (err: any) {
+      setInviteError(err.message || "Failed to create team member.");
+    } finally {
+      setIsSubmittingInvite(false);
+    }
+  };
+
+  const handleDeleteMember = async (memberId: number) => {
+    if (!confirm("Are you sure you want to remove this team member?")) return;
+    try {
+      const res = await fetch(`/api/crm/team?id=${memberId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setTeamMembers((prev) => prev.filter((m) => m.id !== memberId));
+      } else {
+        alert(data.error || "Failed to remove member.");
+      }
+    } catch (err) {
+      console.error("Failed to remove member:", err);
+    }
   };
 
   if (isLoading) {
@@ -141,10 +220,26 @@ export default function CrmDashboardPage() {
 
             {/* User & Logout */}
             <div className="flex items-center space-x-3 sm:space-x-4">
+              <button
+                type="button"
+                onClick={() => router.push("/crm/profile")}
+                className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-100 border border-gray-200 transition-colors cursor-pointer"
+                title="Manage Business Profile"
+              >
+                <Building2 size={14} className="text-brand" />
+                <span>Manage Profile</span>
+              </button>
               <div className="hidden sm:flex flex-col text-right">
-                <span className="text-xs font-bold text-gray-900">
-                  {user?.fullName || "Business User"}
-                </span>
+                <div className="flex items-center justify-end space-x-1.5">
+                  <span className="text-xs font-bold text-gray-900">
+                    {user?.fullName || "Business User"}
+                  </span>
+                  {user?.role && (
+                    <span className="text-[10px] bg-brand/10 text-brand font-bold uppercase px-1.5 py-0.5 rounded-md">
+                      {user.role}
+                    </span>
+                  )}
+                </div>
                 <span className="text-[11px] text-gray-500">{user?.email}</span>
               </div>
               <button
@@ -264,11 +359,11 @@ export default function CrmDashboardPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => router.push("/crm/onboarding")}
+                    onClick={() => router.push("/crm/profile")}
                     className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-brand text-xs font-semibold text-gray-700 hover:text-brand transition-colors cursor-pointer"
                   >
                     <Edit3 size={13} />
-                    <span>Edit Profile</span>
+                    <span>Manage Profile</span>
                   </button>
                 </div>
 
@@ -309,6 +404,28 @@ export default function CrmDashboardPage() {
                     </p>
                   </div>
 
+                  {business?.businessCategory && (
+                    <div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                        Business Category
+                      </span>
+                      <p className="text-sm font-semibold text-brand">
+                        {business.businessCategory}
+                      </p>
+                    </div>
+                  )}
+
+                  {business?.taxNumber && (
+                    <div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                        {business.taxLabel || "GSTIN"}
+                      </span>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {business.taxNumber}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="sm:col-span-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
                       Registered Address
@@ -316,8 +433,9 @@ export default function CrmDashboardPage() {
                     <p className="text-sm text-gray-700 flex items-start gap-1.5">
                       <MapPin size={15} className="text-gray-400 shrink-0 mt-0.5" />
                       <span>
-                        {[business?.addressLine1, business?.addressLine2].filter(Boolean).join(", ") ||
-                          "No physical address provided"}
+                        {[business?.addressLine1, business?.addressLine2, business?.addressLine3, business?.state]
+                          .filter(Boolean)
+                          .join(", ") || "No physical address provided"}
                       </span>
                     </p>
                   </div>
@@ -396,7 +514,7 @@ export default function CrmDashboardPage() {
                   className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer self-start sm:self-auto"
                 >
                   <Plus size={15} />
-                  <span>Invite Member</span>
+                  <span>Add Team Member</span>
                 </button>
               </div>
 
@@ -409,22 +527,38 @@ export default function CrmDashboardPage() {
                       <th className="pb-3">Email</th>
                       <th className="pb-3">Role</th>
                       <th className="pb-3">Status</th>
+                      {canManageTeam && <th className="pb-3 text-right">Action</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {teamMembers.map((member, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50/60 transition-colors">
+                      <tr key={member.id || idx} className="hover:bg-gray-50/60 transition-colors">
                         <td className="py-4 font-semibold text-gray-900">
                           <div className="flex items-center space-x-2.5">
-                            <div className="w-8 h-8 rounded-full bg-brand/10 text-brand font-bold text-xs flex items-center justify-center uppercase">
-                              {member.name.charAt(0)}
+                            <div className="w-8 h-8 rounded-full bg-brand/10 text-brand font-bold text-xs flex items-center justify-center uppercase shrink-0">
+                              {(member.name || "U").charAt(0)}
                             </div>
-                            <span>{member.name}</span>
+                            <div>
+                              <span>{member.name}</span>
+                              {member.phone && member.phone !== "0000000000" && (
+                                <p className="text-[11px] text-gray-400 font-normal">{member.phone}</p>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="py-4 text-gray-600 text-xs sm:text-sm">{member.email}</td>
                         <td className="py-4">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                              member.role.includes("Owner")
+                                ? "bg-amber-100 text-amber-900 font-bold"
+                                : member.role === "Admin"
+                                ? "bg-purple-100 text-purple-900 font-bold"
+                                : member.role === "Manager"
+                                ? "bg-blue-100 text-blue-900 font-medium"
+                                : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
                             {member.role}
                           </span>
                         </td>
@@ -444,6 +578,20 @@ export default function CrmDashboardPage() {
                             <span>{member.status}</span>
                           </span>
                         </td>
+                        {canManageTeam && (
+                          <td className="py-4 text-right">
+                            {!member.isOwner && member.id !== 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMember(member.id)}
+                                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Remove team member"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -454,25 +602,52 @@ export default function CrmDashboardPage() {
         </div>
       </main>
 
-      {/* Invite Member Modal */}
+      {/* Add Team Member Modal */}
       {isInviteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 sm:p-8 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-5">
-              <h3 className="text-lg font-bold text-gray-900">Invite Team Member</h3>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Add Team Member</h3>
+                <p className="text-xs text-gray-500">Create login credentials for your colleague</p>
+              </div>
               <button
                 type="button"
-                onClick={() => setIsInviteModalOpen(false)}
-                className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                onClick={() => {
+                  setIsInviteModalOpen(false);
+                  setInviteError("");
+                }}
+                className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleInvite} className="space-y-4">
+            {inviteError && (
+              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-center gap-2">
+                <AlertCircle size={15} className="shrink-0 text-rose-600" />
+                <span>{inviteError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleInvite} className="space-y-3.5">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Colleague Email Address
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  value={inviteName}
+                  onChange={(e) => setInviteName(e.target.value)}
+                  placeholder="e.g. Ramesh Sharma"
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                  Email Address (Login ID) *
                 </label>
                 <input
                   type="email"
@@ -486,32 +661,88 @@ export default function CrmDashboardPage() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Assigned Role
+                  Password *
                 </label>
-                <select
-                  value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand bg-white"
-                >
-                  <option value="Manager">Manager (Quotes & Billing)</option>
-                  <option value="Staff">Staff (View Only)</option>
-                  <option value="Admin">Administrator (Full Access)</option>
-                </select>
+                <div className="relative flex items-center">
+                  <input
+                    type={showInvitePassword ? "text" : "password"}
+                    value={invitePassword}
+                    onChange={(e) => setInvitePassword(e.target.value)}
+                    placeholder="Set at least 6 characters"
+                    required
+                    className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowInvitePassword(!showInvitePassword)}
+                    className="absolute right-3 text-gray-400 hover:text-gray-600 cursor-pointer"
+                  >
+                    {showInvitePassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                    Assigned Role
+                  </label>
+                  <select
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand bg-white cursor-pointer font-medium"
+                  >
+                    <option value="Manager">Manager</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Staff">Staff</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                    Mobile <span className="text-gray-400 font-normal lowercase">(optional)</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={invitePhone}
+                    onChange={(e) => setInvitePhone(e.target.value)}
+                    placeholder="10-digit mobile"
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl text-xs text-blue-800 leading-relaxed flex items-start gap-2">
+                <CheckCircle2 size={15} className="text-brand shrink-0 mt-0.5" />
+                <span>
+                  This team member can directly sign in at <strong>/crm</strong> using this email and password.
+                </span>
+              </div>
+
+              <div className="flex gap-3 pt-3">
                 <button
                   type="button"
-                  onClick={() => setIsInviteModalOpen(false)}
-                  className="flex-1 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl font-bold uppercase tracking-wider text-xs"
+                  onClick={() => {
+                    setIsInviteModalOpen(false);
+                    setInviteError("");
+                  }}
+                  className="flex-1 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl font-bold uppercase tracking-wider text-xs cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-brand hover:bg-brand-hover text-white rounded-xl font-bold uppercase tracking-wider text-xs shadow-md"
+                  disabled={isSubmittingInvite}
+                  className="flex-1 py-3 bg-brand hover:bg-brand-hover text-white rounded-xl font-bold uppercase tracking-wider text-xs shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  Send Invite
+                  {isSubmittingInvite ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <span>Create Member</span>
+                  )}
                 </button>
               </div>
             </form>

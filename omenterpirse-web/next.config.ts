@@ -1,5 +1,10 @@
 import type { NextConfig } from "next";
 import path from "path";
+import dns from "node:dns";
+
+if (dns && typeof dns.setDefaultResultOrder === "function") {
+  dns.setDefaultResultOrder("ipv4first");
+}
 
 const nextConfig: NextConfig = {
   images: {

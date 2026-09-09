@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { crmUsers, crmBusinesses } from "@/db/schema";
+import { crmUsers, crmBusinesses, crmTeamMembers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getCrmSession } from "@/lib/crmAuth";
 
@@ -28,18 +28,49 @@ export async function GET() {
       return NextResponse.json({ authenticated: false });
     }
 
-    const businessResult = await db
+    let business = null;
+    let userRole = "Owner";
+    let isCompleted = Boolean(user.isOnboardingCompleted);
+
+    const ownerBusiness = await db
       .select()
       .from(crmBusinesses)
       .where(eq(crmBusinesses.userId, user.id))
       .limit(1);
 
-    const business = businessResult[0] || null;
+    if (ownerBusiness.length > 0) {
+      business = ownerBusiness[0];
+      userRole = "Owner";
+      isCompleted = Boolean(user.isOnboardingCompleted && business);
+    } else {
+      const membership = await db
+        .select()
+        .from(crmTeamMembers)
+        .where(eq(crmTeamMembers.userId, user.id))
+        .limit(1);
+
+      if (membership.length > 0) {
+        const teamBiz = await db
+          .select()
+          .from(crmBusinesses)
+          .where(eq(crmBusinesses.id, membership[0].businessId))
+          .limit(1);
+
+        if (teamBiz.length > 0) {
+          business = teamBiz[0];
+          userRole = membership[0].role;
+          isCompleted = true; // Team members bypass onboarding
+        }
+      }
+    }
 
     return NextResponse.json({
       authenticated: true,
-      user,
-      isOnboardingCompleted: Boolean(user.isOnboardingCompleted && business),
+      user: {
+        ...user,
+        role: userRole,
+      },
+      isOnboardingCompleted: isCompleted,
       business,
     });
   } catch (error: any) {
