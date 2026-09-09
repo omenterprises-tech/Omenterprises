@@ -44,15 +44,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Email is required." }, { status: 400 });
     }
 
-    // Check if business already exists for this user
-    const existingBusiness = await db
-      .select()
-      .from(crmBusinesses)
-      .where(eq(crmBusinesses.userId, session.userId))
-      .limit(1);
-
-    let businessRecord;
-
     const payload = {
       userId: session.userId,
       businessName: businessName.trim(),
@@ -71,29 +62,52 @@ export async function POST(request: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    if (existingBusiness.length > 0) {
-      const updated = await db
-        .update(crmBusinesses)
-        .set(payload)
-        .where(eq(crmBusinesses.id, existingBusiness[0].id))
-        .returning();
-      businessRecord = updated[0];
-    } else {
-      const inserted = await db
-        .insert(crmBusinesses)
-        .values({
-          ...payload,
-          createdAt: new Date().toISOString(),
-        })
-        .returning();
-      businessRecord = inserted[0];
-    }
+    const businessRecord = await (async () => {
+      let lastErr: any;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          // Check if business already exists for this user
+          const existingBusiness = await db
+            .select()
+            .from(crmBusinesses)
+            .where(eq(crmBusinesses.userId, session.userId))
+            .limit(1);
 
-    // Mark user onboarding completed
-    await db
-      .update(crmUsers)
-      .set({ isOnboardingCompleted: true })
-      .where(eq(crmUsers.id, session.userId));
+          let record;
+          if (existingBusiness.length > 0) {
+            const updated = await db
+              .update(crmBusinesses)
+              .set(payload)
+              .where(eq(crmBusinesses.id, existingBusiness[0].id))
+              .returning();
+            record = updated[0];
+          } else {
+            const inserted = await db
+              .insert(crmBusinesses)
+              .values({
+                ...payload,
+                createdAt: new Date().toISOString(),
+              })
+              .returning();
+            record = inserted[0];
+          }
+
+          // Mark user onboarding completed
+          await db
+            .update(crmUsers)
+            .set({ isOnboardingCompleted: true })
+            .where(eq(crmUsers.id, session.userId));
+
+          return record;
+        } catch (err: any) {
+          lastErr = err;
+          if (attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+        }
+      }
+      throw lastErr;
+    })();
 
     return NextResponse.json({
       success: true,
@@ -101,8 +115,12 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error("CRM onboarding error:", error);
+    const userMessage = error.message?.includes("Failed query")
+      ? "Database connection timed out. Please click Finish again."
+      : (error.message || "Failed to save business details.");
+
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to save business details." },
+      { success: false, error: userMessage },
       { status: 500 }
     );
   }

@@ -37,6 +37,7 @@ export default function CrmDashboardPage() {
   
   // Team management state
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [inputsUnlocked, setInputsUnlocked] = useState(false);
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitePassword, setInvitePassword] = useState("");
@@ -46,6 +47,23 @@ export default function CrmDashboardPage() {
   const [isSubmittingInvite, setIsSubmittingInvite] = useState(false);
   const [inviteError, setInviteError] = useState("");
   const [canManageTeam, setCanManageTeam] = useState(true);
+
+  const openAddMemberModal = () => {
+    setInviteName("");
+    setInviteEmail("");
+    setInvitePassword("");
+    setInvitePhone("");
+    setInviteRole("Manager");
+    setInviteError("");
+    setInputsUnlocked(false);
+    setIsInviteModalOpen(true);
+  };
+
+  const closeAddMemberModal = () => {
+    setIsInviteModalOpen(false);
+    setInviteError("");
+    setInputsUnlocked(false);
+  };
   const [teamMembers, setTeamMembers] = useState<
     {
       id: number;
@@ -510,7 +528,7 @@ export default function CrmDashboardPage() {
 
                 <button
                   type="button"
-                  onClick={() => setIsInviteModalOpen(true)}
+                  onClick={openAddMemberModal}
                   className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer self-start sm:self-auto"
                 >
                   <Plus size={15} />
@@ -613,10 +631,7 @@ export default function CrmDashboardPage() {
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setIsInviteModalOpen(false);
-                  setInviteError("");
-                }}
+                onClick={closeAddMemberModal}
                 className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
               >
                 <X size={18} />
@@ -630,16 +645,38 @@ export default function CrmDashboardPage() {
               </div>
             )}
 
-            <form onSubmit={handleInvite} className="space-y-3.5">
+            <form onSubmit={handleInvite} autoComplete="off" className="space-y-3.5">
+              {/* Offscreen inputs to catch aggressive browser credential autofill */}
+              <input
+                type="text"
+                name="fake_autofill_username"
+                tabIndex={-1}
+                autoComplete="username"
+                aria-hidden="true"
+                style={{ position: "absolute", top: "-9999px", left: "-9999px", opacity: 0, height: 0, width: 0, pointerEvents: "none" }}
+              />
+              <input
+                type="password"
+                name="fake_autofill_password"
+                tabIndex={-1}
+                autoComplete="current-password"
+                aria-hidden="true"
+                style={{ position: "absolute", top: "-9999px", left: "-9999px", opacity: 0, height: 0, width: 0, pointerEvents: "none" }}
+              />
+
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
                   Full Name *
                 </label>
                 <input
                   type="text"
+                  name="new_member_name"
                   value={inviteName}
                   onChange={(e) => setInviteName(e.target.value)}
+                  onFocus={() => setInputsUnlocked(true)}
+                  onClick={() => setInputsUnlocked(true)}
                   placeholder="e.g. Ramesh Sharma"
+                  autoComplete="off"
                   required
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
                 />
@@ -651,9 +688,14 @@ export default function CrmDashboardPage() {
                 </label>
                 <input
                   type="email"
+                  name="new_member_email"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
+                  onFocus={() => setInputsUnlocked(true)}
+                  onClick={() => setInputsUnlocked(true)}
+                  readOnly={!inputsUnlocked}
                   placeholder="colleague@company.com"
+                  autoComplete="new-password"
                   required
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
                 />
@@ -666,9 +708,14 @@ export default function CrmDashboardPage() {
                 <div className="relative flex items-center">
                   <input
                     type={showInvitePassword ? "text" : "password"}
+                    name="new_member_password"
                     value={invitePassword}
                     onChange={(e) => setInvitePassword(e.target.value)}
+                    onFocus={() => setInputsUnlocked(true)}
+                    onClick={() => setInputsUnlocked(true)}
+                    readOnly={!inputsUnlocked}
                     placeholder="Set at least 6 characters"
+                    autoComplete="new-password"
                     required
                     className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
                   />
@@ -676,6 +723,7 @@ export default function CrmDashboardPage() {
                     type="button"
                     onClick={() => setShowInvitePassword(!showInvitePassword)}
                     className="absolute right-3 text-gray-400 hover:text-gray-600 cursor-pointer"
+                    tabIndex={-1}
                   >
                     {showInvitePassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -688,6 +736,7 @@ export default function CrmDashboardPage() {
                     Assigned Role
                   </label>
                   <select
+                    name="new_member_role"
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand bg-white cursor-pointer font-medium"
@@ -704,9 +753,13 @@ export default function CrmDashboardPage() {
                   </label>
                   <input
                     type="tel"
+                    name="new_member_phone"
                     value={invitePhone}
                     onChange={(e) => setInvitePhone(e.target.value)}
+                    onFocus={() => setInputsUnlocked(true)}
+                    onClick={() => setInputsUnlocked(true)}
                     placeholder="10-digit mobile"
+                    autoComplete="off"
                     className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
                   />
                 </div>
@@ -722,10 +775,7 @@ export default function CrmDashboardPage() {
               <div className="flex gap-3 pt-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsInviteModalOpen(false);
-                    setInviteError("");
-                  }}
+                  onClick={closeAddMemberModal}
                   className="flex-1 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl font-bold uppercase tracking-wider text-xs cursor-pointer"
                 >
                   Cancel
