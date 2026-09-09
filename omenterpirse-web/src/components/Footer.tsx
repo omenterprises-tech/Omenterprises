@@ -8,8 +8,8 @@ import { Zap, MapPin, Mail, PhoneCall } from "lucide-react";
 export default function Footer() {
   const pathname = usePathname();
 
-  // Hide Footer for Admin Portal and Login Page
-  if (pathname.startsWith("/admin") || pathname === "/login") {
+  // Hide Footer for Admin Portal, Login Page, and CRM
+  if (pathname.startsWith("/admin") || pathname === "/login" || pathname.startsWith("/crm")) {
     return null;
   }
 

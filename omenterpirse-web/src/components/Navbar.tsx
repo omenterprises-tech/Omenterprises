@@ -40,7 +40,7 @@ export default function Navbar() {
   const clearCart = useCartStore((state) => state.clearCart);
 
   useEffect(() => {
-    if (pathname.startsWith("/admin") || pathname === "/login") return;
+    if (pathname.startsWith("/admin") || pathname === "/login" || pathname.startsWith("/crm")) return;
 
     setCartCount(getTotalItems());
 
@@ -65,7 +65,7 @@ export default function Navbar() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (pathname.startsWith("/admin") || pathname === "/login") return;
+      if (pathname.startsWith("/admin") || pathname === "/login" || pathname.startsWith("/crm")) return;
 
       const safeJson = async (res: Response) => {
         if (!res.ok) return null;
@@ -141,8 +141,8 @@ export default function Navbar() {
     }
   };
 
-  // Hide Navbar for Admin Portal and Login Page
-  if (pathname.startsWith("/admin") || pathname === "/login") {
+  // Hide Navbar for Admin Portal, Login Page, and CRM
+  if (pathname.startsWith("/admin") || pathname === "/login" || pathname.startsWith("/crm")) {
     return null;
   }
 

@@ -1,8 +1,15 @@
 "use client";
 
 import React from "react";
+import { usePathname } from "next/navigation";
 
 export default function WhatsAppButton() {
+  const pathname = usePathname();
+
+  if (pathname.startsWith("/admin") || pathname === "/login" || pathname.startsWith("/crm")) {
+    return null;
+  }
+
   const phoneNumber = "9849845555";
   const customMessage = encodeURIComponent(
     "Hello OM Enterprises, I visited your website and would like to inquire about your products and services."

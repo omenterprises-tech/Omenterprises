@@ -191,3 +191,36 @@ export const brandVariations = sqliteTable("brand_variations", {
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
 });
 
+export const crmUsers = sqliteTable("crm_users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  email: text("email").notNull().unique(),
+  fullName: text("full_name").notNull(),
+  phoneNumber: text("phone_number").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  salt: text("salt").notNull(),
+  isOnboardingCompleted: integer("is_onboarding_completed", { mode: "boolean" }).default(false),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
+  lastLoginAt: text("last_login_at"),
+});
+
+export const crmBusinesses = sqliteTable("crm_businesses", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  businessName: text("business_name").notNull(),
+  contactName: text("contact_name").notNull(),
+  mobileNumber: text("mobile_number").notNull(),
+  email: text("email").notNull(),
+  addressLine1: text("address_line_1"),
+  addressLine2: text("address_line_2"),
+  logoUrl: text("logo_url"),
+  signatureUrl: text("signature_url"),
+  signatureType: text("signature_type"),
+  dateFormat: text("date_format").default("dd/MM/yyyy"),
+  currencyCode: text("currency_code").default("INR"),
+  currencyCountry: text("currency_country").default("India"),
+  currencyPriceFormatted: text("currency_price_formatted").default("₹999,999.12"),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at").$defaultFn(() => new Date().toISOString()),
+});
+
+
