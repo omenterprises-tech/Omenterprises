@@ -245,4 +245,47 @@ export const crmTeamMembers = sqliteTable("crm_team_members", {
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
 });
 
+export const crmCustomers = sqliteTable("crm_customers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  businessId: integer("business_id").notNull().references(() => crmBusinesses.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  companyName: text("company_name"),
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  pincode: text("pincode"),
+  gstin: text("gstin"),
+  createdByUserId: integer("created_by_user_id").references(() => crmUsers.id, { onDelete: "set null" }),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at").$defaultFn(() => new Date().toISOString()),
+});
+
+export const crmQuotations = sqliteTable("crm_quotations", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  businessId: integer("business_id").notNull().references(() => crmBusinesses.id, { onDelete: "cascade" }),
+  quotationNumber: text("quotation_number").notNull(),
+  quotationDate: text("quotation_date").notNull(),
+  validUntil: text("valid_until"),
+  customerId: integer("customer_id").references(() => crmCustomers.id, { onDelete: "set null" }),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  customerAddress: text("customer_address"),
+  customerGstin: text("customer_gstin"),
+  items: text("items").notNull(), // JSON array: [{ description, quantity, unitPrice, taxPercent, total }]
+  subtotal: real("subtotal").notNull(),
+  taxTotal: real("tax_total").notNull(),
+  grandTotal: real("grand_total").notNull(),
+  notes: text("notes"),
+  termsConditions: text("terms_conditions"),
+  status: text("status").notNull().default("Draft"), // Draft, Sent, Accepted, Declined
+  createdByUserId: integer("created_by_user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  createdByName: text("created_by_name").notNull(),
+  createdByRole: text("created_by_role").notNull().default("Staff"),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at").$defaultFn(() => new Date().toISOString()),
+});
+
 

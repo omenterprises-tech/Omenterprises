@@ -64,11 +64,15 @@ export async function GET() {
       }
     }
 
+    const isOwner = ownerBusiness.length > 0;
+
     return NextResponse.json({
       authenticated: true,
       user: {
         ...user,
         role: userRole,
+        isOwner,
+        canManageBusiness: isOwner,
       },
       isOnboardingCompleted: isCompleted,
       business,

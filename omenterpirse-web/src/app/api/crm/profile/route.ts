@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { crmUsers, crmBusinesses } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getCrmSession } from "@/lib/crmAuth";
+import { resolveBusinessAndRole } from "@/lib/crmBusinessResolver";
 
 export async function GET() {
   try {
@@ -11,28 +12,14 @@ export async function GET() {
       return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
     }
 
-    const businesses = await db
-      .select()
-      .from(crmBusinesses)
-      .where(eq(crmBusinesses.userId, session.userId))
-      .limit(1);
-
-    const userRecords = await db
-      .select({
-        id: crmUsers.id,
-        email: crmUsers.email,
-        fullName: crmUsers.fullName,
-        phoneNumber: crmUsers.phoneNumber,
-        isOnboardingCompleted: crmUsers.isOnboardingCompleted,
-      })
-      .from(crmUsers)
-      .where(eq(crmUsers.id, session.userId))
-      .limit(1);
+    const { business, role, user, canManageBusiness } = await resolveBusinessAndRole(session.userId);
 
     return NextResponse.json({
       success: true,
-      business: businesses[0] || null,
-      user: userRecords[0] || null,
+      business: business || null,
+      user: user || null,
+      role: role || "Owner",
+      canManageBusiness,
     });
   } catch (error: any) {
     console.error("Fetch profile error:", error);
@@ -48,6 +35,14 @@ export async function POST(request: Request) {
     const session = await getCrmSession();
     if (!session) {
       return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+    }
+
+    const { business, role, canManageBusiness } = await resolveBusinessAndRole(session.userId);
+    if (!canManageBusiness) {
+      return NextResponse.json(
+        { success: false, error: "Only the primary business owner can update the business profile." },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
@@ -107,18 +102,12 @@ export async function POST(request: Request) {
       let lastErr: any;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const existing = await db
-            .select()
-            .from(crmBusinesses)
-            .where(eq(crmBusinesses.userId, session.userId))
-            .limit(1);
-
           let record;
-          if (existing.length > 0) {
+          if (business) {
             const updated = await db
               .update(crmBusinesses)
               .set(payload)
-              .where(eq(crmBusinesses.id, existing[0].id))
+              .where(eq(crmBusinesses.id, business.id))
               .returning();
             record = updated[0];
           } else {

@@ -25,16 +25,25 @@ import {
   EyeOff,
   Trash2,
   AlertCircle,
+  FileText,
+  Printer,
+  UserCheck,
 } from "lucide-react";
 import { formatDateWithPattern } from "@/lib/crmCurrencyData";
+import CustomerModal from "@/components/crm/CustomerModal";
+import { CreateQuotationModal, ViewQuotationModal } from "@/components/crm/QuotationModal";
 
 export default function CrmDashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [business, setBusiness] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"business" | "team">("business");
-  
+  const [activeTab, setActiveTab] = useState<"quotations" | "customers" | "business" | "team">("quotations");
+
+  // Permissions
+  const [canManageTeam, setCanManageTeam] = useState(true);
+  const canManageBusiness = Boolean(user?.isOwner ?? (user?.role === "Owner"));
+
   // Team management state
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inputsUnlocked, setInputsUnlocked] = useState(false);
@@ -46,7 +55,17 @@ export default function CrmDashboardPage() {
   const [invitePhone, setInvitePhone] = useState("");
   const [isSubmittingInvite, setIsSubmittingInvite] = useState(false);
   const [inviteError, setInviteError] = useState("");
-  const [canManageTeam, setCanManageTeam] = useState(true);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+
+  // Quotations state
+  const [quotations, setQuotations] = useState<any[]>([]);
+  const [isCreateQuotationOpen, setIsCreateQuotationOpen] = useState(false);
+  const [isViewQuotationOpen, setIsViewQuotationOpen] = useState(false);
+  const [selectedQuotation, setSelectedQuotation] = useState<any>(null);
+
+  // Customers state
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
 
   const openAddMemberModal = () => {
     setInviteName("");
@@ -64,18 +83,6 @@ export default function CrmDashboardPage() {
     setInviteError("");
     setInputsUnlocked(false);
   };
-  const [teamMembers, setTeamMembers] = useState<
-    {
-      id: number;
-      userId?: number;
-      name: string;
-      email: string;
-      phone?: string;
-      role: string;
-      status: string;
-      isOwner?: boolean;
-    }[]
-  >([]);
 
   const loadTeam = async () => {
     try {
@@ -89,6 +96,30 @@ export default function CrmDashboardPage() {
       }
     } catch (teamErr) {
       console.error("Failed to load team members:", teamErr);
+    }
+  };
+
+  const loadQuotations = async () => {
+    try {
+      const res = await fetch("/api/crm/quotations");
+      const data = await res.json();
+      if (data.success && data.quotations) {
+        setQuotations(data.quotations);
+      }
+    } catch (err) {
+      console.error("Failed to load quotations:", err);
+    }
+  };
+
+  const loadCustomers = async () => {
+    try {
+      const res = await fetch("/api/crm/customers");
+      const data = await res.json();
+      if (data.success && data.customers) {
+        setCustomers(data.customers);
+      }
+    } catch (err) {
+      console.error("Failed to load customers:", err);
     }
   };
 
@@ -109,8 +140,7 @@ export default function CrmDashboardPage() {
         setUser(data.user);
         setBusiness(data.business);
 
-        // Fetch team members from database
-        await loadTeam();
+        await Promise.all([loadTeam(), loadQuotations(), loadCustomers()]);
       } catch (err) {
         console.error("Failed to load CRM session:", err);
       } finally {
@@ -123,31 +153,17 @@ export default function CrmDashboardPage() {
   const handleLogout = async () => {
     try {
       await fetch("/api/crm/auth/logout", { method: "POST" });
-      router.push("/crm");
-      router.refresh();
-    } catch (err) {
-      console.error("Logout failed:", err);
+    } catch (e) {
+      // ignore
     }
+    router.replace("/crm");
   };
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     setInviteError("");
-
-    if (!inviteName.trim()) {
-      setInviteError("Please enter member full name.");
-      return;
-    }
-    if (!inviteEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail.trim())) {
-      setInviteError("Please enter a valid email address.");
-      return;
-    }
-    if (!invitePassword || invitePassword.length < 6) {
-      setInviteError("Password must be at least 6 characters long.");
-      return;
-    }
-
     setIsSubmittingInvite(true);
+
     try {
       const res = await fetch("/api/crm/team", {
         method: "POST",
@@ -155,9 +171,9 @@ export default function CrmDashboardPage() {
         body: JSON.stringify({
           fullName: inviteName.trim(),
           email: inviteEmail.trim(),
-          password: invitePassword,
+          password: invitePassword.trim(),
           role: inviteRole,
-          phoneNumber: invitePhone.trim(),
+          phoneNumber: invitePhone.trim() || undefined,
         }),
       });
 
@@ -166,14 +182,8 @@ export default function CrmDashboardPage() {
         throw new Error(data.error || "Failed to create team member.");
       }
 
-      // Refresh team members list
       await loadTeam();
-      setInviteName("");
-      setInviteEmail("");
-      setInvitePassword("");
-      setInvitePhone("");
-      setInviteRole("Manager");
-      setIsInviteModalOpen(false);
+      closeAddMemberModal();
     } catch (err: any) {
       setInviteError(err.message || "Failed to create team member.");
     } finally {
@@ -184,7 +194,7 @@ export default function CrmDashboardPage() {
   const handleDeleteMember = async (memberId: number) => {
     if (!confirm("Are you sure you want to remove this team member?")) return;
     try {
-      const res = await fetch(`/api/crm/team?id=${memberId}`, { method: "DELETE" });
+      const res = await fetch("/api/crm/team?id=" + memberId, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
         setTeamMembers((prev) => prev.filter((m) => m.id !== memberId));
@@ -193,6 +203,56 @@ export default function CrmDashboardPage() {
       }
     } catch (err) {
       console.error("Failed to remove member:", err);
+    }
+  };
+
+  const handleDeleteQuotation = async (qId: number) => {
+    if (!confirm("Are you sure you want to delete this quotation?")) return;
+    try {
+      const res = await fetch("/api/crm/quotations/" + qId, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setQuotations((prev) => prev.filter((q) => q.id !== qId));
+      } else {
+        alert(data.error || "Failed to delete quotation.");
+      }
+    } catch (err) {
+      console.error("Failed to delete quotation:", err);
+    }
+  };
+
+  const handleQuotationStatusChange = async (newStatus: string) => {
+    if (!selectedQuotation) return;
+    try {
+      const res = await fetch("/api/crm/quotations/" + selectedQuotation.id, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await res.json();
+      if (data.success && data.quotation) {
+        setSelectedQuotation(data.quotation);
+        setQuotations((prev) =>
+          prev.map((q) => (q.id === data.quotation.id ? data.quotation : q))
+        );
+      }
+    } catch (err) {
+      console.error("Failed to update status:", err);
+    }
+  };
+
+  const handleDeleteCustomer = async (cId: number) => {
+    if (!confirm("Are you sure you want to delete this customer?")) return;
+    try {
+      const res = await fetch("/api/crm/customers?id=" + cId, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setCustomers((prev) => prev.filter((c) => c.id !== cId));
+      } else {
+        alert(data.error || "Failed to delete customer.");
+      }
+    } catch (err) {
+      console.error("Failed to delete customer:", err);
     }
   };
 
@@ -206,9 +266,6 @@ export default function CrmDashboardPage() {
   }
 
   const businessName = business?.businessName || "Your Business";
-  const dateFormat = business?.dateFormat || "dd/MM/yyyy";
-  const currencyCode = business?.currencyCode || "INR";
-  const currencyPrice = business?.currencyPriceFormatted || "₹999,999.12";
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-inter">
@@ -236,17 +293,18 @@ export default function CrmDashboardPage() {
               </div>
             </div>
 
-            {/* User & Logout */}
+            {/* User & Actions */}
             <div className="flex items-center space-x-3 sm:space-x-4">
               <button
                 type="button"
                 onClick={() => router.push("/crm/profile")}
                 className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-100 border border-gray-200 transition-colors cursor-pointer"
-                title="Manage Business Profile"
+                title={canManageBusiness ? "Manage Business Profile" : "View Official Business Profile"}
               >
                 <Building2 size={14} className="text-brand" />
-                <span>Manage Profile</span>
+                <span>{canManageBusiness ? "Manage Profile" : "View Profile"}</span>
               </button>
+
               <div className="hidden sm:flex flex-col text-right">
                 <div className="flex items-center justify-end space-x-1.5">
                   <span className="text-xs font-bold text-gray-900">
@@ -260,6 +318,7 @@ export default function CrmDashboardPage() {
                 </div>
                 <span className="text-[11px] text-gray-500">{user?.email}</span>
               </div>
+
               <button
                 type="button"
                 onClick={handleLogout}
@@ -289,67 +348,110 @@ export default function CrmDashboardPage() {
                 Welcome, {businessName}!
               </h1>
               <p className="text-white/80 text-sm sm:text-base max-w-2xl leading-relaxed">
-                Your business CRM profile is fully configured. Manage your identity, documents, configurations, and team below.
+                Create official customer quotations, manage clients, inspect your company settings, and collaborate with your team.
               </p>
             </div>
 
-            {/* Quick Badges */}
+            {/* Quick Stats */}
             <div className="flex flex-wrap gap-2.5 shrink-0">
               <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/15 text-xs flex items-center space-x-2">
-                <Calendar size={15} className="text-[#FF9800]" />
+                <FileText size={15} className="text-[#FF9800]" />
                 <div>
-                  <div className="text-[10px] uppercase text-white/60 font-bold">Date Format</div>
-                  <div className="font-semibold">{dateFormat}</div>
+                  <div className="text-white/70 text-[10px] uppercase font-bold">Quotations</div>
+                  <div className="font-semibold text-sm">{quotations.length} Quotes</div>
                 </div>
               </div>
 
               <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/15 text-xs flex items-center space-x-2">
-                <CreditCard size={15} className="text-[#FF9800]" />
+                <Users size={15} className="text-[#FF9800]" />
                 <div>
-                  <div className="text-[10px] uppercase text-white/60 font-bold">Currency</div>
-                  <div className="font-semibold">{currencyCode} ({currencyPrice})</div>
+                  <div className="text-white/70 text-[10px] uppercase font-bold">Customers</div>
+                  <div className="font-semibold text-sm">{customers.length} Clients</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* MANAGE HEADING SECTION */}
+        {/* NAVIGATION TABS */}
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 font-playfair tracking-tight">
-                Manage
+                {activeTab === "quotations" && "Quotations"}
+                {activeTab === "customers" && "Customers & Clients"}
+                {activeTab === "business" && "Business Profile"}
+                {activeTab === "team" && "Team Members"}
               </h2>
               <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-                Select an area below to inspect and manage your business settings and team members.
+                {activeTab === "quotations" && "Generate, track, and manage official quotations for clients"}
+                {activeTab === "customers" && "Manage your client database and direct contact details"}
+                {activeTab === "business" && "Official company information registered by the business owner"}
+                {activeTab === "team" && "Team access and permissions for your business account"}
               </p>
             </div>
 
-            {/* Two Options Toggle Buttons: Business & Team */}
-            <div className="flex bg-gray-200/80 p-1.5 rounded-2xl shrink-0">
+            {/* Four Tab Toggle Buttons */}
+            <div className="flex bg-gray-200/80 p-1.5 rounded-2xl shrink-0 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setActiveTab("quotations")}
+                className={"flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer shrink-0 " + (
+                  activeTab === "quotations"
+                    ? "bg-white text-brand shadow-md"
+                    : "text-gray-600 hover:text-gray-900"
+                )}
+              >
+                <FileText size={15} />
+                <span>Quotations</span>
+                {quotations.length > 0 && (
+                  <span className="w-5 h-5 rounded-full bg-brand/10 text-brand text-[10px] font-bold flex items-center justify-center">
+                    {quotations.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("customers")}
+                className={"flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer shrink-0 " + (
+                  activeTab === "customers"
+                    ? "bg-white text-brand shadow-md"
+                    : "text-gray-600 hover:text-gray-900"
+                )}
+              >
+                <UserCheck size={15} />
+                <span>Customers</span>
+                {customers.length > 0 && (
+                  <span className="w-5 h-5 rounded-full bg-brand/10 text-brand text-[10px] font-bold flex items-center justify-center">
+                    {customers.length}
+                  </span>
+                )}
+              </button>
+
               <button
                 type="button"
                 onClick={() => setActiveTab("business")}
-                className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+                className={"flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer shrink-0 " + (
                   activeTab === "business"
                     ? "bg-white text-brand shadow-md"
                     : "text-gray-600 hover:text-gray-900"
-                }`}
+                )}
               >
-                <Building2 size={16} />
+                <Building2 size={15} />
                 <span>Business</span>
               </button>
+
               <button
                 type="button"
                 onClick={() => setActiveTab("team")}
-                className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+                className={"flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer shrink-0 " + (
                   activeTab === "team"
                     ? "bg-white text-brand shadow-md"
                     : "text-gray-600 hover:text-gray-900"
-                }`}
+                )}
               >
-                <Users size={16} />
+                <Users size={15} />
                 <span>Team</span>
                 {teamMembers.length > 0 && (
                   <span className="w-5 h-5 rounded-full bg-brand/10 text-brand text-[10px] font-bold flex items-center justify-center">
@@ -360,9 +462,255 @@ export default function CrmDashboardPage() {
             </div>
           </div>
 
-          {/* ================= OPTION 1: BUSINESS ================= */}
+          {/* ================= TAB 1: QUOTATIONS ================= */}
+          {activeTab === "quotations" && (
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm space-y-6 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-brand flex items-center justify-center">
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Quotation Ledger</h3>
+                    <p className="text-xs text-gray-500">Official commercial quotations issued for {businessName}</p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCreateQuotationOpen(true)}
+                  className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer self-start sm:self-auto"
+                >
+                  <Plus size={15} />
+                  <span>New Quotation</span>
+                </button>
+              </div>
+
+              {quotations.length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
+                  <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-400">
+                    <FileText size={28} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-800">No Quotations Drafted Yet</h4>
+                    <p className="text-xs text-gray-500 mt-1 max-w-sm">
+                      Create your first client quotation with company branding, tax calculations, and PDF export.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateQuotationOpen(true)}
+                    className="mt-2 px-4 py-2 rounded-xl bg-brand text-white text-xs font-bold shadow hover:bg-brand-hover transition-all cursor-pointer"
+                  >
+                    + Draft First Quote
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                        <th className="pb-3">Quotation #</th>
+                        <th className="pb-3">Date</th>
+                        <th className="pb-3">Customer</th>
+                        <th className="pb-3">Amount</th>
+                        <th className="pb-3">Status</th>
+                        <th className="pb-3">Created By</th>
+                        <th className="pb-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {quotations.map((q) => (
+                        <tr key={q.id} className="hover:bg-gray-50/60 transition-colors">
+                          <td className="py-4 font-bold text-brand text-xs sm:text-sm">
+                            {q.quotationNumber}
+                          </td>
+                          <td className="py-4 text-xs text-gray-500">{q.quotationDate}</td>
+                          <td className="py-4 font-semibold text-gray-900 text-xs sm:text-sm">
+                            <div>{q.customerName}</div>
+                            {q.customerPhone && (
+                              <div className="text-[11px] text-gray-400 font-normal">{q.customerPhone}</div>
+                            )}
+                          </td>
+                          <td className="py-4 font-bold text-gray-900 text-xs sm:text-sm">
+                            ₹{Number(q.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-4">
+                            <span
+                              className={"inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold " + (
+                                q.status === "Accepted"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : q.status === "Sent"
+                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                  : q.status === "Declined"
+                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                  : "bg-amber-50 text-amber-700 border border-amber-200"
+                              )}
+                            >
+                              {q.status}
+                            </span>
+                          </td>
+                          <td className="py-4">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-900 border border-purple-100">
+                              <span>{q.createdByName}</span>
+                              <span className="text-[10px] text-purple-600">({q.createdByRole})</span>
+                            </span>
+                          </td>
+                          <td className="py-4 text-right">
+                            <div className="flex items-center justify-end space-x-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedQuotation(q);
+                                  setIsViewQuotationOpen(true);
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold flex items-center space-x-1 cursor-pointer transition-colors"
+                              >
+                                <Eye size={13} />
+                                <span>View / Print</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteQuotation(q.id)}
+                                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Delete quotation"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ================= TAB 2: CUSTOMERS ================= */}
+          {activeTab === "customers" && (
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm space-y-6 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#FF9800] flex items-center justify-center">
+                    <UserCheck size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Customer Directory</h3>
+                    <p className="text-xs text-gray-500">Manage client contacts and billing addresses for {businessName}</p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCustomerModalOpen(true)}
+                  className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer self-start sm:self-auto"
+                >
+                  <Plus size={15} />
+                  <span>Add Customer</span>
+                </button>
+              </div>
+
+              {customers.length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
+                  <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-400">
+                    <UserCheck size={28} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-800">No Customers Added Yet</h4>
+                    <p className="text-xs text-gray-500 mt-1 max-w-sm">
+                      Save client details to easily generate quotations and invoices.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomerModalOpen(true)}
+                    className="mt-2 px-4 py-2 rounded-xl bg-brand text-white text-xs font-bold shadow hover:bg-brand-hover transition-all cursor-pointer"
+                  >
+                    + Add First Customer
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                        <th className="pb-3">Client</th>
+                        <th className="pb-3">Contact</th>
+                        <th className="pb-3">Location</th>
+                        <th className="pb-3">GSTIN</th>
+                        <th className="pb-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {customers.map((c) => (
+                        <tr key={c.id} className="hover:bg-gray-50/60 transition-colors">
+                          <td className="py-4 font-semibold text-gray-900">
+                            <div>{c.name}</div>
+                            {c.companyName && (
+                              <div className="text-xs text-gray-500 font-normal">{c.companyName}</div>
+                            )}
+                          </td>
+                          <td className="py-4 text-xs text-gray-600">
+                            <div>{c.phone || "—"}</div>
+                            <div className="text-gray-400">{c.email || "—"}</div>
+                          </td>
+                          <td className="py-4 text-xs text-gray-600">
+                            <div>{[c.city, c.state].filter(Boolean).join(", ") || "—"}</div>
+                            {c.pincode && <div className="text-gray-400">PIN: {c.pincode}</div>}
+                          </td>
+                          <td className="py-4 text-xs font-bold text-gray-700 uppercase">
+                            {c.gstin || "—"}
+                          </td>
+                          <td className="py-4 text-right">
+                            <div className="flex items-center justify-end space-x-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsCreateQuotationOpen(true);
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                + Quote
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCustomer(c.id)}
+                                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Delete customer"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ================= TAB 3: BUSINESS PROFILE ================= */}
           {activeTab === "business" && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-200">
+              {/* Read-Only Banner for Team Members */}
+              {!canManageBusiness && (
+                <div className="lg:col-span-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start space-x-3 text-xs text-amber-900">
+                  <AlertCircle size={18} className="shrink-0 mt-0.5 text-amber-600" />
+                  <div>
+                    <strong className="block text-sm font-bold text-amber-950 mb-0.5">
+                      Official Business Profile (Registered by Owner)
+                    </strong>
+                    <span>
+                      You are viewing the business details registered by the primary owner. As a <strong>{user?.role}</strong>, this profile is read-only. All quotations you issue will carry these company credentials.
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Card 1: Core Business Information */}
               <div className="lg:col-span-2 bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm space-y-6">
                 <div className="flex justify-between items-start border-b border-gray-100 pb-4">
@@ -375,13 +723,14 @@ export default function CrmDashboardPage() {
                       <p className="text-xs text-gray-500">Official company and contact information</p>
                     </div>
                   </div>
+
                   <button
                     type="button"
                     onClick={() => router.push("/crm/profile")}
                     className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-brand text-xs font-semibold text-gray-700 hover:text-brand transition-colors cursor-pointer"
                   >
                     <Edit3 size={13} />
-                    <span>Manage Profile</span>
+                    <span>{canManageBusiness ? "Manage Profile" : "View Details"}</span>
                   </button>
                 </div>
 
@@ -448,23 +797,21 @@ export default function CrmDashboardPage() {
                     <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
                       Registered Address
                     </span>
-                    <p className="text-sm text-gray-700 flex items-start gap-1.5">
+                    <p className="text-sm font-semibold text-gray-900 flex items-start gap-1.5">
                       <MapPin size={15} className="text-gray-400 shrink-0 mt-0.5" />
                       <span>
-                        {[business?.addressLine1, business?.addressLine2, business?.addressLine3, business?.state]
-                          .filter(Boolean)
-                          .join(", ") || "No physical address provided"}
+                        {[business?.addressLine1, business?.addressLine2, business?.addressLine3, business?.state].filter(Boolean).join(", ") || "—"}
                       </span>
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Card 2: Identity & Branding */}
+              {/* Card 2: Logo & Signature Preview */}
               <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm space-y-6">
                 <div className="border-b border-gray-100 pb-4">
-                  <h3 className="text-lg font-bold text-gray-900">Brand Identity</h3>
-                  <p className="text-xs text-gray-500">Logo and authorized signature</p>
+                  <h3 className="text-lg font-bold text-gray-900">Official Assets</h3>
+                  <p className="text-xs text-gray-500">Logo and signature stamped on quotes</p>
                 </div>
 
                 {/* Logo Preview */}
@@ -510,12 +857,12 @@ export default function CrmDashboardPage() {
             </div>
           )}
 
-          {/* ================= OPTION 2: TEAM ================= */}
+          {/* ================= TAB 4: TEAM ================= */}
           {activeTab === "team" && (
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm space-y-6 animate-in fade-in duration-200">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#FF9800] flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
                     <Users size={20} />
                   </div>
                   <div>
@@ -526,14 +873,16 @@ export default function CrmDashboardPage() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={openAddMemberModal}
-                  className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer self-start sm:self-auto"
-                >
-                  <Plus size={15} />
-                  <span>Add Team Member</span>
-                </button>
+                {canManageTeam && (
+                  <button
+                    type="button"
+                    onClick={openAddMemberModal}
+                    className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer self-start sm:self-auto"
+                  >
+                    <Plus size={15} />
+                    <span>Add Team Member</span>
+                  </button>
+                )}
               </div>
 
               {/* Members Table */}
@@ -567,7 +916,7 @@ export default function CrmDashboardPage() {
                         <td className="py-4 text-gray-600 text-xs sm:text-sm">{member.email}</td>
                         <td className="py-4">
                           <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            className={"inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold " + (
                               member.role.includes("Owner")
                                 ? "bg-amber-100 text-amber-900 font-bold"
                                 : member.role === "Admin"
@@ -575,23 +924,23 @@ export default function CrmDashboardPage() {
                                 : member.role === "Manager"
                                 ? "bg-blue-100 text-blue-900 font-medium"
                                 : "bg-gray-100 text-gray-800"
-                            }`}
+                            )}
                           >
                             {member.role}
                           </span>
                         </td>
                         <td className="py-4">
                           <span
-                            className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                            className={"inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold " + (
                               member.status === "Active"
                                 ? "bg-green-50 text-green-700"
                                 : "bg-amber-50 text-amber-700"
-                            }`}
+                            )}
                           >
                             <span
-                              className={`w-1.5 h-1.5 rounded-full ${
+                              className={"w-1.5 h-1.5 rounded-full " + (
                                 member.status === "Active" ? "bg-green-500" : "bg-amber-500"
-                              }`}
+                              )}
                             />
                             <span>{member.status}</span>
                           </span>
@@ -646,7 +995,6 @@ export default function CrmDashboardPage() {
             )}
 
             <form onSubmit={handleInvite} autoComplete="off" className="space-y-3.5">
-              {/* Offscreen inputs to catch aggressive browser credential autofill */}
               <input
                 type="text"
                 name="fake_autofill_username"
@@ -799,6 +1147,41 @@ export default function CrmDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Customer Creation Modal */}
+      <CustomerModal
+        isOpen={isCustomerModalOpen}
+        onClose={() => setIsCustomerModalOpen(false)}
+        onCustomerCreated={(newCust) => {
+          setCustomers((prev) => [newCust, ...prev]);
+        }}
+      />
+
+      {/* Quotation Creation Modal */}
+      <CreateQuotationModal
+        isOpen={isCreateQuotationOpen}
+        onClose={() => setIsCreateQuotationOpen(false)}
+        onCreated={(newQ) => {
+          setQuotations((prev) => [newQ, ...prev]);
+          setSelectedQuotation(newQ);
+          setIsViewQuotationOpen(true);
+        }}
+        business={business}
+        caller={{
+          name: user?.fullName || "User",
+          role: user?.role || "Staff",
+        }}
+        customers={customers}
+      />
+
+      {/* Quotation View / Print Modal */}
+      <ViewQuotationModal
+        isOpen={isViewQuotationOpen}
+        onClose={() => setIsViewQuotationOpen(false)}
+        quotation={selectedQuotation}
+        business={business}
+        onStatusChange={handleQuotationStatusChange}
+      />
     </div>
   );
 }

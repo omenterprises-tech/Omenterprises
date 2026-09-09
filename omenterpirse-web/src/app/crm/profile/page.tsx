@@ -27,6 +27,9 @@ export default function CrmManageProfilePage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [showTips, setShowTips] = useState(false);
 
+  const [canManageBusiness, setCanManageBusiness] = useState(true);
+  const [callerRole, setCallerRole] = useState("Owner");
+
   // Form Fields
   const [businessName, setBusinessName] = useState("");
   const [contactName, setContactName] = useState("");
@@ -70,6 +73,9 @@ export default function CrmManageProfilePage() {
         if (data.success) {
           const b = data.business || {};
           const u = data.user || {};
+
+          setCanManageBusiness(Boolean(data.canManageBusiness));
+          setCallerRole(data.role || "Owner");
 
           setBusinessName(b.businessName || "");
           setContactName(b.contactName || u.fullName || "");
@@ -265,6 +271,18 @@ export default function CrmManageProfilePage() {
             </div>
           )}
 
+          {!canManageBusiness && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start space-x-3 text-xs text-amber-900 animate-in fade-in">
+              <AlertCircle size={18} className="shrink-0 mt-0.5 text-amber-600" />
+              <div>
+                <strong className="block text-sm font-bold text-amber-950 mb-0.5">Read-Only Business Profile</strong>
+                <span>
+                  You are viewing the business profile registered by the business owner. As a <strong>{callerRole}</strong>, you cannot edit company information, tax credentials, or branding.
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* ================= TOP CARDS: ADD LOGO & ADD SIGNATURE ================= */}
           <div className="flex items-center justify-center gap-6 pt-2 pb-1">
             {/* ADD LOGO CARD */}
@@ -278,9 +296,11 @@ export default function CrmManageProfilePage() {
               />
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploadingLogo}
-                className="w-28 h-28 bg-[#18181B] hover:bg-[#27272A] text-white rounded-2xl flex flex-col items-center justify-center p-2.5 transition-all shadow-md active:scale-95 cursor-pointer relative overflow-hidden group border border-gray-800"
+                onClick={() => canManageBusiness && fileInputRef.current?.click()}
+                disabled={isUploadingLogo || !canManageBusiness}
+                className={`w-28 h-28 bg-[#18181B] text-white rounded-2xl flex flex-col items-center justify-center p-2.5 transition-all shadow-md relative overflow-hidden group border border-gray-800 ${
+                  canManageBusiness ? "hover:bg-[#27272A] active:scale-95 cursor-pointer" : "cursor-default opacity-90"
+                }`}
               >
                 {isUploadingLogo ? (
                   <Loader2 size={24} className="animate-spin text-white" />
@@ -299,22 +319,27 @@ export default function CrmManageProfilePage() {
               </button>
 
               {/* White Edit Pencil Badge */}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute -top-2 -right-2 w-7 h-7 bg-white rounded-full border border-gray-200 shadow-md flex items-center justify-center text-black hover:bg-gray-100 transition-transform active:scale-90 cursor-pointer"
-                title="Change Logo"
-              >
-                <Edit3 size={13} />
-              </button>
+              {canManageBusiness && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute -top-2 -right-2 w-7 h-7 bg-white rounded-full border border-gray-200 shadow-md flex items-center justify-center text-black hover:bg-gray-100 transition-transform active:scale-90 cursor-pointer"
+                  title="Change Logo"
+                >
+                  <Edit3 size={13} />
+                </button>
+              )}
             </div>
 
             {/* ADD SIGNATURE CARD */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setIsSignatureModalOpen(true)}
-                className="w-28 h-28 bg-[#18181B] hover:bg-[#27272A] text-white rounded-2xl flex flex-col items-center justify-center p-2.5 transition-all shadow-md active:scale-95 cursor-pointer relative overflow-hidden group border border-gray-800"
+                onClick={() => canManageBusiness && setIsSignatureModalOpen(true)}
+                disabled={!canManageBusiness}
+                className={`w-28 h-28 bg-[#18181B] text-white rounded-2xl flex flex-col items-center justify-center p-2.5 transition-all shadow-md relative overflow-hidden group border border-gray-800 ${
+                  canManageBusiness ? "hover:bg-[#27272A] active:scale-95 cursor-pointer" : "cursor-default opacity-90"
+                }`}
               >
                 {signatureUrl ? (
                   <img
@@ -331,14 +356,16 @@ export default function CrmManageProfilePage() {
               </button>
 
               {/* White Edit Pencil Badge */}
-              <button
-                type="button"
-                onClick={() => setIsSignatureModalOpen(true)}
-                className="absolute -top-2 -right-2 w-7 h-7 bg-white rounded-full border border-gray-200 shadow-md flex items-center justify-center text-black hover:bg-gray-100 transition-transform active:scale-90 cursor-pointer"
-                title="Change Signature"
-              >
-                <Edit3 size={13} />
-              </button>
+              {canManageBusiness && (
+                <button
+                  type="button"
+                  onClick={() => setIsSignatureModalOpen(true)}
+                  className="absolute -top-2 -right-2 w-7 h-7 bg-white rounded-full border border-gray-200 shadow-md flex items-center justify-center text-black hover:bg-gray-100 transition-transform active:scale-90 cursor-pointer"
+                  title="Change Signature"
+                >
+                  <Edit3 size={13} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -352,8 +379,9 @@ export default function CrmManageProfilePage() {
               type="text"
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
+              disabled={!canManageBusiness}
               placeholder="e.g. Acme Corp"
-              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5"
+              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -366,8 +394,9 @@ export default function CrmManageProfilePage() {
               type="text"
               value={contactName}
               onChange={(e) => setContactName(e.target.value)}
+              disabled={!canManageBusiness}
               placeholder="e.g. John Doe"
-              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5"
+              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -380,8 +409,9 @@ export default function CrmManageProfilePage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={!canManageBusiness}
               placeholder="e.g. contact@business.com"
-              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5"
+              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -394,8 +424,9 @@ export default function CrmManageProfilePage() {
               type="tel"
               value={mobileNumber}
               onChange={(e) => setMobileNumber(e.target.value)}
+              disabled={!canManageBusiness}
               placeholder="10-digit mobile number"
-              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5"
+              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -408,8 +439,9 @@ export default function CrmManageProfilePage() {
               type="text"
               value={addressLine1}
               onChange={(e) => setAddressLine1(e.target.value)}
+              disabled={!canManageBusiness}
               placeholder="Building, Street, Area"
-              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5"
+              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -422,8 +454,9 @@ export default function CrmManageProfilePage() {
               type="text"
               value={addressLine2}
               onChange={(e) => setAddressLine2(e.target.value)}
+              disabled={!canManageBusiness}
               placeholder="Landmark, City"
-              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5"
+              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -436,8 +469,9 @@ export default function CrmManageProfilePage() {
               type="text"
               value={addressLine3}
               onChange={(e) => setAddressLine3(e.target.value)}
+              disabled={!canManageBusiness}
               placeholder="Pincode, District"
-              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5"
+              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -450,18 +484,21 @@ export default function CrmManageProfilePage() {
               type="text"
               value={otherInfo}
               onChange={(e) => setOtherInfo(e.target.value)}
+              disabled={!canManageBusiness}
               placeholder="Website, registration notes, etc."
-              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5"
+              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed"
             />
           </div>
 
           {/* Business Category (Clickable to open CategoryModal) */}
           <div
-            onClick={() => setIsCategoryModalOpen(true)}
-            className="bg-[#F3F4F6] hover:bg-gray-200/70 rounded-2xl px-4 py-2.5 border border-transparent cursor-pointer transition-all flex items-center justify-between group"
+            onClick={() => canManageBusiness && setIsCategoryModalOpen(true)}
+            className={`bg-[#F3F4F6] rounded-2xl px-4 py-2.5 border border-transparent transition-all flex items-center justify-between group ${
+              canManageBusiness ? "hover:bg-gray-200/70 cursor-pointer" : "cursor-not-allowed opacity-90"
+            }`}
           >
             <div className="flex-1 min-w-0">
-              <label className="block text-[11px] text-gray-500 font-medium cursor-pointer">
+              <label className={`block text-[11px] text-gray-500 font-medium ${canManageBusiness ? "cursor-pointer" : "cursor-not-allowed"}`}>
                 Business Category
               </label>
               <div className="text-sm font-semibold text-gray-900 pt-0.5 truncate">
@@ -470,7 +507,9 @@ export default function CrmManageProfilePage() {
                 )}
               </div>
             </div>
-            <ChevronDown size={18} className="text-gray-400 group-hover:text-gray-600 transition-colors shrink-0" />
+            {canManageBusiness && (
+              <ChevronDown size={18} className="text-gray-400 group-hover:text-gray-600 transition-colors shrink-0" />
+            )}
           </div>
 
           {/* ================= TAX DETAILS SECTION (Image 4) ================= */}
@@ -489,8 +528,9 @@ export default function CrmManageProfilePage() {
                 type="text"
                 value={taxLabel}
                 onChange={(e) => setTaxLabel(e.target.value)}
+                disabled={!canManageBusiness}
                 placeholder="GSTIN"
-                className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5"
+                className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -503,8 +543,9 @@ export default function CrmManageProfilePage() {
                 type="text"
                 value={taxNumber}
                 onChange={(e) => setTaxNumber(e.target.value)}
+                disabled={!canManageBusiness}
                 placeholder="e.g. 27AAACG9999A1Z5"
-                className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 uppercase"
+                className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 uppercase disabled:text-gray-700 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -516,7 +557,8 @@ export default function CrmManageProfilePage() {
               <select
                 value={selectedState}
                 onChange={(e) => setSelectedState(e.target.value)}
-                className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 cursor-pointer"
+                disabled={!canManageBusiness}
+                className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 cursor-pointer disabled:text-gray-700 disabled:cursor-not-allowed"
               >
                 <option value="">Select State</option>
                 {INDIAN_STATES.map((st) => (
@@ -528,22 +570,28 @@ export default function CrmManageProfilePage() {
             </div>
           </div>
 
-          {/* ================= BOTTOM BUTTON: UPDATE (Image 3 & 4) ================= */}
+          {/* ================= BOTTOM BUTTON: UPDATE ================= */}
           <div className="pt-4 pb-2">
-            <button
-              type="submit"
-              disabled={isUpdating}
-              className="w-full py-4 bg-[#18181B] hover:bg-black text-white rounded-2xl font-bold text-sm tracking-wide shadow-lg hover:shadow-xl active:scale-[0.99] transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-60"
-            >
-              {isUpdating ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>Updating...</span>
-                </>
-              ) : (
-                <span>Update</span>
-              )}
-            </button>
+            {canManageBusiness ? (
+              <button
+                type="submit"
+                disabled={isUpdating}
+                className="w-full py-4 bg-[#18181B] hover:bg-black text-white rounded-2xl font-bold text-sm tracking-wide shadow-lg hover:shadow-xl active:scale-[0.99] transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-60"
+              >
+                {isUpdating ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Updating...</span>
+                  </>
+                ) : (
+                  <span>Update Profile</span>
+                )}
+              </button>
+            ) : (
+              <div className="text-center p-4 bg-gray-100 rounded-2xl border border-gray-200 text-xs text-gray-600 font-semibold">
+                This business profile is managed by the business owner. Team members have view-only access.
+              </div>
+            )}
           </div>
         </form>
       </div>
