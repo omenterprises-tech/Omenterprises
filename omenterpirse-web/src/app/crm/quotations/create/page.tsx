@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Plus,
@@ -46,14 +46,17 @@ interface TermItem {
   text: string;
 }
 
-export default function MakeQuotationPage() {
+function MakeQuotationContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
 
   const [user, setUser] = useState<any>(null);
   const [business, setBusiness] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Top info
+  const [quotationNo, setQuotationNo] = useState("-");
   const [quotationDate, setQuotationDate] = useState(
     new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
   );
@@ -156,6 +159,80 @@ export default function MakeQuotationPage() {
         setTermsList(mappedTerms);
         // Default select all terms
         setSelectedTermIds(mappedTerms.map((t) => t.id));
+
+        // If editId is provided, load existing quotation details
+        if (editId) {
+          const qRes = await fetch(`/api/crm/quotations/${editId}`).then((r) => r.json());
+          if (qRes.success && qRes.quotation) {
+            const q = qRes.quotation;
+            setQuotationNo(q.quotationNumber || "-");
+            if (q.quotationDate) setQuotationDate(q.quotationDate);
+            if (q.notes) setOtherInfo(q.notes);
+
+            // Set customer
+            setSelectedCustomer({
+              id: q.customerId,
+              name: q.customerName,
+              email: q.customerEmail,
+              phone: q.customerPhone,
+              addressLine1: q.customerAddress,
+              gstin: q.customerGstin,
+            });
+
+            // Parse items
+            let parsedItems: any[] = [];
+            try {
+              parsedItems = typeof q.items === "string" ? JSON.parse(q.items) : q.items;
+            } catch (e) {}
+
+            if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+              setSelectedItems(
+                parsedItems.map((it: any, i: number) => ({
+                  id: it.id || `item-${i}-${Date.now()}`,
+                  name: it.name || it.description?.split(" - ")[0] || "Item",
+                  description: it.description?.includes(" - ")
+                    ? it.description.split(" - ").slice(1).join(" - ")
+                    : "",
+                  quantity: Number(it.quantity) || 1,
+                  unitPrice: Number(it.unitPrice) || 0,
+                  taxPercent: Number(it.taxPercent) || 18,
+                  total: Number(it.total) || (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0),
+                }))
+              );
+            }
+
+            // Parse other charges
+            if (q.otherCharges) {
+              try {
+                const parsedOc =
+                  typeof q.otherCharges === "string" ? JSON.parse(q.otherCharges) : q.otherCharges;
+                if (parsedOc && (parsedOc.amount || parsedOc.label)) {
+                  setOtherCharge({
+                    label: parsedOc.label || "Other Charges",
+                    amount: Number(parsedOc.amount) || 0,
+                    isTaxable: Boolean(parsedOc.isTaxable),
+                  });
+                }
+              } catch (e) {}
+            }
+
+            // Parse terms
+            if (q.termsConditions) {
+              const qLines = q.termsConditions
+                .split("\n")
+                .map((l: string) => l.trim())
+                .filter(Boolean);
+              if (qLines.length > 0) {
+                const qMappedTerms: TermItem[] = qLines.map((l: string, idx: number) => ({
+                  id: `term-${idx + 1}-${Date.now()}`,
+                  text: l.replace(/^(\d+[\.\)]\s*|[•\-\*]\s*)/, "").trim(),
+                }));
+                setTermsList(qMappedTerms);
+                setSelectedTermIds(qMappedTerms.map((t) => t.id));
+              }
+            }
+          }
+        }
       } catch (err) {
         console.error("Failed to load quotation editor data:", err);
       } finally {
@@ -163,7 +240,7 @@ export default function MakeQuotationPage() {
       }
     }
     init();
-  }, [router]);
+  }, [router, editId]);
 
   // Calculations
   const subtotal = useMemo(() => {
@@ -367,20 +444,23 @@ export default function MakeQuotationPage() {
         status: "Draft",
       };
 
-      const res = await fetch("/api/crm/quotations", {
-        method: "POST",
+      const url = editId ? `/api/crm/quotations/${editId}` : "/api/crm/quotations";
+      const method = editId ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       const data = await res.json();
-      if (data.success) {
-        router.push("/crm/quotations");
+      if (data.success && data.quotation) {
+        router.push(`/crm/quotations/${data.quotation.id}`);
       } else {
-        setSubmissionError(data.error || "Failed to generate quotation.");
+        setSubmissionError(data.error || "Failed to save quotation.");
       }
     } catch (err: any) {
-      setSubmissionError(err.message || "Failed to generate quotation.");
+      setSubmissionError(err.message || "Failed to save quotation.");
     } finally {
       setIsGenerating(false);
     }
@@ -403,14 +483,14 @@ export default function MakeQuotationPage() {
         <div className="bg-[#1E1E1E] text-white px-4 py-4 flex items-center space-x-3 sticky top-0 z-30 shadow-md">
           <button
             type="button"
-            onClick={() => router.push("/crm/dashboard")}
+            onClick={() => router.push(editId ? `/crm/quotations/${editId}` : "/crm/dashboard")}
             className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Back to Dashboard"
+            title={editId ? "Back to Quotation Detail" : "Back to Dashboard"}
           >
             <ArrowLeft size={22} />
           </button>
           <h1 className="text-lg font-bold tracking-tight text-white">
-            Make Quotation
+            {editId ? "Edit Quotation" : "Make Quotation"}
           </h1>
         </div>
 
@@ -429,7 +509,7 @@ export default function MakeQuotationPage() {
             </div>
             <div className="text-right">
               <span className="block text-[11px] font-medium text-gray-400">Quotation No</span>
-              <span className="font-bold text-gray-900 text-sm">-</span>
+              <span className="font-bold text-gray-900 text-sm">{quotationNo}</span>
             </div>
           </div>
 
@@ -642,10 +722,10 @@ export default function MakeQuotationPage() {
             {isGenerating ? (
               <>
                 <Loader2 size={16} className="animate-spin text-black" />
-                <span>Generating...</span>
+                <span>{editId ? "Updating..." : "Generating..."}</span>
               </>
             ) : (
-              <span>Generate</span>
+              <span>{editId ? "Update Quotation" : "Generate"}</span>
             )}
           </button>
         </div>
@@ -1126,5 +1206,20 @@ export default function MakeQuotationPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function MakeQuotationPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex flex-col items-center justify-center bg-[#1E1E1E] text-white">
+          <Loader2 className="w-10 h-10 text-white animate-spin mb-4" />
+          <p className="text-white/80 font-medium text-sm">Opening Quotation...</p>
+        </div>
+      }
+    >
+      <MakeQuotationContent />
+    </Suspense>
   );
 }

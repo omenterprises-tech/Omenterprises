@@ -46,6 +46,13 @@ export default function CrmManageProfilePage() {
   const [taxNumber, setTaxNumber] = useState("");
   const [selectedState, setSelectedState] = useState("");
 
+  // Bank & Payment Details
+  const [bankAccountName, setBankAccountName] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [bankAccountNo, setBankAccountNo] = useState("");
+  const [bankIfsc, setBankIfsc] = useState("");
+  const [bankAccountType, setBankAccountType] = useState("CURRENT ACCOUNT");
+
   // Logo & Signature
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -89,6 +96,11 @@ export default function CrmManageProfilePage() {
           setTaxLabel(b.taxLabel || "GSTIN");
           setTaxNumber(b.taxNumber || "");
           setSelectedState(b.state || "");
+          setBankAccountName(b.bankAccountName || b.businessName || "");
+          setBankName(b.bankName || "");
+          setBankAccountNo(b.bankAccountNo || "");
+          setBankIfsc(b.bankIfsc || "");
+          setBankAccountType(b.bankAccountType || "CURRENT ACCOUNT");
           setLogoUrl(b.logoUrl || null);
           setSignatureUrl(b.signatureUrl || null);
           setSignatureType(b.signatureType || "draw");
@@ -178,6 +190,11 @@ export default function CrmManageProfilePage() {
           logoUrl,
           signatureUrl,
           signatureType,
+          bankAccountName: bankAccountName.trim(),
+          bankName: bankName.trim(),
+          bankAccountNo: bankAccountNo.trim(),
+          bankIfsc: bankIfsc.trim().toUpperCase(),
+          bankAccountType: bankAccountType.trim(),
         }),
       });
 
@@ -566,6 +583,91 @@ export default function CrmManageProfilePage() {
                     {st}
                   </option>
                 ))}
+              </select>
+            </div>
+          </div>
+
+          {/* ================= BANK & PAYMENT DETAILS (For Quotations) ================= */}
+          <div className="pt-2 space-y-4">
+            {/* Gray Header Pill */}
+            <div className="bg-[#E5E7EB] text-gray-800 font-bold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider">
+              Bank & Payment Instructions
+            </div>
+
+            {/* Account Name */}
+            <div className="bg-[#F3F4F6] rounded-2xl px-4 py-2.5 border border-transparent focus-within:border-gray-400 focus-within:bg-white transition-all">
+              <label className="block text-[11px] text-gray-500 font-medium">
+                Beneficiary / Account Name
+              </label>
+              <input
+                type="text"
+                value={bankAccountName}
+                onChange={(e) => setBankAccountName(e.target.value)}
+                disabled={!canManageBusiness}
+                placeholder="e.g. OM ENTERPRISES"
+                className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed"
+              />
+            </div>
+
+            {/* Bank Name */}
+            <div className="bg-[#F3F4F6] rounded-2xl px-4 py-2.5 border border-transparent focus-within:border-gray-400 focus-within:bg-white transition-all">
+              <label className="block text-[11px] text-gray-500 font-medium">
+                Bank Name
+              </label>
+              <input
+                type="text"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                disabled={!canManageBusiness}
+                placeholder="e.g. KOTAK MAHINDRA BANK"
+                className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed uppercase"
+              />
+            </div>
+
+            {/* Account Number */}
+            <div className="bg-[#F3F4F6] rounded-2xl px-4 py-2.5 border border-transparent focus-within:border-gray-400 focus-within:bg-white transition-all">
+              <label className="block text-[11px] text-gray-500 font-medium">
+                Bank Account Number
+              </label>
+              <input
+                type="text"
+                value={bankAccountNo}
+                onChange={(e) => setBankAccountNo(e.target.value)}
+                disabled={!canManageBusiness}
+                placeholder="e.g. 9849845555"
+                className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed"
+              />
+            </div>
+
+            {/* IFSC Code */}
+            <div className="bg-[#F3F4F6] rounded-2xl px-4 py-2.5 border border-transparent focus-within:border-gray-400 focus-within:bg-white transition-all">
+              <label className="block text-[11px] text-gray-500 font-medium">
+                IFSC Code
+              </label>
+              <input
+                type="text"
+                value={bankIfsc}
+                onChange={(e) => setBankIfsc(e.target.value)}
+                disabled={!canManageBusiness}
+                placeholder="e.g. KKBK0007529"
+                className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed uppercase"
+              />
+            </div>
+
+            {/* Account Type */}
+            <div className="bg-[#F3F4F6] rounded-2xl px-4 py-2.5 border border-transparent focus-within:border-gray-400 focus-within:bg-white transition-all">
+              <label className="block text-[11px] text-gray-500 font-medium">
+                Account Type
+              </label>
+              <select
+                value={bankAccountType}
+                onChange={(e) => setBankAccountType(e.target.value)}
+                disabled={!canManageBusiness}
+                className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 cursor-pointer disabled:text-gray-700 disabled:cursor-not-allowed"
+              >
+                <option value="CURRENT ACCOUNT">CURRENT ACCOUNT</option>
+                <option value="SAVINGS ACCOUNT">SAVINGS ACCOUNT</option>
+                <option value="OVERDRAFT ACCOUNT">OVERDRAFT ACCOUNT</option>
               </select>
             </div>
           </div>

@@ -293,7 +293,10 @@ export default function CrmQuotationsListPage() {
                 <tbody className="divide-y divide-gray-100">
                   {filteredQuotations.map((q) => (
                     <tr key={q.id} className="hover:bg-gray-50/60 transition-colors">
-                      <td className="py-4 font-bold text-brand text-xs sm:text-sm">
+                      <td
+                        onClick={() => router.push(`/crm/quotations/${q.id}`)}
+                        className="py-4 font-bold text-brand hover:underline text-xs sm:text-sm cursor-pointer"
+                      >
                         {q.quotationNumber}
                       </td>
                       <td className="py-4 text-xs text-gray-500">{q.quotationDate}</td>
@@ -331,10 +334,7 @@ export default function CrmQuotationsListPage() {
                         <div className="flex items-center justify-end space-x-2">
                           <button
                             type="button"
-                            onClick={() => {
-                              setSelectedQuotation(q);
-                              setIsViewModalOpen(true);
-                            }}
+                            onClick={() => router.push(`/crm/quotations/${q.id}`)}
                             className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold flex items-center space-x-1 cursor-pointer transition-colors"
                           >
                             <Eye size={13} />

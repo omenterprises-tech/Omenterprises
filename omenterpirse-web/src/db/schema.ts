@@ -227,6 +227,11 @@ export const crmBusinesses = sqliteTable("crm_businesses", {
   currencyCode: text("currency_code").default("INR"),
   currencyCountry: text("currency_country").default("India"),
   currencyPriceFormatted: text("currency_price_formatted").default("₹999,999.12"),
+  bankName: text("bank_name"),
+  bankAccountNo: text("bank_account_no"),
+  bankIfsc: text("bank_ifsc"),
+  bankAccountType: text("bank_account_type"),
+  bankAccountName: text("bank_account_name"),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
   updatedAt: text("updated_at").$defaultFn(() => new Date().toISOString()),
 });

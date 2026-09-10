@@ -71,14 +71,32 @@ export async function PATCH(
     const quotationId = parseInt(idParam, 10);
 
     const body = await request.json();
-    const { status } = body;
+    const updateData: any = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (body.status !== undefined) updateData.status = body.status;
+    if (body.customerName !== undefined) updateData.customerName = body.customerName;
+    if (body.customerEmail !== undefined) updateData.customerEmail = body.customerEmail;
+    if (body.customerPhone !== undefined) updateData.customerPhone = body.customerPhone;
+    if (body.customerAddress !== undefined) updateData.customerAddress = body.customerAddress;
+    if (body.customerGstin !== undefined) updateData.customerGstin = body.customerGstin;
+    if (body.customerId !== undefined) updateData.customerId = body.customerId ? Number(body.customerId) : null;
+    if (body.quotationDate !== undefined) updateData.quotationDate = body.quotationDate;
+    if (body.validUntil !== undefined) updateData.validUntil = body.validUntil;
+    if (body.items !== undefined) updateData.items = typeof body.items === "string" ? body.items : JSON.stringify(body.items);
+    if (body.subtotal !== undefined) updateData.subtotal = Number(body.subtotal) || 0;
+    if (body.taxTotal !== undefined) updateData.taxTotal = Number(body.taxTotal) || 0;
+    if (body.grandTotal !== undefined) updateData.grandTotal = Number(body.grandTotal) || 0;
+    if (body.otherCharges !== undefined) {
+      updateData.otherCharges = body.otherCharges ? (typeof body.otherCharges === "string" ? body.otherCharges : JSON.stringify(body.otherCharges)) : null;
+    }
+    if (body.notes !== undefined) updateData.notes = body.notes;
+    if (body.termsConditions !== undefined) updateData.termsConditions = body.termsConditions;
 
     const updated = await db
       .update(crmQuotations)
-      .set({
-        status,
-        updatedAt: new Date().toISOString(),
-      })
+      .set(updateData)
       .where(
         and(
           eq(crmQuotations.id, quotationId),

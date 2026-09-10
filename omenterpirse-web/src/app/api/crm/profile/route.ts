@@ -62,6 +62,11 @@ export async function POST(request: Request) {
       logoUrl,
       signatureUrl,
       signatureType,
+      bankName,
+      bankAccountNo,
+      bankIfsc,
+      bankAccountType,
+      bankAccountName,
     } = body;
 
     if (!businessName || !businessName.trim()) {
@@ -94,6 +99,11 @@ export async function POST(request: Request) {
       logoUrl: logoUrl || null,
       signatureUrl: signatureUrl || null,
       signatureType: signatureType || null,
+      bankName: (bankName || "").trim() || null,
+      bankAccountNo: (bankAccountNo || "").trim() || null,
+      bankIfsc: (bankIfsc || "").trim() || null,
+      bankAccountType: (bankAccountType || "").trim() || null,
+      bankAccountName: (bankAccountName || "").trim() || null,
       updatedAt: new Date().toISOString(),
     };
 
