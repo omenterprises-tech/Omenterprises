@@ -767,78 +767,117 @@ export default function QuotationDetailPage({
           </div>
 
           {/* ================= 4. PRODUCTS TABLE ================= */}
-          <div className="overflow-x-auto border border-gray-300 rounded-xl py-0.5 print:overflow-visible print:border-gray-400 print:rounded-lg">
-            <table className="w-full text-left text-xs sm:text-sm print:text-xs border-collapse">
-              <thead>
-                <tr className="bg-gray-100 border-b border-gray-300 text-gray-800 font-extrabold uppercase tracking-wider text-[11px] print:text-[10px]">
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-10">#</th>
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2">DESCRIPTION</th>
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-24">HSN</th>
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-20">QTY</th>
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-28">PRICE</th>
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-28">GST</th>
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-32">TOTAL</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {items.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-gray-400">
-                      No products recorded in this quotation.
-                    </td>
-                  </tr>
-                ) : (
-                  items.map((it, idx) => {
-                    const qty = Number(it.quantity) || 1;
-                    const price = Number(it.unitPrice) || 0;
-                    const taxRate = it.taxPercent !== undefined && it.taxPercent !== null ? Number(it.taxPercent) : 0;
-                    const baseTotal = qty * price;
-                    const gstAmount = (baseTotal * taxRate) / 100;
-                    const rowTotal = baseTotal + gstAmount;
+          {(() => {
+            const hasAnyHsn = items.some(
+              (it) => it.hsn && it.hsn.trim() !== "" && it.hsn.trim() !== "-"
+            );
 
-                    return (
-                      <tr key={idx} className="align-top hover:bg-blue-50/20 transition-colors">
-                        <td className="py-3 px-3 print:py-1.5 print:px-2 text-center font-medium text-gray-500">
-                          {idx + 1}
-                        </td>
-                        <td className="py-3 px-3 print:py-1.5 print:px-2">
-                          <span className="font-bold text-gray-900 block leading-snug">
-                            {it.name || it.description?.split(" - ")[0] || "Item"}
-                          </span>
-                          {it.description && (
-                            <span className="text-xs print:text-[10px] text-gray-500 block leading-relaxed mt-0.5 font-normal">
-                              {it.description}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3 print:py-1.5 print:px-2 text-center text-gray-600 font-medium text-xs">
-                          {it.hsn || "-"}
-                        </td>
-                        <td className="py-3 px-3 print:py-1.5 print:px-2 text-center font-bold text-gray-900">
-                          <div>{qty}</div>
-                          <div className="text-[10px] text-gray-500 font-normal uppercase">
-                            {it.unit || "COILS"}
-                          </div>
-                        </td>
-                        <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-semibold text-gray-900">
-                          {formatRs(price)}
-                        </td>
-                        <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-medium text-gray-700">
-                          <div>{formatRs(gstAmount)}</div>
-                          <div className="text-[10px] text-gray-500 font-normal">
-                            {taxRate.toFixed(2)}%
-                          </div>
-                        </td>
-                        <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-black text-gray-900">
-                          {formatRs(it.total || rowTotal)}
+            return (
+              <div className="overflow-x-auto border border-gray-300 rounded-xl py-0.5 print:overflow-visible print:border-gray-400 print:rounded-lg">
+                <table className="w-full text-left text-xs sm:text-sm print:text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100 border-b border-gray-300 text-gray-800 font-extrabold uppercase tracking-wider text-[11px] print:text-[10px]">
+                      <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-10">#</th>
+                      <th className="py-2.5 px-3 print:py-1.5 print:px-2">DESCRIPTION</th>
+                      {hasAnyHsn && (
+                        <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-24">HSN</th>
+                      )}
+                      <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-20">QTY</th>
+                      <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-28">PRICE</th>
+                      <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-28">GST</th>
+                      <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-32">TOTAL</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {items.length === 0 ? (
+                      <tr>
+                        <td colSpan={hasAnyHsn ? 7 : 6} className="py-8 text-center text-gray-400">
+                          No products recorded in this quotation.
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                    ) : (
+                      items.map((it, idx) => {
+                        const qty = Number(it.quantity) || 1;
+                        const price = Number(it.unitPrice) || 0;
+                        const taxRate = it.taxPercent !== undefined && it.taxPercent !== null ? Number(it.taxPercent) : 0;
+                        const baseTotal = qty * price;
+                        const gstAmount = (baseTotal * taxRate) / 100;
+                        const rowTotal = baseTotal + gstAmount;
+
+                        const displayName =
+                          it.name?.trim() ||
+                          (it.description?.includes(" - ")
+                            ? it.description.split(" - ")[0].trim()
+                            : it.description?.trim()) ||
+                          "Item";
+
+                        let rawDesc = (it.description || "").trim();
+                        let cleanedDesc = "";
+
+                        if (rawDesc) {
+                          if (rawDesc.toLowerCase() === displayName.toLowerCase()) {
+                            cleanedDesc = "";
+                          } else if (
+                            rawDesc.toLowerCase().startsWith((displayName + " - ").toLowerCase())
+                          ) {
+                            cleanedDesc = rawDesc.slice(displayName.length + 3).trim();
+                          } else if (rawDesc.toLowerCase().startsWith(displayName.toLowerCase())) {
+                            cleanedDesc = rawDesc
+                              .slice(displayName.length)
+                              .replace(/^[-–—:\s]+/, "")
+                              .trim();
+                          } else {
+                            cleanedDesc = rawDesc;
+                          }
+                        }
+
+                        return (
+                          <tr key={idx} className="align-top hover:bg-blue-50/20 transition-colors">
+                            <td className="py-3 px-3 print:py-1.5 print:px-2 text-center font-medium text-gray-500">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3 px-3 print:py-1.5 print:px-2">
+                              <span className="font-bold text-gray-900 block leading-snug">
+                                {displayName}
+                              </span>
+                              {cleanedDesc ? (
+                                <span className="text-xs print:text-[10px] text-gray-500 block leading-relaxed mt-0.5 font-normal">
+                                  {cleanedDesc}
+                                </span>
+                              ) : null}
+                            </td>
+                            {hasAnyHsn && (
+                              <td className="py-3 px-3 print:py-1.5 print:px-2 text-center text-gray-600 font-medium text-xs">
+                                {it.hsn && it.hsn.trim() !== "-" ? it.hsn.trim() : ""}
+                              </td>
+                            )}
+                            <td className="py-3 px-3 print:py-1.5 print:px-2 text-center font-bold text-gray-900">
+                              <div>{qty}</div>
+                              <div className="text-[10px] text-gray-500 font-normal uppercase">
+                                {it.unit || "COILS"}
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-semibold text-gray-900">
+                              {formatRs(price)}
+                            </td>
+                            <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-medium text-gray-700">
+                              <div>{formatRs(gstAmount)}</div>
+                              <div className="text-[10px] text-gray-500 font-normal">
+                                {taxRate.toFixed(2)}%
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-black text-gray-900">
+                              {formatRs(it.total || rowTotal)}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
 
           {/* ================= 5. FINANCIAL TOTALS BREAKDOWN ================= */}
           <div className="flex justify-end pt-1 print:pt-0.5">

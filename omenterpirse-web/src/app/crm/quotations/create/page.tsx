@@ -189,19 +189,50 @@ function MakeQuotationContent() {
 
             if (Array.isArray(parsedItems) && parsedItems.length > 0) {
               setSelectedItems(
-                parsedItems.map((it: any, i: number) => ({
-                  id: it.id || `item-${i}-${Date.now()}`,
-                  name: it.name || it.description?.split(" - ")[0] || "Item",
-                  description: it.description?.includes(" - ")
-                    ? it.description.split(" - ").slice(1).join(" - ")
-                    : "",
-                  quantity: Number(it.quantity) || 1,
-                  unitPrice: Number(it.unitPrice) || 0,
-                  taxPercent: it.taxPercent !== undefined && it.taxPercent !== null ? Number(it.taxPercent) : 0,
-                  total: Number(it.total) || (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0),
-                  hsn: it.hsn || "-",
-                  unit: it.unit || "PCS",
-                }))
+                parsedItems.map((it: any, i: number) => {
+                  const displayName =
+                    it.name?.trim() ||
+                    (it.description?.includes(" - ")
+                      ? it.description.split(" - ")[0].trim()
+                      : it.description?.trim()) ||
+                    "Item";
+
+                  let rawDesc = (it.description || "").trim();
+                  let cleanedDesc = "";
+                  if (rawDesc) {
+                    if (rawDesc.toLowerCase() === displayName.toLowerCase()) {
+                      cleanedDesc = "";
+                    } else if (
+                      rawDesc.toLowerCase().startsWith((displayName + " - ").toLowerCase())
+                    ) {
+                      cleanedDesc = rawDesc.slice(displayName.length + 3).trim();
+                    } else if (rawDesc.toLowerCase().startsWith(displayName.toLowerCase())) {
+                      cleanedDesc = rawDesc
+                        .slice(displayName.length)
+                        .replace(/^[-–—:\s]+/, "")
+                        .trim();
+                    } else {
+                      cleanedDesc = rawDesc;
+                    }
+                  }
+
+                  return {
+                    id: it.id || `item-${i}-${Date.now()}`,
+                    name: displayName,
+                    description: cleanedDesc,
+                    quantity: Number(it.quantity) || 1,
+                    unitPrice: Number(it.unitPrice) || 0,
+                    taxPercent:
+                      it.taxPercent !== undefined && it.taxPercent !== null
+                        ? Number(it.taxPercent)
+                        : 0,
+                    total:
+                      Number(it.total) ||
+                      (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0),
+                    hsn: it.hsn && it.hsn.trim() !== "-" ? it.hsn.trim() : "",
+                    unit: it.unit || "PCS",
+                  };
+                })
               );
             }
 
@@ -363,7 +394,7 @@ function MakeQuotationContent() {
       description: cfgDescription.trim(),
       taxPercent: taxRate,
       total,
-      hsn: cfgHsn.trim() || "-",
+      hsn: cfgHsn.trim() && cfgHsn.trim() !== "-" ? cfgHsn.trim() : "",
       unit: cfgUnit.trim() || "COILS",
     };
 
@@ -453,16 +484,29 @@ function MakeQuotationContent() {
         .map((t, idx) => `${idx + 1}. ${t.text.trim()}`)
         .join("\n");
 
-      const itemsPayload = selectedItems.map((it) => ({
-        name: it.name,
-        description: it.name + (it.description ? ` - ${it.description}` : ""),
-        quantity: it.quantity,
-        unitPrice: it.unitPrice,
-        taxPercent: it.taxPercent,
-        total: it.total,
-        hsn: it.hsn,
-        unit: it.unit,
-      }));
+      const itemsPayload = selectedItems.map((it) => {
+        const displayName = it.name?.trim() || "Item";
+        let rawDesc = (it.description || "").trim();
+        let cleanedDesc = rawDesc;
+        if (rawDesc.toLowerCase() === displayName.toLowerCase()) {
+          cleanedDesc = "";
+        } else if (rawDesc.toLowerCase().startsWith((displayName + " - ").toLowerCase())) {
+          cleanedDesc = rawDesc.slice(displayName.length + 3).trim();
+        } else if (rawDesc.toLowerCase().startsWith(displayName.toLowerCase())) {
+          cleanedDesc = rawDesc.slice(displayName.length).replace(/^[-–—:\s]+/, "").trim();
+        }
+
+        return {
+          name: displayName,
+          description: cleanedDesc || null,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          taxPercent: it.taxPercent,
+          total: it.total,
+          hsn: it.hsn && it.hsn.trim() !== "" && it.hsn.trim() !== "-" ? it.hsn.trim() : null,
+          unit: it.unit,
+        };
+      });
 
       const payload = {
         customerId: selectedCustomer.id,
@@ -824,9 +868,13 @@ function MakeQuotationContent() {
                     )}
 
                     <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
-                      <span>HSN: {prod.hsn || "-"}</span>
-                      <span>GST: {prod.gst !== undefined && prod.gst !== null ? `${prod.gst}%` : "0%"}</span>
-                      <span className="text-xs font-bold text-brand group-hover:underline">
+                      <div className="flex items-center space-x-3">
+                        {prod.hsn && prod.hsn.trim() !== "-" && <span>HSN: {prod.hsn}</span>}
+                        {prod.gst !== undefined && prod.gst !== null && prod.gst > 0 && (
+                          <span>GST: {prod.gst}%</span>
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-brand group-hover:underline ml-auto">
                         Select & Configure →
                       </span>
                     </div>
@@ -1219,83 +1267,117 @@ function MakeQuotationContent() {
               </button>
             </div>
 
-            <div className="space-y-3">
-              <div className="overflow-x-auto border border-gray-200 rounded-2xl">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-50 border-b border-gray-200 font-extrabold text-gray-700 uppercase tracking-wider text-[11px]">
-                    <tr>
-                      <th className="p-3 text-center w-10">#</th>
-                      <th className="p-3">Item Description</th>
-                      <th className="p-3 text-center w-16">HSN</th>
-                      <th className="p-3 text-center w-20">Qty</th>
-                      <th className="p-3 text-right w-24">Rate (₹)</th>
-                      <th className="p-3 text-center w-16">GST %</th>
-                      <th className="p-3 text-right w-28">Amount (₹)</th>
-                      <th className="p-3 text-center w-16">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {selectedItems.map((item, idx) => (
-                      <tr key={item.id} className="hover:bg-blue-50/30 transition-colors">
-                        <td className="p-3 text-center font-medium text-gray-400">{idx + 1}</td>
-                        <td className="p-3">
-                          <span className="font-bold text-gray-900 block">{item.name}</span>
-                          {item.description && (
-                            <span className="text-[11px] text-gray-500 font-normal block mt-0.5">
-                              {item.description}
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3 text-center text-gray-500">{item.hsn || "-"}</td>
-                        <td className="p-3 text-center font-bold text-gray-800">
-                          {item.quantity} <span className="text-[10px] text-gray-500 uppercase">{item.unit || "COILS"}</span>
-                        </td>
-                        <td className="p-3 text-right font-medium text-gray-800">
-                          ₹{item.unitPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="p-3 text-center font-medium text-gray-600">{item.taxPercent || 0}%</td>
-                        <td className="p-3 text-right font-bold text-gray-900">
-                          ₹{item.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="p-3 text-center">
-                          <div className="flex items-center justify-center space-x-1">
-                            <button
-                              type="button"
-                              onClick={() => openProductConfigurator(item, idx)}
-                              className="p-1 text-gray-400 hover:text-brand transition-colors cursor-pointer"
-                              title="Edit Item"
-                            >
-                              <Edit3 size={15} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setSelectedItems((prev) => prev.filter((_, i) => i !== idx))
-                              }
-                              className="p-1 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
-                              title="Remove Item"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            {(() => {
+              const hasAnyHsn = selectedItems.some(
+                (item) => item.hsn && item.hsn.trim() !== "" && item.hsn.trim() !== "-"
+              );
 
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsProductSelectOpen(true)}
-                  className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl border border-gray-200 hover:border-brand text-brand hover:bg-brand/5 text-xs font-bold transition-all cursor-pointer"
-                >
-                  <Plus size={14} />
-                  <span>Add Another Product</span>
-                </button>
-              </div>
-            </div>
+              return (
+                <div className="space-y-3">
+                  <div className="overflow-x-auto border border-gray-200 rounded-2xl">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-gray-50 border-b border-gray-200 font-extrabold text-gray-700 uppercase tracking-wider text-[11px]">
+                        <tr>
+                          <th className="p-3 text-center w-10">#</th>
+                          <th className="p-3">Item Description</th>
+                          {hasAnyHsn && <th className="p-3 text-center w-16">HSN</th>}
+                          <th className="p-3 text-center w-20">Qty</th>
+                          <th className="p-3 text-right w-24">Rate (₹)</th>
+                          <th className="p-3 text-center w-16">GST %</th>
+                          <th className="p-3 text-right w-28">Amount (₹)</th>
+                          <th className="p-3 text-center w-16">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {selectedItems.map((item, idx) => {
+                          const displayName = item.name?.trim() || "Item";
+                          let rawDesc = (item.description || "").trim();
+                          let cleanedDesc = "";
+                          if (rawDesc) {
+                            if (rawDesc.toLowerCase() === displayName.toLowerCase()) {
+                              cleanedDesc = "";
+                            } else if (
+                              rawDesc.toLowerCase().startsWith((displayName + " - ").toLowerCase())
+                            ) {
+                              cleanedDesc = rawDesc.slice(displayName.length + 3).trim();
+                            } else if (rawDesc.toLowerCase().startsWith(displayName.toLowerCase())) {
+                              cleanedDesc = rawDesc
+                                .slice(displayName.length)
+                                .replace(/^[-–—:\s]+/, "")
+                                .trim();
+                            } else {
+                              cleanedDesc = rawDesc;
+                            }
+                          }
+
+                          return (
+                            <tr key={item.id} className="hover:bg-blue-50/30 transition-colors">
+                              <td className="p-3 text-center font-medium text-gray-400">{idx + 1}</td>
+                              <td className="p-3">
+                                <span className="font-bold text-gray-900 block">{displayName}</span>
+                                {cleanedDesc ? (
+                                  <span className="text-[11px] text-gray-500 font-normal block mt-0.5">
+                                    {cleanedDesc}
+                                  </span>
+                                ) : null}
+                              </td>
+                              {hasAnyHsn && (
+                                <td className="p-3 text-center text-gray-500">
+                                  {item.hsn && item.hsn.trim() !== "-" ? item.hsn.trim() : ""}
+                                </td>
+                              )}
+                              <td className="p-3 text-center font-bold text-gray-800">
+                                {item.quantity} <span className="text-[10px] text-gray-500 uppercase">{item.unit || "COILS"}</span>
+                              </td>
+                              <td className="p-3 text-right font-medium text-gray-800">
+                                ₹{item.unitPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="p-3 text-center font-medium text-gray-600">{item.taxPercent || 0}%</td>
+                              <td className="p-3 text-right font-bold text-gray-900">
+                                ₹{item.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="p-3 text-center">
+                                <div className="flex items-center justify-center space-x-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => openProductConfigurator(item, idx)}
+                                    className="p-1 text-gray-400 hover:text-brand transition-colors cursor-pointer"
+                                    title="Edit Item"
+                                  >
+                                    <Edit3 size={15} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setSelectedItems((prev) => prev.filter((_, i) => i !== idx))
+                                    }
+                                    className="p-1 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                    title="Remove Item"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsProductSelectOpen(true)}
+                      className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl border border-gray-200 hover:border-brand text-brand hover:bg-brand/5 text-xs font-bold transition-all cursor-pointer"
+                    >
+                      <Plus size={14} />
+                      <span>Add Another Product</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
