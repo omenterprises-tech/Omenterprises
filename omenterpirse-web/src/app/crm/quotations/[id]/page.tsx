@@ -69,6 +69,7 @@ export default function QuotationDetailPage({
   // Share Modal & PDF Generation
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [customWhatsAppPhone, setCustomWhatsAppPhone] = useState("");
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -88,6 +89,9 @@ export default function QuotationDetailPage({
       if (data.success && data.quotation) {
         setQuotation(data.quotation);
         setBusiness(data.business);
+        if (data.quotation.customerPhone) {
+          setCustomWhatsAppPhone(data.quotation.customerPhone);
+        }
       } else {
         setError(data.error || "Failed to load quotation.");
       }
@@ -255,6 +259,12 @@ export default function QuotationDetailPage({
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
+        onclone: (clonedDoc) => {
+          const sheet = clonedDoc.getElementById("quotation-sheet");
+          if (sheet) {
+            sheet.style.backgroundColor = "#ffffff";
+          }
+        },
       });
 
       const imgData = canvas.toDataURL("image/png");
@@ -308,6 +318,9 @@ export default function QuotationDetailPage({
   // Handle Share as PDF File
   const handleShare = async () => {
     if (!quotation) return;
+    if (quotation.customerPhone && !customWhatsAppPhone) {
+      setCustomWhatsAppPhone(quotation.customerPhone);
+    }
     setIsGeneratingPdf(true);
 
     try {
@@ -346,42 +359,57 @@ export default function QuotationDetailPage({
   const handleDownloadPdf = async () => {
     if (!quotation) return;
     setIsGeneratingPdf(true);
-    const blob = await generateQuotationPdfBlob();
-    if (blob) {
-      const fileName = `Quotation_${quotation.quotationNumber || "Doc"}.pdf`;
-      downloadPdfFile(blob, fileName);
-      showToast("Quotation PDF downloaded successfully!");
-    } else {
-      showToast("Falling back to print dialog...");
+    try {
+      const blob = await generateQuotationPdfBlob();
+      if (blob) {
+        const fileName = `Quotation_${quotation.quotationNumber || "Doc"}.pdf`;
+        downloadPdfFile(blob, fileName);
+        showToast("Quotation PDF downloaded successfully!");
+      } else {
+        showToast("Falling back to print dialog...");
+        handlePrint();
+      }
+    } catch (err) {
+      console.error("Download error:", err);
       handlePrint();
+    } finally {
+      setIsGeneratingPdf(false);
+      setIsShareModalOpen(false);
     }
-    setIsGeneratingPdf(false);
-    setIsShareModalOpen(false);
   };
 
-  // Handle WhatsApp PDF sharing
-  const handleWhatsAppPdfShare = async () => {
+  // Handle WhatsApp PDF sharing to any number or any chat
+  const handleWhatsAppPdfShare = async (phoneArg?: string) => {
     if (!quotation) return;
     setIsGeneratingPdf(true);
-    const blob = await generateQuotationPdfBlob();
-    const fileName = `Quotation_${quotation.quotationNumber || "Doc"}.pdf`;
-    if (blob) {
-      downloadPdfFile(blob, fileName);
+    try {
+      const blob = await generateQuotationPdfBlob();
+      const fileName = `Quotation_${quotation.quotationNumber || "Doc"}.pdf`;
+      if (blob) {
+        downloadPdfFile(blob, fileName);
+        showToast("PDF downloaded! Attach the file to your WhatsApp chat.");
+      } else {
+        showToast("Opening WhatsApp...");
+      }
+
+      const targetRaw = phoneArg !== undefined ? phoneArg : customWhatsAppPhone;
+      const cleanDigits = targetRaw?.replace(/[^0-9]/g, "") || "";
+      const finalPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+
+      const customerLabel = quotation.customerName ? ` ${quotation.customerName}` : "";
+      const msg = `Hello${customerLabel}, please find attached Quotation ${quotation.quotationNumber} for ₹${Number(quotation.grandTotal).toLocaleString("en-IN")} from ${business?.businessName || "OM Enterprises"}.`;
+
+      const waUrl = finalPhone
+        ? `https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(msg)}`
+        : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+
+      window.open(waUrl, "_blank");
+    } catch (err) {
+      console.error("WhatsApp share error:", err);
+    } finally {
+      setIsGeneratingPdf(false);
+      setIsShareModalOpen(false);
     }
-    setIsGeneratingPdf(false);
-    setIsShareModalOpen(false);
-
-    showToast("PDF downloaded! Attach the file to your WhatsApp chat.");
-
-    const rawPhone = quotation.customerPhone?.replace(/[^0-9]/g, "") || "";
-    const cleanPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
-    const msg = `Hello ${quotation.customerName}, please find attached Quotation ${quotation.quotationNumber} for ₹${Number(quotation.grandTotal).toLocaleString("en-IN")} from ${business?.businessName || "OM Enterprises"}.`;
-    
-    const waUrl = cleanPhone
-      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`
-      : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-
-    window.open(waUrl, "_blank");
   };
 
   // Trigger Print / PDF
@@ -1027,10 +1055,11 @@ export default function QuotationDetailPage({
 
 
 
-      {/* ================= SHARE OPTIONS MODAL (PDF ONLY) ================= */}
+      {/* ================= SHARE OPTIONS MODAL (PDF & WHATSAPP) ================= */}
       {isShareModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-7 shadow-2xl space-y-4 my-auto animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <div className="flex items-center space-x-2">
                 <Share2 size={18} className="text-brand" />
@@ -1046,43 +1075,104 @@ export default function QuotationDetailPage({
             </div>
 
             <p className="text-xs text-gray-600 leading-relaxed">
-              Export and share your quotation as an official PDF document:
+              Export and share your formal quotation document via PDF or directly over WhatsApp:
             </p>
 
-            <div className="space-y-2.5 pt-1">
-              {/* 1. Direct Download PDF */}
-              <button
-                type="button"
-                onClick={handleDownloadPdf}
-                disabled={isGeneratingPdf}
-                className="w-full py-3 bg-brand hover:bg-brand-hover text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
-              >
-                {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-                <span>Download PDF Document</span>
-              </button>
+            <div className="space-y-3 pt-1">
+              {/* 1. Direct PDF Download */}
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-800">Download PDF File</span>
+                  <span className="text-[10px] text-brand font-bold bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                    A4 Clean Format
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  disabled={isGeneratingPdf}
+                  className="w-full py-2.5 bg-brand hover:bg-brand-hover text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                  <span>Download PDF Document</span>
+                </button>
+              </div>
 
-              {/* 2. WhatsApp PDF Share */}
-              <button
-                type="button"
-                onClick={handleWhatsAppPdfShare}
-                disabled={isGeneratingPdf}
-                className="w-full py-3 bg-[#25D366] hover:bg-[#1EBE5D] text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
-              >
-                {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-                <span>Send PDF via WhatsApp</span>
-              </button>
+              {/* 2. WhatsApp Sharing to Any Number */}
+              <div className="bg-[#25D366]/10 p-4 rounded-2xl border border-[#25D366]/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                    <Send size={14} className="text-[#25D366]" />
+                    <span>Send via WhatsApp</span>
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-800 bg-[#25D366]/20 px-2 py-0.5 rounded-full">
+                    Any Number
+                  </span>
+                </div>
 
-              {/* 3. Print / Save as PDF */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                    Recipient Mobile Number (Optional)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={customWhatsAppPhone}
+                      onChange={(e) => setCustomWhatsAppPhone(e.target.value)}
+                      placeholder="Enter 10-digit number (e.g. 9876543210)"
+                      className="w-full px-3.5 py-2.5 bg-white rounded-xl border border-gray-300 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#25D366]/50 focus:border-[#25D366] font-medium"
+                    />
+                    {customWhatsAppPhone && (
+                      <button
+                        type="button"
+                        onClick={() => setCustomWhatsAppPhone("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs p-1"
+                        title="Clear Number"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Send to this specific number, or click below to choose any chat/contact in WhatsApp.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleWhatsAppPdfShare(customWhatsAppPhone)}
+                    disabled={isGeneratingPdf || !customWhatsAppPhone.trim()}
+                    className="py-2.5 px-3 bg-[#25D366] hover:bg-[#1EBE5D] text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                    title="Send to the specified number"
+                  >
+                    {isGeneratingPdf ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                    <span>Send to Number</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleWhatsAppPdfShare("")}
+                    disabled={isGeneratingPdf}
+                    className="py-2.5 px-3 bg-white border border-[#25D366] text-emerald-800 hover:bg-[#25D366]/10 font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                    title="Choose any chat, contact or group in WhatsApp"
+                  >
+                    <span>Choose Any Chat</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Browser Print / Save Dialog */}
               <button
                 type="button"
                 onClick={() => {
                   setIsShareModalOpen(false);
                   handlePrint();
                 }}
-                className="w-full py-3 border border-gray-300 text-gray-700 font-bold text-xs rounded-xl hover:bg-gray-50 transition-all cursor-pointer flex items-center justify-center space-x-2"
+                className="w-full py-2.5 border border-gray-300 text-gray-700 font-bold text-xs rounded-xl hover:bg-gray-50 transition-all cursor-pointer flex items-center justify-center space-x-2"
               >
                 <Printer size={15} />
-                <span>Print / Save via Print Dialog</span>
+                <span>Print or Save via Browser Dialog</span>
               </button>
             </div>
           </div>
