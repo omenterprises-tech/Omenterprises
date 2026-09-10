@@ -1,24 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Loader2, AlertCircle, Contact } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Loader2, AlertCircle, Contact, CheckCircle2 } from "lucide-react";
 import { INDIAN_STATES } from "@/lib/crmCategoriesData";
 
-interface CustomerModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onCustomerCreated?: (customer: any) => void;
-  onCustomerSaved?: (customer: any) => void;
-  initialCustomer?: any | null;
-}
+export default function AddCustomerPage() {
+  const router = useRouter();
 
-export default function CustomerModal({
-  isOpen,
-  onClose,
-  onCustomerCreated,
-  onCustomerSaved,
-  initialCustomer,
-}: CustomerModalProps) {
   const [name, setName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
@@ -33,38 +22,7 @@ export default function CustomerModal({
   const [errors, setErrors] = useState<{ name?: string; companyName?: string }>({});
   const [loading, setLoading] = useState(false);
   const [generalError, setGeneralError] = useState("");
-
-  const isEditing = Boolean(initialCustomer?.id);
-
-  useEffect(() => {
-    if (initialCustomer) {
-      setName(initialCustomer.name || "");
-      setCompanyName(initialCustomer.companyName || "");
-      setEmail(initialCustomer.email || "");
-      setMobile(initialCustomer.phone || initialCustomer.mobile || "");
-      setAddressLine1(initialCustomer.addressLine1 || initialCustomer.address || "");
-      setAddressLine2(initialCustomer.addressLine2 || "");
-      setOtherInfo(initialCustomer.otherInfo || "");
-      setGstin(initialCustomer.gstin || "");
-      setState(initialCustomer.state || "");
-      setShippingAddress(initialCustomer.shippingAddress || "");
-    } else {
-      setName("");
-      setCompanyName("");
-      setEmail("");
-      setMobile("");
-      setAddressLine1("");
-      setAddressLine2("");
-      setOtherInfo("");
-      setGstin("");
-      setState("");
-      setShippingAddress("");
-    }
-    setErrors({});
-    setGeneralError("");
-  }, [initialCustomer, isOpen]);
-
-  if (!isOpen) return null;
+  const [successMsg, setSuccessMsg] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,78 +45,77 @@ export default function CustomerModal({
     setLoading(true);
 
     try {
-      const url = "/api/crm/customers";
-      const method = isEditing ? "PUT" : "POST";
-      const payload: any = {
-        name: name.trim(),
-        companyName: companyName.trim(),
-        email: email.trim(),
-        phone: mobile.trim(),
-        addressLine1: addressLine1.trim(),
-        addressLine2: addressLine2.trim(),
-        otherInfo: otherInfo.trim(),
-        gstin: gstin.trim(),
-        state: state.trim(),
-        shippingAddress: shippingAddress.trim(),
-      };
-      if (isEditing && initialCustomer?.id) {
-        payload.id = initialCustomer.id;
-      }
-
-      const res = await fetch(url, {
-        method,
+      const res = await fetch("/api/crm/customers", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          name: name.trim(),
+          companyName: companyName.trim(),
+          email: email.trim(),
+          phone: mobile.trim(),
+          addressLine1: addressLine1.trim(),
+          addressLine2: addressLine2.trim(),
+          otherInfo: otherInfo.trim(),
+          gstin: gstin.trim(),
+          state: state.trim(),
+          shippingAddress: shippingAddress.trim(),
+        }),
       });
 
       const data = await res.json();
       if (data.success && data.customer) {
-        if (isEditing) {
-          if (onCustomerSaved) onCustomerSaved(data.customer);
-        } else {
-          if (onCustomerCreated) onCustomerCreated(data.customer);
-        }
-        onClose();
+        setSuccessMsg("Customer added successfully!");
+        setTimeout(() => {
+          router.push("/crm/customers");
+        }, 1000);
       } else {
         if (data.field === "name") {
           setErrors((prev) => ({ ...prev, name: data.error }));
         } else if (data.field === "companyName") {
           setErrors((prev) => ({ ...prev, companyName: data.error }));
         } else {
-          setGeneralError(data.error || "Failed to save customer.");
+          setGeneralError(data.error || "Failed to add customer.");
         }
       }
     } catch (err: any) {
-      setGeneralError(err.message || "Failed to save customer.");
+      setGeneralError(err.message || "Failed to add customer.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
-        {/* Dark Header */}
-        <div className="bg-[#1E1E1E] text-white px-4 py-3.5 flex items-center space-x-3 shrink-0">
+    <div className="min-h-screen bg-[#1E1E1E] flex flex-col justify-start items-center font-inter">
+      {/* Mobile-style Frame Container */}
+      <div className="w-full max-w-md min-h-screen bg-white flex flex-col shadow-2xl">
+        {/* Dark Mobile Header */}
+        <div className="bg-[#1E1E1E] text-white px-4 py-4 flex items-center space-x-3 sticky top-0 z-30 shadow-sm">
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => router.push("/crm/customers")}
             className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Back / Close"
+            title="Back to Customers"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={22} />
           </button>
-          <h2 className="text-base font-bold tracking-tight text-white">
-            {isEditing ? "Edit Customer" : "Add Customer"}
-          </h2>
+          <h1 className="text-lg font-bold tracking-tight text-white">
+            Add Customer
+          </h1>
         </div>
 
-        {/* Scrollable Form Content */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-5 overflow-y-auto space-y-3.5 flex-1">
+        {/* Scrollable Form Body */}
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-3.5 flex-1 overflow-y-auto">
           {generalError && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 font-medium flex items-center gap-2">
               <AlertCircle size={15} className="shrink-0 text-rose-600" />
               <span>{generalError}</span>
+            </div>
+          )}
+
+          {successMsg && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-700 font-medium flex items-center gap-2">
+              <CheckCircle2 size={15} className="shrink-0 text-emerald-600" />
+              <span>{successMsg}</span>
             </div>
           )}
 
@@ -291,12 +248,12 @@ export default function CustomerModal({
             <input
               type="text"
               value={state}
-              list="customer-modal-states"
+              list="add-customer-states"
               onChange={(e) => setState(e.target.value)}
               placeholder="State"
               className="w-full bg-[#F4F5F7] px-4 py-3.5 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 border border-transparent transition-all"
             />
-            <datalist id="customer-modal-states">
+            <datalist id="add-customer-states">
               {INDIAN_STATES.map((st) => (
                 <option key={st} value={st} />
               ))}
@@ -321,7 +278,7 @@ export default function CustomerModal({
           </div>
 
           {/* Action Button */}
-          <div className="pt-3 pb-1">
+          <div className="pt-3 pb-6">
             <button
               type="submit"
               disabled={loading}
@@ -333,7 +290,7 @@ export default function CustomerModal({
                   <span>Saving...</span>
                 </>
               ) : (
-                <span>{isEditing ? "Save Changes" : "Add"}</span>
+                <span>Add</span>
               )}
             </button>
           </div>

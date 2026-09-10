@@ -66,7 +66,7 @@ export function CreateQuotationModal({
       setCustomerName(found.name + (found.companyName ? " (" + found.companyName + ")" : ""));
       setCustomerEmail(found.email || "");
       setCustomerPhone(found.phone || "");
-      setCustomerAddress([found.address, found.city, found.state, found.pincode].filter(Boolean).join(", "));
+      setCustomerAddress([found.addressLine1, found.addressLine2, found.address, found.city, found.state, found.pincode].filter(Boolean).join(", "));
       setCustomerGstin(found.gstin || "");
     }
   };

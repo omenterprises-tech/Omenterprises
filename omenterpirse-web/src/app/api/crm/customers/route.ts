@@ -49,10 +49,28 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, companyName, email, phone, address, city, state, pincode, gstin } = body;
+    const {
+      name,
+      companyName,
+      email,
+      phone,
+      addressLine1,
+      addressLine2,
+      otherInfo,
+      gstin,
+      state,
+      shippingAddress,
+      address,
+      city,
+      pincode,
+    } = body;
 
     if (!name || !name.trim()) {
-      return NextResponse.json({ success: false, error: "Customer name is required." }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Name is required.", field: "name" }, { status: 400 });
+    }
+
+    if (!companyName || !companyName.trim()) {
+      return NextResponse.json({ success: false, error: "Company name is required.", field: "companyName" }, { status: 400 });
     }
 
     const newCustomer = await db
@@ -60,14 +78,18 @@ export async function POST(request: Request) {
       .values({
         businessId: business.id,
         name: name.trim(),
-        companyName: companyName?.trim() || null,
+        companyName: companyName.trim(),
         email: email?.trim() || null,
         phone: phone?.trim() || null,
-        address: address?.trim() || null,
-        city: city?.trim() || null,
-        state: state?.trim() || null,
-        pincode: pincode?.trim() || null,
+        addressLine1: addressLine1?.trim() || null,
+        addressLine2: addressLine2?.trim() || null,
+        otherInfo: otherInfo?.trim() || null,
         gstin: gstin?.trim() || null,
+        state: state?.trim() || null,
+        shippingAddress: shippingAddress?.trim() || null,
+        address: address?.trim() || addressLine1?.trim() || null,
+        city: city?.trim() || null,
+        pincode: pincode?.trim() || null,
         createdByUserId: session.userId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -100,14 +122,33 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, companyName, email, phone, address, city, state, pincode, gstin } = body;
+    const {
+      id,
+      name,
+      companyName,
+      email,
+      phone,
+      addressLine1,
+      addressLine2,
+      otherInfo,
+      gstin,
+      state,
+      shippingAddress,
+      address,
+      city,
+      pincode,
+    } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: "Customer ID is required." }, { status: 400 });
     }
 
     if (!name || !name.trim()) {
-      return NextResponse.json({ success: false, error: "Customer name is required." }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Name is required.", field: "name" }, { status: 400 });
+    }
+
+    if (!companyName || !companyName.trim()) {
+      return NextResponse.json({ success: false, error: "Company name is required.", field: "companyName" }, { status: 400 });
     }
 
     const customerId = parseInt(id, 10);
@@ -115,14 +156,18 @@ export async function PUT(request: Request) {
       .update(crmCustomers)
       .set({
         name: name.trim(),
-        companyName: companyName ? companyName.trim() : null,
+        companyName: companyName.trim(),
         email: email ? email.trim() : null,
         phone: phone ? phone.trim() : null,
-        address: address ? address.trim() : null,
-        city: city ? city.trim() : null,
-        state: state ? state.trim() : null,
-        pincode: pincode ? pincode.trim() : null,
+        addressLine1: addressLine1 ? addressLine1.trim() : null,
+        addressLine2: addressLine2 ? addressLine2.trim() : null,
+        otherInfo: otherInfo ? otherInfo.trim() : null,
         gstin: gstin ? gstin.trim() : null,
+        state: state ? state.trim() : null,
+        shippingAddress: shippingAddress ? shippingAddress.trim() : null,
+        address: address ? address.trim() : (addressLine1 ? addressLine1.trim() : null),
+        city: city ? city.trim() : null,
+        pincode: pincode ? pincode.trim() : null,
         updatedAt: new Date().toISOString(),
       })
       .where(

@@ -111,7 +111,7 @@ export default function CrmCreateQuotationPage() {
       setCustomerEmail(found.email || "");
       setCustomerPhone(found.phone || "");
       setCustomerAddress(
-        [found.address, found.city, found.state, found.pincode].filter(Boolean).join(", ")
+        [found.addressLine1, found.addressLine2, found.address, found.city, found.state, found.pincode].filter(Boolean).join(", ")
       );
       setCustomerGstin(found.gstin || "");
     }

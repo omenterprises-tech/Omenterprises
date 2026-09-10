@@ -91,7 +91,9 @@ export default function CrmCustomersPage() {
         c.companyName?.toLowerCase().includes(q) ||
         c.phone?.toLowerCase().includes(q) ||
         c.email?.toLowerCase().includes(q) ||
+        c.addressLine1?.toLowerCase().includes(q) ||
         c.city?.toLowerCase().includes(q) ||
+        c.state?.toLowerCase().includes(q) ||
         c.gstin?.toLowerCase().includes(q)
     );
   }, [customers, searchQuery]);
@@ -292,8 +294,8 @@ export default function CrmCustomersPage() {
                       </td>
                       <td className="py-4 text-xs text-gray-600">
                         <div className="flex items-center gap-1.5">
-                          <MapPin size={12} className="text-gray-400" />
-                          <span>{[c.city, c.state].filter(Boolean).join(", ") || "—"}</span>
+                          <MapPin size={12} className="text-gray-400 shrink-0" />
+                          <span className="truncate max-w-[200px]">{[c.addressLine1 || c.address, c.city, c.state].filter(Boolean).join(", ") || "—"}</span>
                         </div>
                         {c.pincode && <div className="text-[11px] text-gray-400 pl-4.5">PIN: {c.pincode}</div>}
                       </td>
