@@ -264,7 +264,14 @@ export default function QuotationDetailPage({
 
   // Trigger Print / PDF
   const handlePrint = () => {
+    const prevTitle = document.title;
+    if (quotation?.quotationNumber) {
+      document.title = `Quotation_${quotation.quotationNumber}`;
+    }
     window.print();
+    setTimeout(() => {
+      document.title = prevTitle;
+    }, 1500);
   };
 
   if (isLoading) {
@@ -315,7 +322,58 @@ export default function QuotationDetailPage({
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col text-gray-900 font-inter pb-16 print:bg-white print:p-0 print:pb-0">
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col text-gray-900 font-inter pb-16 print:bg-white print:p-0 print:pb-0 print:min-h-0 print:h-auto print:block">
+      {/* Global print styles to eliminate browser header/footer and excess blank pages */}
+      <style>{`
+        @page {
+          size: A4 portrait;
+          margin: 0mm !important;
+        }
+        @media print {
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            min-height: 0 !important;
+            background: #ffffff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            overflow: visible !important;
+          }
+          header, nav, button, .print\\:hidden {
+            display: none !important;
+          }
+          main {
+            margin: 0 !important;
+            padding: 0 !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            min-height: 0 !important;
+            display: block !important;
+          }
+          #quotation-sheet {
+            margin: 0 auto !important;
+            padding: 8mm 12mm 6mm 12mm !important;
+            box-sizing: border-box !important;
+            width: 100% !important;
+            max-width: 210mm !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            background: #ffffff !important;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+          }
+          #quotation-sheet > * + * {
+            margin-top: 8px !important;
+          }
+          table, tr, td, th {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+        }
+      `}</style>
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-5 right-5 z-50 px-5 py-3 bg-gray-900 text-white text-xs font-semibold rounded-2xl shadow-2xl flex items-center space-x-2 animate-in slide-in-from-top duration-200 print:hidden">
@@ -445,37 +503,37 @@ export default function QuotationDetailPage({
       )}
 
       {/* ================= FULL-SCREEN MAIN WORKSPACE ================= */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 print:p-0 print:max-w-none">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 print:p-0 print:m-0 print:max-w-none print:w-full print:block">
         {/* ================= A4 WHITE QUOTATION SHEET (Website Theme & Exact Design) ================= */}
         <div
           id="quotation-sheet"
-          className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-gray-200 p-6 sm:p-12 space-y-6 print:shadow-none print:rounded-none print:border-none print:p-0 print:w-full"
+          className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-gray-200 p-6 sm:p-12 space-y-6 print:shadow-none print:rounded-none print:border-none print:p-0 print:w-full print:space-y-2"
         >
           {/* ================= 1. TOP HEADER (Logo, Business Info, Quotation Heading) ================= */}
-          <div className="grid grid-cols-12 gap-4 items-start border-b border-gray-200 pb-6">
+          <div className="grid grid-cols-12 gap-4 items-start border-b border-gray-200 pb-6 print:pb-2.5 print:gap-2">
             {/* Left: Business Logo */}
             <div className="col-span-3 sm:col-span-2 flex justify-start">
               {business?.logoUrl ? (
                 <img
                   src={business.logoUrl}
                   alt="Logo"
-                  className="w-20 h-20 sm:w-24 sm:h-24 object-contain rounded-xl border border-gray-100 shadow-xs"
+                  className="w-20 h-20 sm:w-24 sm:h-24 print:w-16 print:h-16 object-contain rounded-xl border border-gray-100 shadow-xs"
                 />
               ) : (
-                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-blue-50 rounded-xl flex items-center justify-center text-brand font-black text-sm border border-blue-100 text-center p-2">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 print:w-16 print:h-16 bg-blue-50 rounded-xl flex items-center justify-center text-brand font-black text-sm border border-blue-100 text-center p-2">
                   {business?.businessName?.slice(0, 4)?.toUpperCase() || "OM"}
                 </div>
               )}
             </div>
 
             {/* Middle: Business Details (Website Brand Deep Blue & Layout) */}
-            <div className="col-span-6 sm:col-span-8 text-center space-y-1">
-              <h2 className="text-lg sm:text-2xl font-black text-brand tracking-tight uppercase font-playfair">
+            <div className="col-span-6 sm:col-span-8 text-center space-y-1 print:space-y-0.5">
+              <h2 className="text-lg sm:text-2xl print:text-xl font-black text-brand tracking-tight uppercase font-playfair">
                 {business?.businessName || "OM ENTERPRISES"}
               </h2>
 
               {/* Address */}
-              <p className="text-xs sm:text-sm text-gray-600 leading-snug font-medium max-w-lg mx-auto">
+              <p className="text-xs sm:text-sm print:text-[11px] text-gray-600 leading-snug font-medium max-w-lg mx-auto">
                 {[business?.addressLine1, business?.addressLine2, business?.addressLine3, business?.state]
                   .filter(Boolean)
                   .join(", ") ||
@@ -483,7 +541,7 @@ export default function QuotationDetailPage({
               </p>
 
               {/* Phone & Email */}
-              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs sm:text-sm text-gray-700 font-medium pt-0.5">
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs sm:text-sm print:text-[11px] text-gray-700 font-medium pt-0.5">
                 <span className="inline-flex items-center gap-1.5">
                   <Phone size={13} className="text-brand shrink-0" />
                   <span>{business?.mobileNumber || "+91 9246999660 / 9849845555"}</span>
@@ -496,7 +554,7 @@ export default function QuotationDetailPage({
 
               {/* GSTIN */}
               {(business?.taxNumber || "36ASLPS7570G1Z5") && (
-                <p className="text-xs sm:text-sm font-bold text-gray-900 tracking-wide pt-0.5">
+                <p className="text-xs sm:text-sm print:text-[11px] font-bold text-gray-900 tracking-wide pt-0.5">
                   {business?.taxLabel || "GSTIN"}: <span className="text-brand">{business?.taxNumber || "36ASLPS7570G1Z5"}</span>
                 </p>
               )}
@@ -504,14 +562,14 @@ export default function QuotationDetailPage({
 
             {/* Right: Quotation Heading */}
             <div className="col-span-3 sm:col-span-2 text-right">
-              <span className="inline-block px-3.5 py-1 bg-brand text-white text-xs sm:text-sm font-extrabold uppercase tracking-wider rounded-lg">
+              <span className="inline-block px-3.5 py-1 print:px-2.5 print:py-0.5 bg-brand text-white text-xs sm:text-sm print:text-xs font-extrabold uppercase tracking-wider rounded-lg">
                 QUOTATION
               </span>
             </div>
           </div>
 
           {/* ================= 2. METADATA: CUSTOMER (LEFT) & QUOTE# / DATE (RIGHT) ================= */}
-          <div className="flex justify-between items-start pt-1 text-xs sm:text-sm gap-4">
+          <div className="flex justify-between items-start pt-1 print:pt-0 text-xs sm:text-sm print:text-xs gap-4">
             {/* Customer Details */}
             <div className="space-y-1 max-w-[65%]">
               <span className="font-bold text-gray-700 block text-xs uppercase tracking-wider">To,</span>
@@ -557,17 +615,17 @@ export default function QuotationDetailPage({
           </div>
 
           {/* ================= 4. PRODUCTS TABLE ================= */}
-          <div className="overflow-x-auto border border-gray-300 rounded-xl py-0.5">
-            <table className="w-full text-left text-xs sm:text-sm border-collapse">
+          <div className="overflow-x-auto border border-gray-300 rounded-xl py-0.5 print:overflow-visible print:border-gray-400 print:rounded-lg">
+            <table className="w-full text-left text-xs sm:text-sm print:text-xs border-collapse">
               <thead>
-                <tr className="bg-gray-100 border-b border-gray-300 text-gray-800 font-extrabold uppercase tracking-wider text-[11px]">
-                  <th className="py-2.5 px-3 text-center w-10">#</th>
-                  <th className="py-2.5 px-3">DESCRIPTION</th>
-                  <th className="py-2.5 px-3 text-center w-24">HSN</th>
-                  <th className="py-2.5 px-3 text-center w-20">QTY</th>
-                  <th className="py-2.5 px-3 text-right w-28">PRICE</th>
-                  <th className="py-2.5 px-3 text-right w-28">GST</th>
-                  <th className="py-2.5 px-3 text-right w-32">TOTAL</th>
+                <tr className="bg-gray-100 border-b border-gray-300 text-gray-800 font-extrabold uppercase tracking-wider text-[11px] print:text-[10px]">
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-10">#</th>
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2">DESCRIPTION</th>
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-24">HSN</th>
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-20">QTY</th>
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-28">PRICE</th>
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-28">GST</th>
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-32">TOTAL</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -588,38 +646,38 @@ export default function QuotationDetailPage({
 
                     return (
                       <tr key={idx} className="align-top hover:bg-blue-50/20 transition-colors">
-                        <td className="py-3 px-3 text-center font-medium text-gray-500">
+                        <td className="py-3 px-3 print:py-1.5 print:px-2 text-center font-medium text-gray-500">
                           {idx + 1}
                         </td>
-                        <td className="py-3 px-3">
+                        <td className="py-3 px-3 print:py-1.5 print:px-2">
                           <span className="font-bold text-gray-900 block leading-snug">
                             {it.name || it.description?.split(" - ")[0] || "Item"}
                           </span>
                           {it.description && (
-                            <span className="text-xs text-gray-500 block leading-relaxed mt-0.5 font-normal">
+                            <span className="text-xs print:text-[10px] text-gray-500 block leading-relaxed mt-0.5 font-normal">
                               {it.description}
                             </span>
                           )}
                         </td>
-                        <td className="py-3 px-3 text-center text-gray-600 font-medium text-xs">
+                        <td className="py-3 px-3 print:py-1.5 print:px-2 text-center text-gray-600 font-medium text-xs">
                           {it.hsn || "-"}
                         </td>
-                        <td className="py-3 px-3 text-center font-bold text-gray-900">
+                        <td className="py-3 px-3 print:py-1.5 print:px-2 text-center font-bold text-gray-900">
                           <div>{qty}</div>
                           <div className="text-[10px] text-gray-500 font-normal uppercase">
                             {it.unit || "COILS"}
                           </div>
                         </td>
-                        <td className="py-3 px-3 text-right font-semibold text-gray-900">
+                        <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-semibold text-gray-900">
                           {formatRs(price)}
                         </td>
-                        <td className="py-3 px-3 text-right font-medium text-gray-700">
+                        <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-medium text-gray-700">
                           <div>{formatRs(gstAmount)}</div>
                           <div className="text-[10px] text-gray-500 font-normal">
                             {taxRate.toFixed(2)}%
                           </div>
                         </td>
-                        <td className="py-3 px-3 text-right font-black text-gray-900">
+                        <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-black text-gray-900">
                           {formatRs(it.total || rowTotal)}
                         </td>
                       </tr>
@@ -631,16 +689,16 @@ export default function QuotationDetailPage({
           </div>
 
           {/* ================= 5. FINANCIAL TOTALS BREAKDOWN ================= */}
-          <div className="flex justify-end pt-2">
-            <div className="w-full sm:w-80 space-y-2 text-xs sm:text-sm text-gray-800">
+          <div className="flex justify-end pt-2 print:pt-1">
+            <div className="w-full sm:w-80 print:w-72 space-y-2 print:space-y-1 text-xs sm:text-sm text-gray-800">
               <div className="flex justify-between py-0.5">
-                <span className="font-semibold text-gray-600 uppercase text-xs">SUB TOTAL</span>
+                <span className="font-semibold text-gray-600 uppercase text-xs print:text-[11px]">SUB TOTAL</span>
                 <span className="font-bold text-gray-900">{formatRs(quotation.subtotal)}</span>
               </div>
 
               {otherCharge && Number(otherCharge.amount) > 0 && (
                 <div className="flex justify-between py-0.5">
-                  <span className="font-semibold text-gray-600 uppercase text-xs">
+                  <span className="font-semibold text-gray-600 uppercase text-xs print:text-[11px]">
                     {otherCharge.label || "OTHER CHARGES"}
                   </span>
                   <span className="font-bold text-gray-900">{formatRs(otherCharge.amount)}</span>
@@ -648,39 +706,39 @@ export default function QuotationDetailPage({
               )}
 
               <div className="flex justify-between py-0.5">
-                <span className="font-semibold text-gray-600 uppercase text-xs">GST AMOUNT</span>
+                <span className="font-semibold text-gray-600 uppercase text-xs print:text-[11px]">GST AMOUNT</span>
                 <span className="font-bold text-gray-900">{formatRs(quotation.taxTotal)}</span>
               </div>
 
               {/* Highlighted Grand Total Banner (Brand Colors) */}
-              <div className="bg-blue-50/80 border-2 border-brand/20 p-3 rounded-xl flex justify-between items-center font-black text-base text-brand mt-1 shadow-xs">
+              <div className="bg-blue-50/80 border-2 border-brand/20 p-3 print:p-2 rounded-xl flex justify-between items-center font-black text-base print:text-sm text-brand mt-1 shadow-xs">
                 <span className="tracking-wide">GRAND TOTAL</span>
-                <span className="text-lg">{formatRs(quotation.grandTotal)}</span>
+                <span className="text-lg print:text-base">{formatRs(quotation.grandTotal)}</span>
               </div>
             </div>
           </div>
 
           {/* ================= 6. CLOSING STATEMENT ================= */}
-          <div className="pt-2 text-xs sm:text-sm text-gray-700 font-medium">
+          <div className="pt-2 print:pt-1 text-xs sm:text-sm print:text-xs text-gray-700 font-medium">
             We hope you find our offer to be in line with your requirement.
           </div>
 
           {/* ================= 7. BOTTOM SECTION: TERMS (LEFT) & PAYMENT + SIGNATURE (RIGHT) ================= */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-4 items-start border-t border-gray-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-4 items-start border-t border-gray-100 print:grid-cols-2 print:gap-4 print:pt-2">
             {/* Left Column: TERMS & CONDITIONS */}
-            <div className="space-y-2 text-xs sm:text-sm">
+            <div className="space-y-2 text-xs sm:text-sm print:space-y-1 print:text-xs">
               <h5 className="font-black text-gray-900 uppercase tracking-wider text-xs border-b border-gray-200 pb-1 inline-block">
                 TERMS & CONDITIONS:
               </h5>
               {termsList.length === 0 ? (
-                <ul className="space-y-1.5 text-gray-600 text-xs">
+                <ul className="space-y-1.5 text-gray-600 text-xs print:space-y-0.5 print:text-[11px]">
                   <li>• DELIVERY CHARGES : EXTRA AT ACTUAL</li>
                   <li>• PAYMENT : 100% AGAINST DELIVERY</li>
                   <li>• VALIDITY : 30 DAYS</li>
                   <li>• DELIVERY : READY STOCK</li>
                 </ul>
               ) : (
-                <ul className="space-y-1.5 text-gray-700 text-xs">
+                <ul className="space-y-1.5 text-gray-700 text-xs print:space-y-0.5 print:text-[11px]">
                   {termsList.map((t, idx) => (
                     <li key={idx} className="flex items-start gap-2">
                       <span className="font-bold text-brand shrink-0">•</span>
@@ -692,10 +750,10 @@ export default function QuotationDetailPage({
             </div>
 
             {/* Right Column: PAYMENT INSTRUCTIONS + SIGNATORY */}
-            <div className="space-y-5 text-xs sm:text-sm sm:text-right">
+            <div className="space-y-4 print:space-y-2 text-xs sm:text-sm sm:text-right print:text-right">
               {/* Payment Instructions Box */}
-              <div className="space-y-1 text-xs text-gray-800 sm:text-left sm:ml-auto sm:max-w-xs bg-gray-50/70 p-3.5 rounded-xl border border-gray-200">
-                <h5 className="font-black text-brand uppercase tracking-wider text-xs mb-1">
+              <div className="space-y-1 text-xs text-gray-800 sm:text-left sm:ml-auto sm:max-w-xs bg-gray-50/70 p-3.5 print:p-2.5 rounded-xl border border-gray-200 print:text-[11px] print:rounded-lg">
+                <h5 className="font-black text-brand uppercase tracking-wider text-xs print:text-[11px] mb-1">
                   PAYMENT INSTRUCTIONS
                 </h5>
                 <p>
@@ -721,13 +779,13 @@ export default function QuotationDetailPage({
               </div>
 
               {/* Authorized Signatory Block */}
-              <div className="pt-2 sm:ml-auto sm:max-w-xs space-y-1 text-center">
-                <p className="font-bold text-xs text-gray-900">
+              <div className="pt-2 print:pt-0.5 sm:ml-auto sm:max-w-xs space-y-0.5 text-center">
+                <p className="font-bold text-xs text-gray-900 print:text-[11px]">
                   For, {business?.businessName?.toUpperCase() || "OM ENTERPRISES"}
                 </p>
 
                 {/* Signature Image or Text */}
-                <div className="h-16 flex items-center justify-center">
+                <div className="h-14 print:h-10 flex items-center justify-center">
                   {business?.signatureUrl ? (
                     <img
                       src={business.signatureUrl}
@@ -749,7 +807,7 @@ export default function QuotationDetailPage({
           </div>
 
           {/* ================= 8. PAGE FOOTER ================= */}
-          <div className="pt-6 border-t border-gray-100 flex justify-end items-center text-xs text-gray-400">
+          <div className="pt-4 print:pt-2 border-t border-gray-100 flex justify-end items-center text-xs text-gray-400 print:text-[10px]">
             <span>Page 1 of 1</span>
           </div>
         </div>

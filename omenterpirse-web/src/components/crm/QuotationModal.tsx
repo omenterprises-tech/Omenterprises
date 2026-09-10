@@ -532,11 +532,24 @@ export function ViewQuotationModal({
   }
 
   const handlePrint = () => {
+    const prevTitle = document.title;
+    if (quotation?.quotationNumber) {
+      document.title = `Quotation_${quotation.quotationNumber}`;
+    }
     window.print();
+    setTimeout(() => {
+      document.title = prevTitle;
+    }, 1500);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 print:p-0 print:bg-white print:static">
+      <style>{`
+        @page {
+          size: A4 portrait;
+          margin: 0mm !important;
+        }
+      `}</style>
       <div className="w-full max-w-3xl bg-white rounded-3xl shadow-2xl p-6 sm:p-10 animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto print:max-h-none print:shadow-none print:p-0 print:border-none">
         {/* Modal Controls (Hidden when printing) */}
         <div className="flex justify-between items-center border-b border-gray-100 pb-4 mb-6 print:hidden">
