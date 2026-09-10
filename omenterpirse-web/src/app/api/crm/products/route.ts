@@ -37,24 +37,34 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, description, basePrice, category } = body;
+    const { name, price, basePrice, gst, description, unit, hsn, category } = body;
 
     if (!name || !name.trim()) {
-      return NextResponse.json({ success: false, error: "Product name is required." }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Product Name is required.", field: "name" }, { status: 400 });
     }
 
-    const price = parseFloat(basePrice);
-    if (isNaN(price) || price < 0) {
-      return NextResponse.json({ success: false, error: "Valid price is required." }, { status: 400 });
+    const rawPrice = price !== undefined && price !== null && String(price).trim() !== "" ? price : basePrice;
+    if (rawPrice === undefined || rawPrice === null || String(rawPrice).trim() === "") {
+      return NextResponse.json({ success: false, error: "Price is required.", field: "price" }, { status: 400 });
     }
+
+    const parsedPrice = parseFloat(rawPrice);
+    if (isNaN(parsedPrice) || parsedPrice < 0) {
+      return NextResponse.json({ success: false, error: "Valid price is required.", field: "price" }, { status: 400 });
+    }
+
+    const parsedGst = gst !== undefined && gst !== null && String(gst).trim() !== "" ? parseFloat(gst) : null;
 
     const newProduct = await db
       .insert(products)
       .values({
         name: name.trim(),
         description: description ? description.trim() : null,
-        basePrice: price,
-        salePrice: price,
+        basePrice: parsedPrice,
+        salePrice: parsedPrice,
+        gst: parsedGst !== null && !isNaN(parsedGst) ? parsedGst : null,
+        unit: unit ? unit.trim() : null,
+        hsn: hsn ? hsn.trim() : null,
         category: category ? category.trim() : "General",
         createdAt: new Date().toISOString(),
       })
@@ -81,28 +91,38 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, description, basePrice, category } = body;
+    const { id, name, price, basePrice, gst, description, unit, hsn, category } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: "Product ID is required." }, { status: 400 });
     }
 
     if (!name || !name.trim()) {
-      return NextResponse.json({ success: false, error: "Product name is required." }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Product Name is required.", field: "name" }, { status: 400 });
     }
 
-    const price = parseFloat(basePrice);
-    if (isNaN(price) || price < 0) {
-      return NextResponse.json({ success: false, error: "Valid price is required." }, { status: 400 });
+    const rawPrice = price !== undefined && price !== null && String(price).trim() !== "" ? price : basePrice;
+    if (rawPrice === undefined || rawPrice === null || String(rawPrice).trim() === "") {
+      return NextResponse.json({ success: false, error: "Price is required.", field: "price" }, { status: 400 });
     }
+
+    const parsedPrice = parseFloat(rawPrice);
+    if (isNaN(parsedPrice) || parsedPrice < 0) {
+      return NextResponse.json({ success: false, error: "Valid price is required.", field: "price" }, { status: 400 });
+    }
+
+    const parsedGst = gst !== undefined && gst !== null && String(gst).trim() !== "" ? parseFloat(gst) : null;
 
     const updated = await db
       .update(products)
       .set({
         name: name.trim(),
         description: description ? description.trim() : null,
-        basePrice: price,
-        salePrice: price,
+        basePrice: parsedPrice,
+        salePrice: parsedPrice,
+        gst: parsedGst !== null && !isNaN(parsedGst) ? parsedGst : null,
+        unit: unit ? unit.trim() : null,
+        hsn: hsn ? hsn.trim() : null,
         category: category ? category.trim() : "General",
       })
       .where(eq(products.id, parseInt(id, 10)))

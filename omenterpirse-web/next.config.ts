@@ -43,6 +43,8 @@ const nextConfig: NextConfig = {
       { source: '/quotation-list', destination: '/crm/quotations', permanent: false },
       { source: '/add-customer', destination: '/crm/customers/add', permanent: false },
       { source: '/customer-add', destination: '/crm/customers/add', permanent: false },
+      { source: '/add-product', destination: '/crm/products/add', permanent: false },
+      { source: '/product-add', destination: '/crm/products/add', permanent: false },
     ];
   },
 };

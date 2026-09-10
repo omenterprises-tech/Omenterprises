@@ -31,7 +31,9 @@ export const products = sqliteTable("products", {
   tags: text("tags"),       // comma-separated tags
   isFeatured: integer("is_featured", { mode: "boolean" }).default(false),
   specifications: text("specifications"), // JSON string array of { key: string, value: string }
-  colorImages: text("color_images"),       // JSON string map of color -> images array
+  gst: real("gst"),
+  unit: text("unit"),
+  hsn: text("hsn"),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
 });
 
