@@ -585,96 +585,29 @@ export default function QuotationDetailPage({
               </div>
             </div>
 
-            {/* Right: Desktop Action Toolbar (Website Brand Styling) */}
+            {/* Right: Only Share Option Above */}
             <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={handlePrint}
-                className="px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center space-x-1.5 cursor-pointer"
-                title="Print or Save as PDF"
-              >
-                <Printer size={15} />
-                <span>Print / PDF</span>
-              </button>
-
               <button
                 type="button"
                 onClick={handleShare}
                 disabled={isGeneratingPdf}
-                className="hidden sm:inline-flex items-center space-x-1 px-3.5 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
                 title="Share Quotation as PDF"
               >
-                {isGeneratingPdf ? <Loader2 size={14} className="animate-spin text-brand" /> : <Share2 size={14} />}
-                <span>{isGeneratingPdf ? "Generating PDF..." : "Share PDF"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleDuplicate}
-                disabled={isDuplicating}
-                className="hidden sm:inline-flex items-center space-x-1 px-3.5 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
-                title="Create Duplicate"
-              >
-                {isDuplicating ? <Loader2 size={14} className="animate-spin" /> : <Copy size={14} />}
-                <span>Duplicate</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleEdit}
-                className="inline-flex items-center space-x-1 px-3.5 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold transition-colors cursor-pointer"
-                title="Edit Quotation"
-              >
-                <Edit3 size={14} />
-                <span>Edit</span>
-              </button>
-
-              {/* Status & Delete More Menu Toggle */}
-              <button
-                type="button"
-                onClick={() => setIsMoreOpen(!isMoreOpen)}
-                className={`p-2 rounded-xl border transition-colors cursor-pointer ${
-                  isMoreOpen ? "bg-brand text-white border-brand" : "border-gray-200 hover:bg-gray-100 text-gray-700"
-                }`}
-                title="More Options"
-              >
-                <MoreHorizontal size={18} />
+                {isGeneratingPdf ? (
+                  <Loader2 size={15} className="animate-spin text-white" />
+                ) : (
+                  <Share2 size={15} />
+                )}
+                <span>{isGeneratingPdf ? "Generating..." : "Share PDF"}</span>
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* ================= MORE OPTIONS POP-UP (Status & Delete) ================= */}
-      {isMoreOpen && (
-        <div className="fixed top-20 right-6 sm:right-12 z-50 w-48 bg-white rounded-2xl shadow-xl border border-gray-200 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150 print:hidden">
-          <button
-            type="button"
-            onClick={() => {
-              setIsMoreOpen(false);
-              setIsStatusModalOpen(true);
-            }}
-            className="w-full px-3 py-2.5 rounded-xl hover:bg-blue-50 text-left text-xs font-bold text-gray-800 hover:text-brand flex items-center space-x-2 transition-colors cursor-pointer"
-          >
-            <Tag size={15} />
-            <span>Change Status</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setIsMoreOpen(false);
-              handleDelete();
-            }}
-            className="w-full px-3 py-2.5 rounded-xl hover:bg-rose-50 text-left text-xs font-bold text-rose-600 flex items-center space-x-2 transition-colors cursor-pointer"
-          >
-            <Trash2 size={15} />
-            <span>Delete Quotation</span>
-          </button>
-        </div>
-      )}
-
       {/* ================= FULL-SCREEN MAIN WORKSPACE ================= */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 print:p-0 print:m-0 print:max-w-none print:w-full print:block">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 sm:pb-28 print:p-0 print:m-0 print:max-w-none print:w-full print:block">
         {/* ================= A4 WHITE QUOTATION SHEET (Website Theme & Exact Design) ================= */}
         <div
           id="quotation-sheet"
@@ -1025,55 +958,93 @@ export default function QuotationDetailPage({
         </div>
       </main>
 
-      {/* ================= MOBILE FLOATING BOTTOM TOOLBAR (Only shown on small screens) ================= */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-2xl py-2 px-3 flex items-center justify-around print:hidden">
-        <button
-          type="button"
-          onClick={handleDuplicate}
-          disabled={isDuplicating}
-          className="flex flex-col items-center justify-center py-1 px-2 text-gray-700 hover:text-brand transition-colors cursor-pointer"
-        >
-          {isDuplicating ? <Loader2 size={20} className="animate-spin text-brand" /> : <Copy size={20} />}
-          <span className="text-[10px] font-bold mt-0.5">Duplicate</span>
-        </button>
+      {/* ================= FIXED BOTTOM TOOLBAR (5 Options: Duplicate, Edit, Print/PDF, Share PDF, More) ================= */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-2xl py-2 px-4 print:hidden">
+        <nav className="max-w-md mx-auto flex items-center justify-between sm:justify-around">
+          <button
+            type="button"
+            onClick={handleDuplicate}
+            disabled={isDuplicating}
+            className="flex flex-col items-center justify-center py-1 px-2.5 sm:px-3 text-gray-700 hover:text-brand transition-colors cursor-pointer rounded-xl hover:bg-gray-50 disabled:opacity-50"
+          >
+            {isDuplicating ? <Loader2 size={18} className="animate-spin text-brand" /> : <Copy size={18} />}
+            <span className="text-[10px] sm:text-[11px] font-bold mt-1">Duplicate</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={handleEdit}
-          className="flex flex-col items-center justify-center py-1 px-2 text-gray-700 hover:text-brand transition-colors cursor-pointer"
-        >
-          <Edit3 size={20} />
-          <span className="text-[10px] font-bold mt-0.5">Edit</span>
-        </button>
+          <button
+            type="button"
+            onClick={handleEdit}
+            className="flex flex-col items-center justify-center py-1 px-2.5 sm:px-3 text-gray-700 hover:text-brand transition-colors cursor-pointer rounded-xl hover:bg-gray-50"
+          >
+            <Edit3 size={18} />
+            <span className="text-[10px] sm:text-[11px] font-bold mt-1">Edit</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={handlePrint}
-          className="flex flex-col items-center justify-center py-1 px-2 text-brand hover:text-brand-hover transition-colors cursor-pointer font-bold"
-        >
-          <Printer size={20} />
-          <span className="text-[10px] font-bold mt-0.5">Print/PDF</span>
-        </button>
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="flex flex-col items-center justify-center py-1 px-2.5 sm:px-3 text-brand hover:text-brand-hover transition-colors cursor-pointer font-bold rounded-xl hover:bg-blue-50"
+          >
+            <Printer size={18} />
+            <span className="text-[10px] sm:text-[11px] font-bold mt-1">Print/PDF</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={handleShare}
-          disabled={isGeneratingPdf}
-          className="flex flex-col items-center justify-center py-1 px-2 text-gray-700 hover:text-brand transition-colors cursor-pointer disabled:opacity-50"
-        >
-          {isGeneratingPdf ? <Loader2 size={20} className="animate-spin text-brand" /> : <Share2 size={20} />}
-          <span className="text-[10px] font-bold mt-0.5">Share PDF</span>
-        </button>
+          <button
+            type="button"
+            onClick={handleShare}
+            disabled={isGeneratingPdf}
+            className="flex flex-col items-center justify-center py-1 px-2.5 sm:px-3 text-gray-700 hover:text-brand transition-colors cursor-pointer disabled:opacity-50 rounded-xl hover:bg-gray-50"
+          >
+            {isGeneratingPdf ? <Loader2 size={18} className="animate-spin text-brand" /> : <Share2 size={18} />}
+            <span className="text-[10px] sm:text-[11px] font-bold mt-1">Share PDF</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setIsMoreOpen(!isMoreOpen)}
-          className="flex flex-col items-center justify-center py-1 px-2 text-gray-700 hover:text-brand transition-colors cursor-pointer"
-        >
-          <MoreHorizontal size={20} />
-          <span className="text-[10px] font-bold mt-0.5">More</span>
-        </button>
-      </nav>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsMoreOpen(!isMoreOpen)}
+              className="flex flex-col items-center justify-center py-1 px-2.5 sm:px-3 text-gray-700 hover:text-brand transition-colors cursor-pointer rounded-xl hover:bg-gray-50"
+            >
+              <MoreHorizontal size={18} />
+              <span className="text-[10px] sm:text-[11px] font-bold mt-1">More</span>
+            </button>
+
+            {/* More Options Pop-up */}
+            {isMoreOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40 print:hidden cursor-default"
+                  onClick={() => setIsMoreOpen(false)}
+                />
+                <div className="absolute bottom-full mb-3 right-0 z-50 w-48 bg-white rounded-2xl shadow-2xl border border-gray-200 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150 print:hidden">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMoreOpen(false);
+                      setIsStatusModalOpen(true);
+                    }}
+                    className="w-full px-3 py-2.5 rounded-xl hover:bg-blue-50 text-left text-xs font-bold text-gray-800 hover:text-brand flex items-center space-x-2 transition-colors cursor-pointer"
+                  >
+                    <Tag size={15} />
+                    <span>Change Status</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMoreOpen(false);
+                      handleDelete();
+                    }}
+                    className="w-full px-3 py-2.5 rounded-xl hover:bg-rose-50 text-left text-xs font-bold text-rose-600 flex items-center space-x-2 transition-colors cursor-pointer"
+                  >
+                    <Trash2 size={15} />
+                    <span>Delete Quotation</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </nav>
+      </div>
 
       {/* ================= STATUS CHANGE MODAL ================= */}
       {isStatusModalOpen && (
