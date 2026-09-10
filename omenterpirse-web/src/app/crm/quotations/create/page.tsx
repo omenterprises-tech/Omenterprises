@@ -7,7 +7,6 @@ import {
   Plus,
   Search,
   Trash2,
-  ChevronRight,
   Edit3,
   Loader2,
   Check,
@@ -18,6 +17,10 @@ import {
   DollarSign,
   AlertCircle,
   Calculator,
+  Building2,
+  Phone,
+  Mail,
+  MapPin,
 } from "lucide-react";
 import CustomerModal from "@/components/crm/CustomerModal";
 import ProductModal from "@/components/crm/ProductModal";
@@ -62,14 +65,14 @@ function MakeQuotationContent() {
   );
   const [otherInfo, setOtherInfo] = useState("");
 
-  // 1. Customer State
+  // 1. Customer State & Selection Page View
   const [customers, setCustomers] = useState<any[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [isCustomerSelectOpen, setIsCustomerSelectOpen] = useState(false);
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
 
-  // 2. Products State
+  // 2. Products State & Selection Page View
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [selectedItems, setSelectedItems] = useState<QuotationItem[]>([]);
   const [isProductSelectOpen, setIsProductSelectOpen] = useState(false);
@@ -289,7 +292,8 @@ function MakeQuotationContent() {
         c.name?.toLowerCase().includes(q) ||
         c.companyName?.toLowerCase().includes(q) ||
         c.phone?.toLowerCase().includes(q) ||
-        c.email?.toLowerCase().includes(q)
+        c.email?.toLowerCase().includes(q) ||
+        c.gstin?.toLowerCase().includes(q)
     );
   }, [customers, customerSearch]);
 
@@ -501,6 +505,336 @@ function MakeQuotationContent() {
 
   const businessName = business?.businessName || "OM ENTERPRISES";
 
+  // =========================================================================
+  // VIEW 1: DEDICATED NEW PAGE FOR CUSTOMER SELECTION
+  // =========================================================================
+  if (isCustomerSelectOpen) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] text-gray-900 font-inter flex flex-col pb-16">
+        {/* Full-Screen Sticky Header */}
+        <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200/80 shadow-xs">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex items-center space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCustomerSelectOpen(false)}
+                  className="p-2 rounded-xl text-gray-500 hover:text-brand hover:bg-brand/5 transition-colors cursor-pointer mr-1"
+                  title="Back to Quotation"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900 tracking-tight">
+                    Select Customer
+                  </h1>
+                  <p className="text-xs text-gray-500 font-medium">
+                    {customers.length} registered customers • Choose customer for quotation
+                  </p>
+                </div>
+              </div>
+
+              {/* Add Customer Button in page header */}
+              <button
+                type="button"
+                onClick={() => setIsAddCustomerOpen(true)}
+                className="px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-sm hover:shadow-md transition-all flex items-center space-x-1.5 cursor-pointer"
+              >
+                <Plus size={15} />
+                <span>+ Add Customer</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Page Workspace */}
+        <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+          {/* Search Bar */}
+          <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-gray-200/80 shadow-xs">
+            <div className="relative">
+              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={customerSearch}
+                onChange={(e) => setCustomerSearch(e.target.value)}
+                placeholder="Search customers by name, company, phone, email, GSTIN..."
+                className="w-full pl-10 pr-10 py-2.5 bg-gray-50 rounded-xl text-sm font-medium text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:border-brand transition-all"
+                autoFocus
+              />
+              {customerSearch && (
+                <button
+                  type="button"
+                  onClick={() => setCustomerSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Customer Directory List / Grid */}
+          {filteredCustomers.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 border border-gray-200/80 text-center space-y-4 shadow-xs">
+              <div className="w-14 h-14 rounded-2xl bg-brand/10 text-brand flex items-center justify-center mx-auto">
+                <User size={28} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">
+                  {customerSearch ? "No matching customers found" : "No customers registered yet"}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                  {customerSearch
+                    ? `No customer found for "${customerSearch}". You can clear your search or add a new customer.`
+                    : "Add your first client to start creating professional quotations."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddCustomerOpen(true)}
+                className="inline-flex items-center space-x-1.5 px-5 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-md cursor-pointer transition-all"
+              >
+                <Plus size={15} />
+                <span>+ Add Customer</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredCustomers.map((cust) => {
+                const isCurrentlySelected = selectedCustomer?.id === cust.id;
+                return (
+                  <div
+                    key={cust.id}
+                    onClick={() => {
+                      setSelectedCustomer(cust);
+                      setIsCustomerSelectOpen(false);
+                    }}
+                    className={`p-5 rounded-2xl sm:rounded-3xl border transition-all cursor-pointer flex flex-col justify-between group shadow-xs hover:shadow-md ${
+                      isCurrentlySelected
+                        ? "bg-blue-50/70 border-brand ring-2 ring-brand/20"
+                        : "bg-white border-gray-200/80 hover:border-brand/60 hover:bg-blue-50/20"
+                    }`}
+                  >
+                    <div className="space-y-2.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
+                            {cust.name}
+                          </h4>
+                          {cust.companyName && (
+                            <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-bold px-2 py-0.5 bg-blue-100 text-brand rounded-md">
+                              <Building2 size={12} />
+                              <span>{cust.companyName}</span>
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          className={`text-xs font-bold px-3 py-1 rounded-xl transition-all ${
+                            isCurrentlySelected
+                              ? "bg-brand text-white"
+                              : "bg-gray-100 text-gray-700 group-hover:bg-brand group-hover:text-white"
+                          }`}
+                        >
+                          {isCurrentlySelected ? "Selected" : "Select"}
+                        </span>
+                      </div>
+
+                      {cust.addressLine1 && (
+                        <p className="text-xs text-gray-600 line-clamp-2">
+                          {cust.addressLine1}
+                          {cust.city ? `, ${cust.city}` : ""}
+                          {cust.state ? `, ${cust.state}` : ""}
+                        </p>
+                      )}
+
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 pt-2 border-t border-gray-100">
+                        {cust.phone && <span>📞 {cust.phone}</span>}
+                        {cust.email && <span>✉ {cust.email}</span>}
+                        {cust.gstin && (
+                          <span className="font-semibold text-brand">GSTIN: {cust.gstin}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </main>
+
+        {/* Customer Modal Component for creating new customers on this page */}
+        <CustomerModal
+          isOpen={isAddCustomerOpen}
+          onClose={() => setIsAddCustomerOpen(false)}
+          onCustomerCreated={(newCust: any) => {
+            setCustomers((prev) => [newCust, ...prev]);
+            setSelectedCustomer(newCust);
+            setIsAddCustomerOpen(false);
+            setIsCustomerSelectOpen(false);
+          }}
+        />
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW 2: DEDICATED NEW PAGE FOR PRODUCT SELECTION FROM CATALOG
+  // =========================================================================
+  if (isProductSelectOpen) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] text-gray-900 font-inter flex flex-col pb-16">
+        {/* Full-Screen Sticky Header */}
+        <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200/80 shadow-xs">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex items-center space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsProductSelectOpen(false)}
+                  className="p-2 rounded-xl text-gray-500 hover:text-brand hover:bg-brand/5 transition-colors cursor-pointer mr-1"
+                  title="Back to Quotation"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900 tracking-tight">
+                    Select Product from Catalog
+                  </h1>
+                  <p className="text-xs text-gray-500 font-medium">
+                    {allProducts.length} catalog products • Choose product to add
+                  </p>
+                </div>
+              </div>
+
+              {/* Add New Product Button in page header */}
+              <button
+                type="button"
+                onClick={() => setIsAddProductOpen(true)}
+                className="px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-sm hover:shadow-md transition-all flex items-center space-x-1.5 cursor-pointer"
+              >
+                <Plus size={15} />
+                <span>+ New Product</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Page Workspace */}
+        <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+          {/* Search Bar */}
+          <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-gray-200/80 shadow-xs">
+            <div className="relative">
+              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                placeholder="Search products by title, category, description, specifications..."
+                className="w-full pl-10 pr-10 py-2.5 bg-gray-50 rounded-xl text-sm font-medium text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:border-brand transition-all"
+                autoFocus
+              />
+              {productSearch && (
+                <button
+                  type="button"
+                  onClick={() => setProductSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Products Grid */}
+          {filteredProducts.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 border border-gray-200/80 text-center space-y-4 shadow-xs">
+              <div className="w-14 h-14 rounded-2xl bg-brand/10 text-brand flex items-center justify-center mx-auto">
+                <Package size={28} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">
+                  {productSearch ? "No matching products found" : "No products registered in catalog"}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                  {productSearch
+                    ? `No product matches "${productSearch}". Try another keyword or create a new product.`
+                    : "Add your first commercial product to build quotations effortlessly."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddProductOpen(true)}
+                className="inline-flex items-center space-x-1.5 px-5 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-md cursor-pointer transition-all"
+              >
+                <Plus size={15} />
+                <span>+ Add Product</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredProducts.map((prod) => (
+                <div
+                  key={prod.id}
+                  onClick={() => openProductConfigurator(prod)}
+                  className="p-5 rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 hover:border-brand/60 hover:bg-blue-50/20 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
+                          {prod.name}
+                        </h4>
+                        {prod.category && (
+                          <span className="inline-block mt-1 text-[11px] font-bold px-2 py-0.5 bg-gray-100 text-gray-700 rounded-md">
+                            {prod.category}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <span className="text-base font-black text-brand">
+                          ₹{Number(prod.basePrice || prod.price || 0).toLocaleString("en-IN")}
+                        </span>
+                        <span className="text-[10px] text-gray-500 block uppercase">
+                          per {prod.unit || "COILS"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {prod.description && (
+                      <p className="text-xs text-gray-600 line-clamp-2 pt-1">{prod.description}</p>
+                    )}
+
+                    <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
+                      <span>HSN: {prod.hsn || "85446020"}</span>
+                      <span>GST: {prod.gst || 18}%</span>
+                      <span className="text-xs font-bold text-brand group-hover:underline">
+                        + Select & Configure →
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </main>
+
+        {/* Product Modal Component for creating new products on this page */}
+        <ProductModal
+          isOpen={isAddProductOpen}
+          onClose={() => setIsAddProductOpen(false)}
+          onProductCreated={(newProd: any) => {
+            setAllProducts((prev) => [newProd, ...prev]);
+            setIsAddProductOpen(false);
+            openProductConfigurator(newProd);
+          }}
+        />
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW 3: MAIN MAKE QUOTATION PAGE (EXACT ORDER + CLEAN CARDS)
+  // =========================================================================
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-gray-900 font-inter flex flex-col pb-36 sm:pb-32">
       {/* ================= FULL-SCREEN TOP HEADER (Website Brand Styling) ================= */}
@@ -545,7 +879,7 @@ function MakeQuotationContent() {
       </header>
 
       {/* ================= MAIN VERTICAL STACK ================= */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-5">
         {/* Error Notification */}
         {submissionError && (
           <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-xs text-rose-800 font-medium animate-in fade-in">
@@ -594,131 +928,129 @@ function MakeQuotationContent() {
           </div>
         </div>
 
-        {/* ---------------- 1. TO (CUSTOMER) ---------------- */}
-        <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3.5">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
-                <User size={17} />
+        {/* ---------------- 1. TO (CUSTOMER) CARD ---------------- */}
+        {!selectedCustomer ? (
+          <div
+            onClick={() => setIsCustomerSelectOpen(true)}
+            className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs hover:border-brand/50 hover:shadow-sm cursor-pointer transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-center space-x-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-brand/10 text-brand flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+                <User size={20} />
               </div>
               <div>
-                <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+                <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight group-hover:text-brand transition-colors">
                   TO (CUSTOMER)
                 </h2>
-                <p className="text-[11px] text-gray-500">
-                  {selectedCustomer ? "Client selected for quotation" : "Add recipient customer details"}
-                </p>
+                <p className="text-xs text-gray-500">Tap to select existing customer or add new</p>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsCustomerSelectOpen(true)}
-              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-brand hover:text-white text-gray-700 flex items-center justify-center transition-all cursor-pointer shadow-xs"
-              title={selectedCustomer ? "Change Customer" : "Add Customer"}
-            >
-              <Plus size={16} />
-            </button>
+            <div className="w-9 h-9 rounded-full bg-gray-100 group-hover:bg-brand group-hover:text-white text-gray-700 flex items-center justify-center transition-all shadow-xs shrink-0">
+              <Plus size={18} />
+            </div>
           </div>
-
-          {!selectedCustomer ? (
-            <div
-              onClick={() => setIsCustomerSelectOpen(true)}
-              className="p-6 border-2 border-dashed border-gray-200 hover:border-brand rounded-2xl text-center cursor-pointer transition-all bg-gray-50/50 hover:bg-blue-50/20 group"
-            >
-              <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
-                <Plus size={20} />
-              </div>
-              <h4 className="text-sm font-bold text-gray-800">Select or Add Customer</h4>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Click here to choose an existing client or register a new customer
-              </p>
-            </div>
-          ) : (
-            <div className="p-4 rounded-2xl bg-blue-50/40 border border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-bold text-gray-900">{selectedCustomer.name}</h4>
-                  {selectedCustomer.companyName && (
-                    <span className="text-xs font-semibold px-2.5 py-0.5 bg-blue-100 text-brand rounded-md">
-                      {selectedCustomer.companyName}
-                    </span>
-                  )}
+        ) : (
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-3">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
+                  <User size={16} />
                 </div>
-                {selectedCustomer.addressLine1 && (
-                  <p className="text-xs text-gray-600">{selectedCustomer.addressLine1}</p>
-                )}
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 pt-0.5">
-                  {selectedCustomer.phone && <span>Phone: {selectedCustomer.phone}</span>}
-                  {selectedCustomer.email && <span>Email: {selectedCustomer.email}</span>}
-                  {selectedCustomer.gstin && (
-                    <span className="font-semibold text-brand">GSTIN: {selectedCustomer.gstin}</span>
-                  )}
+                <div>
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                    TO (CUSTOMER)
+                  </h2>
                 </div>
               </div>
-
-              <div className="flex items-center space-x-2 self-end sm:self-center">
+              <div className="flex items-center space-x-2">
                 <button
                   type="button"
                   onClick={() => setIsCustomerSelectOpen(true)}
-                  className="px-3 py-1.5 bg-white border border-gray-200 hover:border-brand text-brand hover:bg-brand/5 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-brand text-xs font-bold rounded-xl transition-all cursor-pointer"
                 >
                   Change
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedCustomer(null)}
-                  className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-white rounded-xl transition-colors cursor-pointer"
+                  className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
                   title="Remove Customer"
                 >
                   <Trash2 size={16} />
                 </button>
               </div>
             </div>
-          )}
-        </section>
 
-        {/* ---------------- 2. PRODUCTS ---------------- */}
-        <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3.5">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
-                <Package size={17} />
+            <div className="space-y-1 pt-1">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-gray-900">{selectedCustomer.name}</h3>
+                {selectedCustomer.companyName && (
+                  <span className="text-xs font-semibold px-2.5 py-0.5 bg-blue-100 text-brand rounded-md">
+                    {selectedCustomer.companyName}
+                  </span>
+                )}
+              </div>
+              {selectedCustomer.addressLine1 && (
+                <p className="text-xs text-gray-600">{selectedCustomer.addressLine1}</p>
+              )}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 pt-0.5">
+                {selectedCustomer.phone && <span>Phone: {selectedCustomer.phone}</span>}
+                {selectedCustomer.email && <span>Email: {selectedCustomer.email}</span>}
+                {selectedCustomer.gstin && (
+                  <span className="font-semibold text-brand">GSTIN: {selectedCustomer.gstin}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ---------------- 2. PRODUCTS CARD ---------------- */}
+        {selectedItems.length === 0 ? (
+          <div
+            onClick={() => setIsProductSelectOpen(true)}
+            className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs hover:border-brand/50 hover:shadow-sm cursor-pointer transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-center space-x-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-brand/10 text-brand flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+                <Package size={20} />
               </div>
               <div>
-                <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+                <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight group-hover:text-brand transition-colors">
                   PRODUCTS
                 </h2>
-                <p className="text-[11px] text-gray-500">
-                  {selectedItems.length} {selectedItems.length === 1 ? "item" : "items"} added
-                </p>
+                <p className="text-xs text-gray-500">Tap to select products from catalog</p>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsProductSelectOpen(true)}
-              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-brand hover:text-white text-gray-700 flex items-center justify-center transition-all cursor-pointer shadow-xs"
-              title="Add Product"
-            >
-              <Plus size={16} />
-            </button>
+            <div className="w-9 h-9 rounded-full bg-gray-100 group-hover:bg-brand group-hover:text-white text-gray-700 flex items-center justify-center transition-all shadow-xs shrink-0">
+              <Plus size={18} />
+            </div>
           </div>
-
-          {selectedItems.length === 0 ? (
-            <div
-              onClick={() => setIsProductSelectOpen(true)}
-              className="p-6 border-2 border-dashed border-gray-200 hover:border-brand rounded-2xl text-center cursor-pointer transition-all bg-gray-50/50 hover:bg-blue-50/20 group"
-            >
-              <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
-                <Plus size={20} />
+        ) : (
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
+                  <Package size={16} />
+                </div>
+                <div>
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                    PRODUCTS ({selectedItems.length})
+                  </h2>
+                </div>
               </div>
-              <h4 className="text-sm font-bold text-gray-800">Add Products / Line Items</h4>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Select from catalog or define custom product with rate, quantity, and GST
-              </p>
+
+              <button
+                type="button"
+                onClick={() => setIsProductSelectOpen(true)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-brand hover:text-white text-gray-700 flex items-center justify-center transition-all cursor-pointer shadow-xs"
+                title="Add More Products"
+              >
+                <Plus size={16} />
+              </button>
             </div>
-          ) : (
+
             <div className="space-y-3">
               <div className="overflow-x-auto border border-gray-200 rounded-2xl">
                 <table className="w-full text-left text-xs">
@@ -796,73 +1128,47 @@ function MakeQuotationContent() {
                 </button>
               </div>
             </div>
-          )}
-        </section>
+          </div>
+        )}
 
-        {/* ---------------- 3. OTHER CHARGES ---------------- */}
-        <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3.5">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
-                <DollarSign size={17} />
+        {/* ---------------- 3. OTHER CHARGES CARD ---------------- */}
+        {!otherCharge ? (
+          <div
+            onClick={() => {
+              setOcLabel("Transportation / Delivery Charges");
+              setOcAmount("");
+              setOcIsTaxable(false);
+              setIsOtherChargeOpen(true);
+            }}
+            className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs hover:border-brand/50 hover:shadow-sm cursor-pointer transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-center space-x-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-brand/10 text-brand flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+                <DollarSign size={20} />
               </div>
               <div>
-                <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+                <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight group-hover:text-brand transition-colors">
                   OTHER CHARGES
                 </h2>
-                <p className="text-[11px] text-gray-500">
-                  {otherCharge ? "Additional charges configured" : "Optional freight, transport, packaging, or handling"}
-                </p>
+                <p className="text-xs text-gray-500">Freight, transportation, delivery, or packaging</p>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setOcLabel(otherCharge?.label || "Transportation / Delivery Charges");
-                setOcAmount(otherCharge ? String(otherCharge.amount) : "");
-                setOcIsTaxable(otherCharge ? otherCharge.isTaxable : false);
-                setIsOtherChargeOpen(true);
-              }}
-              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-brand hover:text-white text-gray-700 flex items-center justify-center transition-all cursor-pointer shadow-xs"
-              title={otherCharge ? "Edit Other Charge" : "Add Other Charge"}
-            >
-              <Plus size={16} />
-            </button>
+            <div className="w-9 h-9 rounded-full bg-gray-100 group-hover:bg-brand group-hover:text-white text-gray-700 flex items-center justify-center transition-all shadow-xs shrink-0">
+              <Plus size={18} />
+            </div>
           </div>
-
-          {!otherCharge ? (
-            <div
-              onClick={() => {
-                setOcLabel("Transportation / Delivery Charges");
-                setOcAmount("");
-                setOcIsTaxable(false);
-                setIsOtherChargeOpen(true);
-              }}
-              className="p-5 border border-dashed border-gray-200 hover:border-brand rounded-2xl flex items-center justify-between cursor-pointer transition-colors bg-gray-50/50 hover:bg-blue-50/20 group"
-            >
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <Plus size={16} />
+        ) : (
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-3">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
+                  <DollarSign size={16} />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-gray-800">Add Other Charge</h4>
-                  <p className="text-[11px] text-gray-500">Freight, courier, packaging, or installation charges</p>
-                </div>
-              </div>
-              <span className="text-xs font-bold text-brand group-hover:underline">+ Add</span>
-            </div>
-          ) : (
-            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-between">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-gray-900">{otherCharge.label}</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${otherCharge.isTaxable ? "bg-amber-100 text-amber-800" : "bg-gray-200 text-gray-700"}`}>
-                    {otherCharge.isTaxable ? "+18% GST Applicable" : "Non-Taxable"}
-                  </span>
-                </div>
-                <div className="text-sm font-extrabold text-gray-900">
-                  ₹{otherCharge.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                    OTHER CHARGES
+                  </h2>
                 </div>
               </div>
 
@@ -875,7 +1181,7 @@ function MakeQuotationContent() {
                     setOcIsTaxable(otherCharge.isTaxable);
                     setIsOtherChargeOpen(true);
                   }}
-                  className="p-1.5 text-gray-500 hover:text-brand hover:bg-white rounded-lg transition-all cursor-pointer"
+                  className="p-1.5 text-gray-500 hover:text-brand hover:bg-gray-100 rounded-lg transition-all cursor-pointer"
                   title="Edit Charge"
                 >
                   <Edit3 size={16} />
@@ -883,17 +1189,29 @@ function MakeQuotationContent() {
                 <button
                   type="button"
                   onClick={() => setOtherCharge(null)}
-                  className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all cursor-pointer"
+                  className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
                   title="Remove Charge"
                 >
                   <Trash2 size={16} />
                 </button>
               </div>
             </div>
-          )}
-        </section>
 
-        {/* ---------------- 4. TERMS & CONDITIONS ---------------- */}
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <span className="text-sm font-bold text-gray-900 block">{otherCharge.label}</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-0.5 ${otherCharge.isTaxable ? "bg-amber-100 text-amber-800" : "bg-gray-200 text-gray-700"}`}>
+                  {otherCharge.isTaxable ? "+18% GST Applicable" : "Non-Taxable"}
+                </span>
+              </div>
+              <div className="text-base font-extrabold text-gray-900">
+                ₹{otherCharge.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ---------------- 4. TERMS & CONDITIONS CARD ---------------- */}
         <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-gray-100 pb-3.5">
             <div className="flex items-center space-x-2.5">
@@ -1075,188 +1393,6 @@ function MakeQuotationContent() {
           </div>
         </div>
       </footer>
-
-      {/* ================= MODAL 1: SELECT CUSTOMER ================= */}
-      {isCustomerSelectOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
-            <div className="bg-brand text-white px-6 py-4 flex items-center justify-between">
-              <h3 className="text-base font-bold">Select Client / Customer</h3>
-              <div className="flex items-center space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddCustomerOpen(true)}
-                  className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer"
-                >
-                  <Plus size={14} />
-                  <span>+ New Customer</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsCustomerSelectOpen(false)}
-                  className="p-1 rounded-full text-white/80 hover:text-white"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-4 border-b border-gray-100">
-              <div className="relative">
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={customerSearch}
-                  onChange={(e) => setCustomerSearch(e.target.value)}
-                  placeholder="Search customer by name, company, phone, email..."
-                  className="w-full bg-gray-50 pl-10 pr-4 py-2.5 rounded-xl text-xs text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:border-brand"
-                />
-              </div>
-            </div>
-
-            <div className="p-4 overflow-y-auto space-y-2 flex-1">
-              {filteredCustomers.length === 0 ? (
-                <div className="py-12 text-center text-xs text-gray-500 space-y-2">
-                  <p>No customers found matching your search.</p>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddCustomerOpen(true)}
-                    className="px-4 py-2 bg-brand text-white rounded-xl font-bold cursor-pointer"
-                  >
-                    + Register New Customer
-                  </button>
-                </div>
-              ) : (
-                filteredCustomers.map((cust) => (
-                  <div
-                    key={cust.id}
-                    onClick={() => {
-                      setSelectedCustomer(cust);
-                      setIsCustomerSelectOpen(false);
-                    }}
-                    className="p-3.5 rounded-2xl bg-gray-50 hover:bg-blue-50/50 border border-gray-200 hover:border-brand/40 shadow-xs cursor-pointer transition-all flex items-center justify-between group"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand">
-                          {cust.name}
-                        </h4>
-                        {cust.companyName && (
-                          <span className="text-[11px] px-2 py-0.5 bg-gray-200 text-gray-700 rounded-md font-medium">
-                            {cust.companyName}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 flex gap-3 mt-0.5">
-                        {cust.phone && <span>{cust.phone}</span>}
-                        {cust.email && <span>{cust.email}</span>}
-                      </div>
-                    </div>
-                    <ChevronRight size={18} className="text-gray-400 group-hover:text-brand" />
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Customer Registration Modal Component */}
-      <CustomerModal
-        isOpen={isAddCustomerOpen}
-        onClose={() => setIsAddCustomerOpen(false)}
-        onCustomerCreated={(newCust: any) => {
-          setCustomers((prev) => [newCust, ...prev]);
-          setSelectedCustomer(newCust);
-          setIsAddCustomerOpen(false);
-          setIsCustomerSelectOpen(false);
-        }}
-      />
-
-      {/* ================= MODAL 2: SELECT PRODUCT ================= */}
-      {isProductSelectOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
-            <div className="bg-brand text-white px-6 py-4 flex items-center justify-between">
-              <h3 className="text-base font-bold">Select Product from Catalog</h3>
-              <div className="flex items-center space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddProductOpen(true)}
-                  className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer"
-                >
-                  <Plus size={14} />
-                  <span>+ New Product</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsProductSelectOpen(false)}
-                  className="p-1 rounded-full text-white/80 hover:text-white"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-4 border-b border-gray-100">
-              <div className="relative">
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  placeholder="Search products by title, category, description..."
-                  className="w-full bg-gray-50 pl-10 pr-4 py-2.5 rounded-xl text-xs text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:border-brand"
-                />
-              </div>
-            </div>
-
-            <div className="p-4 overflow-y-auto space-y-2 flex-1">
-              {filteredProducts.length === 0 ? (
-                <div className="py-12 text-center text-xs text-gray-500 space-y-2">
-                  <p>No products found matching your catalog search.</p>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddProductOpen(true)}
-                    className="px-4 py-2 bg-brand text-white rounded-xl font-bold cursor-pointer"
-                  >
-                    + Add New Product
-                  </button>
-                </div>
-              ) : (
-                filteredProducts.map((prod) => (
-                  <div
-                    key={prod.id}
-                    onClick={() => openProductConfigurator(prod)}
-                    className="p-3.5 rounded-2xl bg-gray-50 hover:bg-blue-50/50 border border-gray-200 hover:border-brand/40 shadow-xs cursor-pointer transition-all flex items-center justify-between group"
-                  >
-                    <div>
-                      <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand">
-                        {prod.name}
-                      </h4>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Base Rate: ₹{prod.basePrice || prod.price || 0} | GST: {prod.gst || 18}% | {prod.unit || "COILS"}
-                      </p>
-                    </div>
-                    <ChevronRight size={18} className="text-gray-400 group-hover:text-brand" />
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Product Registration Modal Component */}
-      <ProductModal
-        isOpen={isAddProductOpen}
-        onClose={() => setIsAddProductOpen(false)}
-        onProductCreated={(newProd: any) => {
-          setAllProducts((prev) => [newProd, ...prev]);
-          setIsAddProductOpen(false);
-          openProductConfigurator(newProd);
-        }}
-      />
 
       {/* ================= MODAL 3: PRODUCT CONFIGURATOR ================= */}
       {isConfiguringProduct && (
