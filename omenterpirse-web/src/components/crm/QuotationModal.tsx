@@ -522,6 +522,15 @@ export function ViewQuotationModal({
     parsedItems = [];
   }
 
+  let parsedOtherCharges: { label?: string; amount?: number; isTaxable?: boolean } | null = null;
+  if (quotation.otherCharges) {
+    try {
+      parsedOtherCharges = typeof quotation.otherCharges === "string" ? JSON.parse(quotation.otherCharges) : quotation.otherCharges;
+    } catch (e) {
+      parsedOtherCharges = null;
+    }
+  }
+
   const handlePrint = () => {
     window.print();
   };
@@ -707,6 +716,14 @@ export function ViewQuotationModal({
                     ₹{Number(quotation.subtotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                   </span>
                 </div>
+                {parsedOtherCharges && Number(parsedOtherCharges.amount) > 0 && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>{parsedOtherCharges.label || "Other Charges"}:</span>
+                    <span className="font-semibold">
+                      ₹{Number(parsedOtherCharges.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between text-gray-600">
                   <span>Tax Amount:</span>
                   <span className="font-semibold">

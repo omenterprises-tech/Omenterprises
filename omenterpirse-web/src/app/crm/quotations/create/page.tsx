@@ -1,57 +1,106 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
-  FileText,
   ArrowLeft,
   Plus,
+  Search,
   Trash2,
+  ChevronRight,
+  Edit3,
   Loader2,
+  Check,
+  CheckSquare,
+  Square,
+  X,
+  User,
+  Package,
+  FileText,
+  DollarSign,
   AlertCircle,
-  Building2,
-  CheckCircle2,
-  UserCheck,
+  SlidersHorizontal,
 } from "lucide-react";
+import CustomerModal from "@/components/crm/CustomerModal";
+import ProductModal from "@/components/crm/ProductModal";
 
-interface ItemRow {
+interface QuotationItem {
   id: string;
-  description: string;
+  productId?: number;
+  name: string;
   quantity: number;
   unitPrice: number;
+  description: string;
   taxPercent: number;
   total: number;
 }
 
-export default function CrmCreateQuotationPage() {
+interface OtherChargeData {
+  label: string;
+  amount: number;
+  isTaxable: boolean;
+}
+
+interface TermItem {
+  id: string;
+  text: string;
+}
+
+export default function MakeQuotationPage() {
   const router = useRouter();
+
   const [user, setUser] = useState<any>(null);
   const [business, setBusiness] = useState<any>(null);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Form State
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [customerAddress, setCustomerAddress] = useState("");
-  const [customerGstin, setCustomerGstin] = useState("");
-  const [quotationDate, setQuotationDate] = useState(() => new Date().toISOString().split("T")[0]);
-  const [validUntil, setValidUntil] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 30);
-    return d.toISOString().split("T")[0];
-  });
-  const [items, setItems] = useState<ItemRow[]>([
-    { id: "1", description: "", quantity: 1, unitPrice: 0, taxPercent: 18, total: 0 },
-  ]);
-  const [notes, setNotes] = useState("Thank you for your business. Please contact us if you have any questions.");
-  const [terms, setTerms] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  // Top info
+  const [quotationDate, setQuotationDate] = useState(
+    new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
+  );
+  const [otherInfo, setOtherInfo] = useState("");
 
+  // Customer State
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  const [isCustomerSelectOpen, setIsCustomerSelectOpen] = useState(false);
+  const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
+
+  // Products State
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [selectedItems, setSelectedItems] = useState<QuotationItem[]>([]);
+  const [isProductSelectOpen, setIsProductSelectOpen] = useState(false);
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
+
+  // Add / Edit Quotation Product Sheet (Image 2)
+  const [isConfiguringProduct, setIsConfiguringProduct] = useState(false);
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [currentProductObj, setCurrentProductObj] = useState<any | null>(null);
+  const [cfgName, setCfgName] = useState("");
+  const [cfgQuantity, setCfgQuantity] = useState("1");
+  const [cfgPrice, setCfgPrice] = useState("");
+  const [cfgDescription, setCfgDescription] = useState("");
+  const [cfgTaxPercent, setCfgTaxPercent] = useState("18");
+
+  // Other Charge State (Image 3)
+  const [isOtherChargeOpen, setIsOtherChargeOpen] = useState(false);
+  const [otherCharge, setOtherCharge] = useState<OtherChargeData | null>(null);
+  const [ocLabel, setOcLabel] = useState("Other Charges");
+  const [ocAmount, setOcAmount] = useState("");
+  const [ocIsTaxable, setOcIsTaxable] = useState(false);
+
+  // Terms & Conditions State (Image 4 & 5)
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
+  const [termsList, setTermsList] = useState<TermItem[]>([]);
+  const [selectedTermIds, setSelectedTermIds] = useState<string[]>([]);
+  const [isEditingTerms, setIsEditingTerms] = useState(false);
+
+  // Submission
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [submissionError, setSubmissionError] = useState("");
+
+  // Load initial data
   useEffect(() => {
     async function init() {
       try {
@@ -68,26 +117,47 @@ export default function CrmCreateQuotationPage() {
         setUser(data.user);
         setBusiness(data.business);
 
-        // Pre-populate terms from business otherInfo or terms API
-        if (data.business?.otherInfo) {
-          setTerms(data.business.otherInfo);
-        } else {
-          setTerms(
-            "• Validity: 30 days from quote date.\n• Payment: 100% advance against Proforma Invoice.\n• Delivery: 5 to 7 working days from confirmed PO.\n• Warranty: 12 months manufacturer warranty."
-          );
+        // Fetch customers, products, terms
+        const [custRes, prodRes, termsRes] = await Promise.all([
+          fetch("/api/crm/customers").then((r) => r.json()),
+          fetch("/api/crm/products").then((r) => r.json()),
+          fetch("/api/crm/terms").then((r) => r.json()),
+        ]);
+
+        if (custRes.success && custRes.customers) {
+          setCustomers(custRes.customers);
+        }
+        if (prodRes.success && prodRes.products) {
+          setAllProducts(prodRes.products);
         }
 
-        // Fetch customers & products for quick fill
-        const [custRes, prodRes] = await Promise.all([
-          fetch("/api/crm/customers"),
-          fetch("/api/crm/products"),
-        ]);
-        const custData = await custRes.json();
-        const prodData = await prodRes.json();
-        if (custData.success && custData.customers) setCustomers(custData.customers);
-        if (prodData.success && prodData.products) setProducts(prodData.products);
+        // Initialize terms list
+        let initialTermsText = "";
+        if (termsRes.success && termsRes.terms) {
+          initialTermsText = termsRes.terms;
+        } else if (data.business?.otherInfo) {
+          initialTermsText = data.business.otherInfo;
+        }
+
+        const lines = initialTermsText
+          ? initialTermsText.split("\n").map((l: string) => l.trim()).filter(Boolean)
+          : [
+              "Validity: 30 days from quotation date.",
+              "Payment: 100% advance against Proforma Invoice.",
+              "Delivery: 5 to 7 working days from confirmed Purchase Order.",
+              "Warranty: 12 months manufacturer warranty against manufacturing defects.",
+            ];
+
+        const mappedTerms: TermItem[] = lines.map((l: string, idx: number) => ({
+          id: `term-${idx + 1}-${Date.now()}`,
+          text: l.replace(/^(\d+[\.\)]\s*|[•\-\*]\s*)/, "").trim(),
+        }));
+
+        setTermsList(mappedTerms);
+        // Default select all terms
+        setSelectedTermIds(mappedTerms.map((t) => t.id));
       } catch (err) {
-        console.error("Failed to load CRM session:", err);
+        console.error("Failed to load quotation editor data:", err);
       } finally {
         setIsLoading(false);
       }
@@ -95,588 +165,966 @@ export default function CrmCreateQuotationPage() {
     init();
   }, [router]);
 
-  const handleCustomerSelect = (custId: string) => {
-    setSelectedCustomerId(custId);
-    if (!custId) {
-      setCustomerName("");
-      setCustomerEmail("");
-      setCustomerPhone("");
-      setCustomerAddress("");
-      setCustomerGstin("");
-      return;
-    }
-    const found = customers.find((c) => String(c.id) === String(custId));
-    if (found) {
-      setCustomerName(found.name + (found.companyName ? " (" + found.companyName + ")" : ""));
-      setCustomerEmail(found.email || "");
-      setCustomerPhone(found.phone || "");
-      setCustomerAddress(
-        [found.addressLine1, found.addressLine2, found.address, found.city, found.state, found.pincode].filter(Boolean).join(", ")
-      );
-      setCustomerGstin(found.gstin || "");
-    }
+  // Calculations
+  const subtotal = useMemo(() => {
+    return selectedItems.reduce((acc, it) => acc + (Number(it.total) || 0), 0);
+  }, [selectedItems]);
+
+  const otherChargeAmount = useMemo(() => {
+    return otherCharge ? Number(otherCharge.amount) || 0 : 0;
+  }, [otherCharge]);
+
+  const taxTotal = useMemo(() => {
+    const itemsTax = selectedItems.reduce((acc, it) => {
+      const base = (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0);
+      const taxRate = Number(it.taxPercent) || 0;
+      return acc + (base * taxRate) / 100;
+    }, 0);
+
+    const ocTax = otherCharge?.isTaxable ? (otherChargeAmount * 18) / 100 : 0;
+    return Math.round((itemsTax + ocTax) * 100) / 100;
+  }, [selectedItems, otherCharge, otherChargeAmount]);
+
+  const amountDue = useMemo(() => {
+    return Math.round((subtotal + otherChargeAmount + taxTotal) * 100) / 100;
+  }, [subtotal, otherChargeAmount, taxTotal]);
+
+  // Filtered customers for search
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch.trim()) return customers;
+    const q = customerSearch.toLowerCase().trim();
+    return customers.filter(
+      (c) =>
+        c.name?.toLowerCase().includes(q) ||
+        c.companyName?.toLowerCase().includes(q) ||
+        c.phone?.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q)
+    );
+  }, [customers, customerSearch]);
+
+  // Filtered products for search
+  const filteredProducts = useMemo(() => {
+    if (!productSearch.trim()) return allProducts;
+    const q = productSearch.toLowerCase().trim();
+    return allProducts.filter(
+      (p) =>
+        p.name?.toLowerCase().includes(q) ||
+        p.category?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q)
+    );
+  }, [allProducts, productSearch]);
+
+  // Product Selection Handlers
+  const openProductConfigurator = (prod: any, editIndex: number | null = null) => {
+    setCurrentProductObj(prod);
+    setEditingItemIndex(editIndex);
+    setCfgName(prod.name || "");
+    setCfgPrice(
+      prod.basePrice !== undefined ? String(prod.basePrice) : prod.price !== undefined ? String(prod.price) : "0"
+    );
+    setCfgQuantity(editIndex !== null && selectedItems[editIndex] ? String(selectedItems[editIndex].quantity) : "1");
+    setCfgDescription(prod.description || "");
+    setCfgTaxPercent(prod.gst !== undefined && prod.gst !== null ? String(prod.gst) : "18");
+
+    setIsProductSelectOpen(false);
+    setIsConfiguringProduct(true);
   };
 
-  const handleItemChange = (index: number, field: keyof ItemRow, value: any) => {
-    setItems((prev) => {
-      const updated = [...prev];
-      const item = { ...updated[index], [field]: value };
-      const qty = Number(item.quantity) || 0;
-      const price = Number(item.unitPrice) || 0;
-      const tax = Number(item.taxPercent) || 0;
-      const base = qty * price;
-      item.total = Math.round((base + (base * tax) / 100) * 100) / 100;
-      updated[index] = item;
-      return updated;
-    });
-  };
-
-  const addItemRow = () => {
-    setItems((prev) => [
-      ...prev,
-      { id: String(Date.now()), description: "", quantity: 1, unitPrice: 0, taxPercent: 18, total: 0 },
-    ]);
-  };
-
-  const removeItemRow = (index: number) => {
-    if (items.length <= 1) return;
-    setItems((prev) => prev.filter((_, idx) => idx !== index));
-  };
-
-  const handleProductSelect = (index: number, prodId: string) => {
-    const prod = products.find((p) => String(p.id) === String(prodId));
-    if (prod) {
-      handleItemChange(index, "description", prod.name + (prod.description ? ` - ${prod.description}` : ""));
-      handleItemChange(index, "unitPrice", prod.basePrice);
-    }
-  };
-
-  const subtotal = items.reduce(
-    (acc, it) => acc + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
-    0
-  );
-  const taxTotal = items.reduce(
-    (acc, it) =>
-      acc +
-      ((Number(it.quantity) || 0) * (Number(it.unitPrice) || 0) * (Number(it.taxPercent) || 0)) /
-        100,
-    0
-  );
-  const grandTotal = Math.round((subtotal + taxTotal) * 100) / 100;
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSaveProductToQuotation = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName.trim()) {
-      setErrorMessage("Customer name is required.");
-      return;
+    const qty = Math.max(1, Number(cfgQuantity) || 1);
+    const unitPrice = Math.max(0, Number(cfgPrice) || 0);
+    const taxRate = Number(cfgTaxPercent) || 0;
+    const base = qty * unitPrice;
+    const total = Math.round((base + (base * taxRate) / 100) * 100) / 100;
+
+    const itemObj: QuotationItem = {
+      id: editingItemIndex !== null ? selectedItems[editingItemIndex].id : `item-${Date.now()}`,
+      productId: currentProductObj?.id,
+      name: cfgName.trim() || currentProductObj?.name || "Item",
+      quantity: qty,
+      unitPrice,
+      description: cfgDescription.trim(),
+      taxPercent: taxRate,
+      total,
+    };
+
+    if (editingItemIndex !== null) {
+      setSelectedItems((prev) => {
+        const updated = [...prev];
+        updated[editingItemIndex] = itemObj;
+        return updated;
+      });
+    } else {
+      setSelectedItems((prev) => [...prev, itemObj]);
     }
-    if (items.some((it) => !it.description.trim() || Number(it.unitPrice) <= 0)) {
-      setErrorMessage("All line items must have a description and a positive unit price.");
+
+    setIsConfiguringProduct(false);
+    setEditingItemIndex(null);
+    setCurrentProductObj(null);
+  };
+
+  // Other Charge Save
+  const handleSaveOtherCharge = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(ocAmount);
+    if (isNaN(amt) || amt < 0) {
+      alert("Please enter a valid amount.");
       return;
     }
 
-    setIsSubmitting(true);
-    setErrorMessage("");
+    setOtherCharge({
+      label: ocLabel.trim() || "Other Charges",
+      amount: amt,
+      isTaxable: ocIsTaxable,
+    });
+    setIsOtherChargeOpen(false);
+  };
+
+  // Terms Handlers
+  const handleToggleTerm = (id: string) => {
+    setSelectedTermIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllTerms = () => {
+    if (selectedTermIds.length === termsList.length) {
+      setSelectedTermIds([]);
+    } else {
+      setSelectedTermIds(termsList.map((t) => t.id));
+    }
+  };
+
+  const updateTermText = (id: string, text: string) => {
+    setTermsList((prev) => prev.map((t) => (t.id === id ? { ...t, text } : t)));
+  };
+
+  const addNewTermItem = () => {
+    const newId = `term-${Date.now()}`;
+    const newTerm = { id: newId, text: "" };
+    setTermsList((prev) => [...prev, newTerm]);
+    setSelectedTermIds((prev) => [...prev, newId]);
+    setIsEditingTerms(true);
+  };
+
+  // Generate Quotation
+  const handleGenerateQuotation = async () => {
+    setSubmissionError("");
+
+    if (!selectedCustomer) {
+      setSubmissionError("Please select a customer (TO CUSTOMER) for this quotation.");
+      return;
+    }
+
+    if (selectedItems.length === 0) {
+      setSubmissionError("Please add at least one product under PRODUCTS.");
+      return;
+    }
+
+    setIsGenerating(true);
 
     try {
+      // Format selected terms
+      const selectedTermsFormatted = termsList
+        .filter((t) => selectedTermIds.includes(t.id) && t.text.trim())
+        .map((t, idx) => `${idx + 1}. ${t.text.trim()}`)
+        .join("\n");
+
+      // Format items payload
+      const itemsPayload = selectedItems.map((it) => ({
+        description: it.name + (it.description ? ` - ${it.description}` : ""),
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        taxPercent: it.taxPercent,
+        total: it.total,
+      }));
+
+      const payload = {
+        customerId: selectedCustomer.id,
+        customerName: selectedCustomer.name,
+        customerEmail: selectedCustomer.email || null,
+        customerPhone: selectedCustomer.phone || null,
+        customerAddress: [
+          selectedCustomer.addressLine1,
+          selectedCustomer.addressLine2,
+          selectedCustomer.address,
+          selectedCustomer.city,
+          selectedCustomer.state,
+          selectedCustomer.pincode,
+        ]
+          .filter(Boolean)
+          .join(", "),
+        customerGstin: selectedCustomer.gstin || null,
+        quotationDate,
+        items: itemsPayload,
+        subtotal,
+        taxTotal,
+        grandTotal: amountDue,
+        otherCharges: otherCharge || null,
+        notes: otherInfo.trim() || null,
+        termsConditions: selectedTermsFormatted || null,
+        status: "Draft",
+      };
+
       const res = await fetch("/api/crm/quotations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId: selectedCustomerId ? parseInt(selectedCustomerId, 10) : undefined,
-          customerName: customerName.trim(),
-          customerEmail: customerEmail.trim() || undefined,
-          customerPhone: customerPhone.trim() || undefined,
-          customerAddress: customerAddress.trim() || undefined,
-          customerGstin: customerGstin.trim() || undefined,
-          quotationDate,
-          validUntil,
-          items,
-          subtotal,
-          taxTotal,
-          grandTotal,
-          notes: notes.trim(),
-          terms: terms.trim(),
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to create quotation.");
+      if (data.success) {
+        router.push("/crm/quotations");
+      } else {
+        setSubmissionError(data.error || "Failed to generate quotation.");
       }
-
-      // Navigate to Quotation List to view and print
-      router.push("/crm/quotations");
     } catch (err: any) {
-      setErrorMessage(err.message || "Failed to create quotation.");
+      setSubmissionError(err.message || "Failed to generate quotation.");
     } finally {
-      setIsSubmitting(false);
+      setIsGenerating(false);
     }
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
-        <Loader2 className="w-10 h-10 text-brand animate-spin mb-4" />
-        <p className="text-gray-500 font-medium text-sm">Opening Quotation Creator...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#1E1E1E]">
+        <Loader2 className="w-10 h-10 text-white animate-spin mb-4" />
+        <p className="text-white/80 font-medium text-sm">Opening Make Quotation...</p>
       </div>
     );
   }
 
-  const businessName = business?.businessName || "Your Business";
-
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-inter">
-      {/* Top Navigation */}
-      <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200/80 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={() => router.push("/crm/dashboard")}
-                className="p-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors cursor-pointer mr-1"
-                title="Back to Dashboard"
-              >
-                <ArrowLeft size={18} />
-              </button>
-              <div className="w-9 h-9 rounded-xl bg-brand text-white flex items-center justify-center shadow-md">
-                <FileText size={18} />
-              </div>
-              <div>
-                <h1 className="font-extrabold text-gray-900 tracking-tight text-base">
-                  Create Commercial Quotation
-                </h1>
-                <p className="text-xs text-gray-500 font-medium truncate max-w-xs">
-                  Issued under {businessName}
-                </p>
-              </div>
-            </div>
+    <div className="min-h-screen bg-[#1E1E1E] flex flex-col justify-start items-center font-inter">
+      {/* Mobile Frame Container */}
+      <div className="w-full max-w-md min-h-screen bg-[#F8F9FA] flex flex-col shadow-2xl relative pb-28">
+        {/* ================= TOP HEADER (Image 1) ================= */}
+        <div className="bg-[#1E1E1E] text-white px-4 py-4 flex items-center space-x-3 sticky top-0 z-30 shadow-md">
+          <button
+            type="button"
+            onClick={() => router.push("/crm/dashboard")}
+            className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            title="Back to Dashboard"
+          >
+            <ArrowLeft size={22} />
+          </button>
+          <h1 className="text-lg font-bold tracking-tight text-white">
+            Make Quotation
+          </h1>
+        </div>
 
-            <div className="flex items-center space-x-2.5">
-              <button
-                type="button"
-                onClick={() => router.push("/crm/quotations")}
-                className="px-3.5 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-100 text-xs font-bold text-gray-700 transition-colors cursor-pointer"
-              >
-                Quotation List →
-              </button>
+        {/* ================= TOP INFO SECTION (Image 1) ================= */}
+        <div className="bg-white p-4 sm:p-5 border-b border-gray-200/80 shadow-xs space-y-2">
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <div>
+              <span className="block text-[11px] font-medium text-gray-400">Quotation Date</span>
+              <input
+                type="text"
+                value={quotationDate}
+                onChange={(e) => setQuotationDate(e.target.value)}
+                placeholder="DD/MM/YYYY"
+                className="font-bold text-gray-900 text-sm focus:outline-none bg-transparent"
+              />
+            </div>
+            <div className="text-right">
+              <span className="block text-[11px] font-medium text-gray-400">Quotation No</span>
+              <span className="font-bold text-gray-900 text-sm">-</span>
             </div>
           </div>
-        </div>
-      </header>
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {errorMessage && (
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 font-medium flex items-center gap-2">
-              <AlertCircle size={16} className="shrink-0 text-rose-600" />
-              <span>{errorMessage}</span>
+          <div className="pt-1">
+            <input
+              type="text"
+              value={otherInfo}
+              onChange={(e) => setOtherInfo(e.target.value)}
+              placeholder="Other Info:"
+              className="w-full text-xs text-gray-600 placeholder:text-gray-400 bg-transparent focus:outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Validation error if any */}
+        {submissionError && (
+          <div className="mx-4 mt-3 p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 font-medium flex items-center gap-2">
+            <AlertCircle size={16} className="shrink-0 text-rose-600" />
+            <span>{submissionError}</span>
+          </div>
+        )}
+
+        {/* ================= MAIN 4 CARDS (Image 1 & 3) ================= */}
+        <div className="p-4 space-y-3.5 flex-1">
+          {/* 1. TO (CUSTOMER) CARD */}
+          {!selectedCustomer ? (
+            <button
+              type="button"
+              onClick={() => setIsCustomerSelectOpen(true)}
+              className="w-full bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs hover:border-brand/40 hover:shadow-sm transition-all flex items-center justify-between cursor-pointer group text-left"
+            >
+              <span className="font-bold text-sm text-gray-900 tracking-wide">
+                TO (CUSTOMER)
+              </span>
+              <div className="w-8 h-8 rounded-full bg-[#1E1E1E] text-white flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Plus size={18} />
+              </div>
+            </button>
+          ) : (
+            <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs space-y-1 relative">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-gray-400 tracking-wider block">
+                    Customer
+                  </span>
+                  <h4 className="text-sm font-bold text-gray-900">{selectedCustomer.name}</h4>
+                  {selectedCustomer.companyName && (
+                    <p className="text-xs text-gray-500">{selectedCustomer.companyName}</p>
+                  )}
+                  {selectedCustomer.phone && (
+                    <p className="text-xs text-gray-400 mt-0.5">{selectedCustomer.phone}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCustomer(null)}
+                  className="p-1 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
+                  title="Remove Customer"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Section 1: Customer Details */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-4">
-              <div>
-                <h2 className="text-lg font-bold text-gray-900 font-playfair">1. Client & Dates</h2>
-                <p className="text-xs text-gray-500">Select an existing customer or type direct details</p>
-              </div>
-
-              {customers.length > 0 && (
-                <div className="w-full sm:w-72">
-                  <select
-                    value={selectedCustomerId}
-                    onChange={(e) => handleCustomerSelect(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand bg-gray-50 font-medium"
-                  >
-                    <option value="">-- Autofill from Customer Directory --</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.companyName ? `(${c.companyName})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Customer / Company Name *
-                </label>
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="e.g. Apex Industrial Corp"
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Customer Email
-                </label>
-                <input
-                  type="email"
-                  value={customerEmail}
-                  onChange={(e) => setCustomerEmail(e.target.value)}
-                  placeholder="billing@apex.com"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="10-digit mobile"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Billing Address
-                </label>
-                <input
-                  type="text"
-                  value={customerAddress}
-                  onChange={(e) => setCustomerAddress(e.target.value)}
-                  placeholder="Street, City, State, PIN"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Customer GSTIN
-                </label>
-                <input
-                  type="text"
-                  value={customerGstin}
-                  onChange={(e) => setCustomerGstin(e.target.value)}
-                  placeholder="e.g. 36AAACG1234F1Z9"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand uppercase"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Quotation Date *
-                </label>
-                <input
-                  type="date"
-                  value={quotationDate}
-                  onChange={(e) => setQuotationDate(e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Valid Until *
-                </label>
-                <input
-                  type="date"
-                  value={validUntil}
-                  onChange={(e) => setValidUntil(e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Items & Calculation */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-4">
-              <div>
-                <h2 className="text-lg font-bold text-gray-900 font-playfair">2. Quotation Items & Rates</h2>
-                <p className="text-xs text-gray-500">Add materials, specifications, unit rates, and GST percentage</p>
-              </div>
-
-              <button
-                type="button"
-                onClick={addItemRow}
-                className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold transition-colors cursor-pointer self-start sm:self-auto"
-              >
-                <Plus size={15} />
-                <span>Add Item Line</span>
-              </button>
-            </div>
-
-            {/* Line Items Table */}
-            <div className="space-y-3">
-              {items.map((item, idx) => (
-                <div
-                  key={item.id}
-                  className="p-4 rounded-2xl border border-gray-200 bg-gray-50/50 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:gap-3"
-                >
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold uppercase text-gray-500">
-                        Item {idx + 1} Description *
-                      </label>
-                      {products.length > 0 && (
-                        <select
-                          onChange={(e) => handleProductSelect(idx, e.target.value)}
-                          className="text-[10px] text-brand bg-white border border-gray-200 rounded-lg px-2 py-0.5"
-                        >
-                          <option value="">-- Fill from Catalog --</option>
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} (₹{p.basePrice})
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      value={item.description}
-                      onChange={(e) => handleItemChange(idx, "description", e.target.value)}
-                      placeholder="e.g. 33kV Vacuum Circuit Breaker with metering unit"
-                      required
-                      className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand bg-white font-medium"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-3 sm:flex sm:items-center gap-2 shrink-0">
-                    <div className="sm:w-20">
-                      <label className="text-[10px] font-bold uppercase text-gray-500 block mb-0.5">
-                        Qty
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => handleItemChange(idx, "quantity", e.target.value)}
-                        className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand bg-white text-center"
-                      />
-                    </div>
-
-                    <div className="sm:w-28">
-                      <label className="text-[10px] font-bold uppercase text-gray-500 block mb-0.5">
-                        Rate (₹)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.unitPrice}
-                        onChange={(e) => handleItemChange(idx, "unitPrice", e.target.value)}
-                        className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand bg-white"
-                      />
-                    </div>
-
-                    <div className="sm:w-20">
-                      <label className="text-[10px] font-bold uppercase text-gray-500 block mb-0.5">
-                        GST %
-                      </label>
-                      <select
-                        value={item.taxPercent}
-                        onChange={(e) => handleItemChange(idx, "taxPercent", e.target.value)}
-                        className="w-full px-2 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand bg-white"
-                      >
-                        <option value="0">0%</option>
-                        <option value="5">5%</option>
-                        <option value="12">12%</option>
-                        <option value="18">18%</option>
-                        <option value="28">28%</option>
-                      </select>
-                    </div>
-
-                    <div className="sm:w-28 text-right self-center pt-3 sm:pt-0">
-                      <div className="text-[10px] uppercase font-bold text-gray-400">Total</div>
-                      <div className="font-bold text-sm text-gray-900">
-                        ₹{item.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </div>
-                    </div>
-
-                    <div className="self-center pt-3 sm:pt-0">
-                      <button
-                        type="button"
-                        onClick={() => removeItemRow(idx)}
-                        disabled={items.length <= 1}
-                        className="p-2 text-gray-400 hover:text-rose-600 disabled:opacity-30 cursor-pointer"
-                        title="Remove item"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Calculations Summary */}
-            <div className="flex justify-end pt-3">
-              <div className="w-full sm:w-80 bg-gray-50 border border-gray-200/80 rounded-2xl p-4 space-y-2 text-xs">
-                <div className="flex justify-between text-gray-600">
-                  <span>Subtotal:</span>
-                  <span className="font-semibold text-gray-900">
-                    ₹{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Total Tax (GST):</span>
-                  <span className="font-semibold text-gray-900">
-                    ₹{taxTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="h-px bg-gray-200 my-1" />
-                <div className="flex justify-between text-sm font-extrabold text-brand">
-                  <span>Grand Total:</span>
-                  <span>₹{grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 3: Terms & Notes */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm space-y-5">
-            <h2 className="text-lg font-bold text-gray-900 font-playfair border-b border-gray-100 pb-3">
-              3. Terms & Client Notes
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
-                    Terms & Conditions (Points Printed on Quote)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTerms((prev) => {
-                        const lines = prev.split("\n").filter((l) => l.trim());
-                        const nextNum = lines.length + 1;
-                        const newLine = `${nextNum}. `;
-                        return prev ? `${prev.trim()}\n${newLine}` : newLine;
-                      });
-                    }}
-                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
-                  >
-                    + Add Point
-                  </button>
-                </div>
-                <textarea
-                  value={terms}
-                  onChange={(e) => setTerms(e.target.value)}
-                  rows={5}
-                  placeholder="1. Validity: 30 days...&#10;2. Payment: 100% advance..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand font-medium leading-relaxed"
-                />
-                <div className="flex flex-wrap gap-1.5 pt-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTerms((prev) => {
-                        const lines = prev.split("\n").filter((l) => l.trim());
-                        const nextNum = lines.length + 1;
-                        const newLine = `${nextNum}. Validity: 30 days from quotation date.`;
-                        return prev ? `${prev.trim()}\n${newLine}` : newLine;
-                      });
-                    }}
-                    className="px-2 py-0.5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-medium cursor-pointer"
-                  >
-                    + 30 Days
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTerms((prev) => {
-                        const lines = prev.split("\n").filter((l) => l.trim());
-                        const nextNum = lines.length + 1;
-                        const newLine = `${nextNum}. Payment: 100% advance against Proforma Invoice.`;
-                        return prev ? `${prev.trim()}\n${newLine}` : newLine;
-                      });
-                    }}
-                    className="px-2 py-0.5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-medium cursor-pointer"
-                  >
-                    + 100% Advance
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTerms((prev) => {
-                        const lines = prev.split("\n").filter((l) => l.trim());
-                        const nextNum = lines.length + 1;
-                        const newLine = `${nextNum}. Delivery: 5 to 7 working days from confirmed PO.`;
-                        return prev ? `${prev.trim()}\n${newLine}` : newLine;
-                      });
-                    }}
-                    className="px-2 py-0.5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-medium cursor-pointer"
-                  >
-                    + 5-7 Days Delivery
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTerms((prev) => {
-                        const lines = prev.split("\n").filter((l) => l.trim());
-                        const nextNum = lines.length + 1;
-                        const newLine = `${nextNum}. Warranty: 12 months manufacturer warranty.`;
-                        return prev ? `${prev.trim()}\n${newLine}` : newLine;
-                      });
-                    }}
-                    className="px-2 py-0.5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-medium cursor-pointer"
-                  >
-                    + 12M Warranty
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Notes / Instructions
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={4}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Submission Bar */}
-          <div className="flex items-center justify-end space-x-3 pt-2">
+          {/* 2. PRODUCTS CARD */}
+          <div className="space-y-2">
             <button
               type="button"
-              onClick={() => router.push("/crm/dashboard")}
-              className="px-6 py-3 rounded-xl border border-gray-300 hover:bg-gray-100 text-gray-700 font-bold text-xs uppercase tracking-wider cursor-pointer transition-colors"
+              onClick={() => setIsProductSelectOpen(true)}
+              className="w-full bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs hover:border-brand/40 hover:shadow-sm transition-all flex items-center justify-between cursor-pointer group text-left"
             >
-              Cancel
+              <span className="font-bold text-sm text-gray-900 tracking-wide">
+                PRODUCTS
+              </span>
+              <div className="w-8 h-8 rounded-full bg-[#1E1E1E] text-white flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Plus size={18} />
+              </div>
             </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-8 py-3 rounded-xl bg-brand hover:bg-brand-hover text-white font-bold text-xs uppercase tracking-wider shadow-lg hover:shadow-xl transition-all flex items-center space-x-2 cursor-pointer disabled:opacity-50"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>Generating Quote...</span>
-                </>
-              ) : (
-                <span>Save & Issue Quotation</span>
-              )}
-            </button>
+
+            {/* List of Added Products (Image 3) */}
+            {selectedItems.length > 0 && (
+              <div className="space-y-2 pt-1">
+                {selectedItems.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between cursor-pointer hover:border-gray-300 transition-all"
+                  >
+                    <div
+                      onClick={() => openProductConfigurator(item, idx)}
+                      className="flex-1 pr-2"
+                    >
+                      <h4 className="text-sm font-bold text-gray-900">{item.name}</h4>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Amount: {item.quantity} * ₹{item.unitPrice} = ₹{item.total}
+                      </p>
+                      {item.description && (
+                        <p className="text-[11px] text-gray-400 truncate max-w-[240px] mt-0.5">
+                          {item.description}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedItems((prev) => prev.filter((_, i) => i !== idx))
+                      }
+                      className="p-1 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
+                      title="Remove Product"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </form>
-      </main>
+
+          {/* 3. OTHER CHARGE CARD */}
+          {!otherCharge ? (
+            <button
+              type="button"
+              onClick={() => {
+                setOcLabel("Other Charges");
+                setOcAmount("");
+                setOcIsTaxable(false);
+                setIsOtherChargeOpen(true);
+              }}
+              className="w-full bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs hover:border-brand/40 hover:shadow-sm transition-all flex items-center justify-between cursor-pointer group text-left"
+            >
+              <span className="font-bold text-sm text-gray-900 tracking-wide">
+                OTHER CHARGE
+              </span>
+              <div className="w-8 h-8 rounded-full bg-[#1E1E1E] text-white flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Plus size={18} />
+              </div>
+            </button>
+          ) : (
+            <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-gray-400 tracking-wider block">
+                  Other Charge
+                </span>
+                <h4 className="text-sm font-bold text-gray-900">{otherCharge.label}</h4>
+                <p className="text-xs text-gray-500">
+                  ₹{otherCharge.amount} {otherCharge.isTaxable ? "(+18% GST)" : "(Non-taxable)"}
+                </p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOcLabel(otherCharge.label);
+                    setOcAmount(String(otherCharge.amount));
+                    setOcIsTaxable(otherCharge.isTaxable);
+                    setIsOtherChargeOpen(true);
+                  }}
+                  className="p-1 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+                  title="Edit Other Charge"
+                >
+                  <Edit3 size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOtherCharge(null)}
+                  className="p-1 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
+                  title="Remove Other Charge"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 4. TERMS & CONDITIONS CARD */}
+          <button
+            type="button"
+            onClick={() => setIsTermsOpen(true)}
+            className="w-full bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs hover:border-brand/40 hover:shadow-sm transition-all flex items-center justify-between cursor-pointer group text-left"
+          >
+            <div>
+              <span className="font-bold text-sm text-gray-900 tracking-wide block">
+                TERMS & CONDITIONS
+              </span>
+              <span className="text-xs text-gray-500 mt-0.5 block">
+                {selectedTermIds.length} Points Selected
+              </span>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-[#1E1E1E] text-white flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Plus size={18} />
+            </div>
+          </button>
+        </div>
+
+        {/* ================= BOTTOM BAR (Image 1) ================= */}
+        <div className="fixed bottom-0 w-full max-w-md bg-[#1E1E1E] text-white p-3.5 sm:p-4 flex items-center justify-between rounded-t-3xl shadow-2xl z-40">
+          <div>
+            <span className="text-[11px] font-medium text-white/70 block">Amount Due</span>
+            <span className="text-xl font-extrabold text-white tracking-tight">
+              ₹{amountDue.toLocaleString("en-IN")}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGenerateQuotation}
+            disabled={isGenerating}
+            className="px-8 py-3.5 bg-white hover:bg-gray-100 text-[#1E1E1E] font-bold text-sm rounded-full shadow-lg transition-all cursor-pointer flex items-center justify-center space-x-2 disabled:opacity-50"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 size={16} className="animate-spin text-black" />
+                <span>Generating...</span>
+              </>
+            ) : (
+              <span>Generate</span>
+            )}
+          </button>
+        </div>
+
+        {/* ================= MODAL 1: SELECT CUSTOMER ================= */}
+        {isCustomerSelectOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              {/* Dark Header */}
+              <div className="bg-[#1E1E1E] text-white px-4 py-3.5 flex items-center justify-between shrink-0">
+                <div className="flex items-center space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomerSelectOpen(false)}
+                    className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10"
+                  >
+                    <ArrowLeft size={20} />
+                  </button>
+                  <h2 className="text-base font-bold text-white">Select Customer</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddCustomerOpen(true)}
+                  className="px-3 py-1 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1"
+                >
+                  <Plus size={13} />
+                  <span>+ Add</span>
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="p-3 border-b border-gray-100">
+                <div className="relative">
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    placeholder="Search name, company, phone..."
+                    className="w-full bg-[#F4F5F7] pl-9 pr-3.5 py-2.5 rounded-xl text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 border border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Customer List */}
+              <div className="p-3 overflow-y-auto space-y-2 flex-1">
+                {filteredCustomers.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-gray-500 space-y-2">
+                    <p>No customers found.</p>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddCustomerOpen(true)}
+                      className="px-4 py-2 bg-[#1E1E1E] text-white rounded-xl font-bold"
+                    >
+                      + Add New Customer
+                    </button>
+                  </div>
+                ) : (
+                  filteredCustomers.map((cust) => (
+                    <div
+                      key={cust.id}
+                      onClick={() => {
+                        setSelectedCustomer(cust);
+                        setIsCustomerSelectOpen(false);
+                      }}
+                      className="p-3.5 rounded-2xl bg-[#F8F9FA] hover:bg-white border border-gray-200/80 hover:border-brand/40 shadow-xs cursor-pointer transition-all flex items-center justify-between group"
+                    >
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
+                          {cust.name}
+                        </h4>
+                        {cust.companyName && (
+                          <p className="text-xs text-gray-500">{cust.companyName}</p>
+                        )}
+                        {cust.phone && <p className="text-[11px] text-gray-400">{cust.phone}</p>}
+                      </div>
+                      <span className="text-xs font-bold text-gray-400 group-hover:text-brand transition-colors">
+                        Select →
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Customer Modal: Add Customer */}
+        <CustomerModal
+          isOpen={isAddCustomerOpen}
+          onClose={() => setIsAddCustomerOpen(false)}
+          onCustomerCreated={(newCust) => {
+            setCustomers((prev) => [newCust, ...prev]);
+            setSelectedCustomer(newCust);
+            setIsAddCustomerOpen(false);
+            setIsCustomerSelectOpen(false);
+          }}
+        />
+
+        {/* ================= MODAL 2: SELECT PRODUCT ================= */}
+        {isProductSelectOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              {/* Dark Header */}
+              <div className="bg-[#1E1E1E] text-white px-4 py-3.5 flex items-center justify-between shrink-0">
+                <div className="flex items-center space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsProductSelectOpen(false)}
+                    className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10"
+                  >
+                    <ArrowLeft size={20} />
+                  </button>
+                  <h2 className="text-base font-bold text-white">Select Product</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddProductOpen(true)}
+                  className="px-3 py-1 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1"
+                >
+                  <Plus size={13} />
+                  <span>+ Add</span>
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="p-3 border-b border-gray-100">
+                <div className="relative">
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    placeholder="Search product..."
+                    className="w-full bg-[#F4F5F7] pl-9 pr-3.5 py-2.5 rounded-xl text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 border border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Product List */}
+              <div className="p-3 overflow-y-auto space-y-2 flex-1">
+                {filteredProducts.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-gray-500 space-y-2">
+                    <p>No products found.</p>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddProductOpen(true)}
+                      className="px-4 py-2 bg-[#1E1E1E] text-white rounded-xl font-bold"
+                    >
+                      + Add New Product
+                    </button>
+                  </div>
+                ) : (
+                  filteredProducts.map((prod) => (
+                    <div
+                      key={prod.id}
+                      onClick={() => openProductConfigurator(prod)}
+                      className="p-3.5 rounded-2xl bg-[#F8F9FA] hover:bg-white border border-gray-200/80 hover:border-brand/40 shadow-xs cursor-pointer transition-all flex items-center justify-between group"
+                    >
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
+                          {prod.name}
+                        </h4>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          ₹{Number(prod.basePrice || prod.price || 0).toLocaleString("en-IN")}
+                        </p>
+                        {prod.description && (
+                          <p className="text-[11px] text-gray-400 truncate max-w-[240px]">
+                            {prod.description}
+                          </p>
+                        )}
+                      </div>
+                      <ChevronRight size={18} className="text-gray-400 group-hover:text-brand" />
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Product Modal: Add New Product */}
+        <ProductModal
+          isOpen={isAddProductOpen}
+          onClose={() => setIsAddProductOpen(false)}
+          onProductCreated={(newProd) => {
+            setAllProducts((prev) => [newProd, ...prev]);
+            setIsAddProductOpen(false);
+            openProductConfigurator(newProd);
+          }}
+        />
+
+        {/* ================= MODAL 3: ADD QUOTATION PRODUCT (Image 2) ================= */}
+        {isConfiguringProduct && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+              {/* Dark Header (Image 2) */}
+              <div className="bg-[#1E1E1E] text-white px-4 py-3.5 flex items-center justify-between shrink-0">
+                <div className="flex items-center space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsConfiguringProduct(false)}
+                    className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10"
+                  >
+                    <ArrowLeft size={20} />
+                  </button>
+                  <h2 className="text-base font-bold text-white">Add Quotation Product</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsProductSelectOpen(true)}
+                  className="p-1.5 text-white/80 hover:text-white"
+                  title="Switch Product"
+                >
+                  <Search size={18} />
+                </button>
+              </div>
+
+              {/* Form Content (Image 2) */}
+              <form onSubmit={handleSaveProductToQuotation} className="p-4 sm:p-5 space-y-3.5 overflow-y-auto flex-1">
+                {/* 1. Product Field with '>' arrow to change product (Image 2) */}
+                <div
+                  onClick={() => {
+                    setIsConfiguringProduct(false);
+                    setIsProductSelectOpen(true);
+                  }}
+                  className="bg-[#F4F5F7] p-3.5 rounded-2xl cursor-pointer flex items-center justify-between hover:bg-gray-100 transition-colors"
+                >
+                  <div>
+                    <span className="block text-xs text-gray-400 font-medium">Product</span>
+                    <span className="text-sm font-bold text-gray-900">{cfgName || "Select Product"}</span>
+                  </div>
+                  <ChevronRight size={18} className="text-gray-400" />
+                </div>
+
+                {/* 2. Quantity (Image 2) */}
+                <div className="bg-[#F4F5F7] p-3.5 rounded-2xl">
+                  <label className="block text-xs text-gray-400 font-medium mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={cfgQuantity}
+                    onChange={(e) => setCfgQuantity(e.target.value)}
+                    required
+                    className="w-full bg-transparent text-sm font-bold text-gray-900 focus:outline-none"
+                  />
+                </div>
+
+                {/* 3. Price (Image 2) */}
+                <div className="bg-[#F4F5F7] p-3.5 rounded-2xl">
+                  <label className="block text-xs text-gray-400 font-medium mb-1">Price (per unit)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={cfgPrice}
+                    onChange={(e) => setCfgPrice(e.target.value)}
+                    required
+                    className="w-full bg-transparent text-sm font-bold text-gray-900 focus:outline-none"
+                  />
+                </div>
+
+                {/* 4. Description with live char counter (Image 2) */}
+                <div>
+                  <div className="bg-[#F4F5F7] p-3.5 rounded-2xl">
+                    <label className="block text-xs text-gray-400 font-medium mb-1">Description</label>
+                    <textarea
+                      rows={4}
+                      maxLength={2000}
+                      value={cfgDescription}
+                      onChange={(e) => setCfgDescription(e.target.value)}
+                      placeholder="Description"
+                      className="w-full bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none resize-none"
+                    />
+                  </div>
+                  <div className="text-right text-xs text-gray-400 mt-1 pr-1 font-medium">
+                    {cfgDescription.length}/2000
+                  </div>
+                </div>
+
+                {/* Bottom Button (Image 2) */}
+                <div className="pt-2 pb-1">
+                  <button
+                    type="submit"
+                    className="w-full py-4 bg-[#1E1E1E] hover:bg-black text-white font-bold text-sm rounded-2xl shadow-md transition-all cursor-pointer"
+                  >
+                    Add To Quotation
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ================= MODAL 4: OTHER CHARGE INFO (Image 3) ================= */}
+        {isOtherChargeOpen && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 space-y-4 animate-in slide-in-from-bottom duration-200">
+              {/* Sheet Grabber */}
+              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto sm:hidden" />
+
+              <h3 className="text-base font-bold text-gray-900">
+                Other Charge Info
+              </h3>
+
+              <form onSubmit={handleSaveOtherCharge} className="space-y-3.5">
+                {/* Other Charge Label */}
+                <div className="bg-[#F4F5F7] p-3.5 rounded-2xl">
+                  <label className="block text-xs text-gray-400 font-medium mb-1">
+                    Other Charge Label
+                  </label>
+                  <input
+                    type="text"
+                    value={ocLabel}
+                    onChange={(e) => setOcLabel(e.target.value)}
+                    placeholder="Other Charges"
+                    required
+                    className="w-full bg-transparent text-sm font-medium text-gray-900 focus:outline-none"
+                  />
+                </div>
+
+                {/* Other Charge Amount */}
+                <div className="bg-[#F4F5F7] p-3.5 rounded-2xl">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={ocAmount}
+                    onChange={(e) => setOcAmount(e.target.value)}
+                    placeholder="Other Charge Amount"
+                    required
+                    className="w-full bg-transparent text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:outline-none"
+                  />
+                </div>
+
+                {/* Is Taxable Checkbox */}
+                <label className="flex items-center justify-between py-1 cursor-pointer">
+                  <span className="text-sm font-medium text-gray-700">Is Taxable?</span>
+                  <input
+                    type="checkbox"
+                    checked={ocIsTaxable}
+                    onChange={(e) => setOcIsTaxable(e.target.checked)}
+                    className="w-5 h-5 rounded-md accent-black cursor-pointer"
+                  />
+                </label>
+
+                {/* Buttons */}
+                <div className="pt-2 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsOtherChargeOpen(false)}
+                    className="flex-1 py-3.5 border border-gray-300 text-gray-700 font-bold text-sm rounded-2xl"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3.5 bg-[#1E1E1E] hover:bg-black text-white font-bold text-sm rounded-2xl shadow-md"
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ================= MODAL 5: SELECT TERMS AND CONDITIONS (Images 4 & 5) ================= */}
+        {isTermsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+              {/* Dark Header (Image 4 & 5) */}
+              <div className="bg-[#1E1E1E] text-white px-4 py-3.5 flex items-center justify-between shrink-0">
+                <div className="flex items-center space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsTermsOpen(false)}
+                    className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10"
+                  >
+                    <ArrowLeft size={20} />
+                  </button>
+                  <h2 className="text-base font-bold text-white truncate max-w-[200px]">
+                    Select Terms and C...
+                  </h2>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={addNewTermItem}
+                    className="w-7 h-7 bg-white text-black rounded-lg flex items-center justify-center font-bold text-base cursor-pointer hover:bg-gray-100"
+                    title="Add New Term"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Subheader with Quotation tab and Edit Items button (Image 4 & 5) */}
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <div className="border-b-2 border-cyan-600 pb-1 px-1 font-bold text-sm text-cyan-800">
+                  Quotation
+                </div>
+
+                {/* Edit Items / Finish Editing toggle (Image 4 & 5) */}
+                <button
+                  type="button"
+                  onClick={() => setIsEditingTerms((prev) => !prev)}
+                  className="flex items-center space-x-1 text-xs font-bold text-gray-700 hover:text-black cursor-pointer"
+                >
+                  <Edit3 size={14} />
+                  <span>{isEditingTerms ? "Finish Editing" : "Edit Items"}</span>
+                </button>
+              </div>
+
+              {/* Select All Row (Image 4 & 5) */}
+              <div className="px-4 py-2.5 flex items-center justify-between bg-gray-50/70 border-b border-gray-100">
+                <span className="text-xs font-bold text-gray-800">Select All</span>
+                <input
+                  type="checkbox"
+                  checked={selectedTermIds.length === termsList.length && termsList.length > 0}
+                  onChange={handleSelectAllTerms}
+                  className="w-4 h-4 rounded-md accent-black cursor-pointer"
+                />
+              </div>
+
+              {/* Terms List (Image 4: Static view, Image 5: Inline editable view) */}
+              <div className="p-4 overflow-y-auto space-y-3 flex-1">
+                {termsList.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-gray-400">
+                    No terms found. Click "+" on top to add a new term.
+                  </div>
+                ) : (
+                  termsList.map((term) => (
+                    <div
+                      key={term.id}
+                      className="p-3.5 bg-white rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between gap-3"
+                    >
+                      {isEditingTerms ? (
+                        /* Image 5: Editable underline input */
+                        <input
+                          type="text"
+                          value={term.text}
+                          onChange={(e) => updateTermText(term.id, e.target.value)}
+                          placeholder="Enter terms point..."
+                          className="w-full border-b border-gray-400 focus:border-black text-sm text-gray-900 py-1 focus:outline-none"
+                        />
+                      ) : (
+                        /* Image 4: Clean text display */
+                        <span className="text-sm font-medium text-gray-900 leading-snug">
+                          {term.text}
+                        </span>
+                      )}
+
+                      <input
+                        type="checkbox"
+                        checked={selectedTermIds.includes(term.id)}
+                        onChange={() => handleToggleTerm(term.id)}
+                        className="w-5 h-5 rounded-md accent-black shrink-0 cursor-pointer"
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* DONE Button (Image 4 & 5) */}
+              <div className="p-4 pt-2 border-t border-gray-100 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsTermsOpen(false)}
+                  className="w-full py-3.5 bg-[#1E1E1E] hover:bg-black text-white font-bold text-sm rounded-full shadow-md transition-all cursor-pointer"
+                >
+                  DONE
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

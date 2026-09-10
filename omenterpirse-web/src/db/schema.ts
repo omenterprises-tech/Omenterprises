@@ -284,6 +284,7 @@ export const crmQuotations = sqliteTable("crm_quotations", {
   subtotal: real("subtotal").notNull(),
   taxTotal: real("tax_total").notNull(),
   grandTotal: real("grand_total").notNull(),
+  otherCharges: text("other_charges"), // JSON: { label: string, amount: number, isTaxable: boolean }
   notes: text("notes"),
   termsConditions: text("terms_conditions"),
   status: text("status").notNull().default("Draft"), // Draft, Sent, Accepted, Declined
