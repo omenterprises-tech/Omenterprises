@@ -553,22 +553,16 @@ export default function CrmDashboardPage() {
             {/* 1. Business */}
             <button
               type="button"
-              onClick={() => setActiveTab("business")}
-              className={`group text-left p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                activeTab === "business"
-                  ? "bg-white border-brand shadow-md ring-2 ring-brand/20"
-                  : "bg-white border-gray-200/80 shadow-sm hover:shadow-md hover:border-gray-300"
-              }`}
+              onClick={() => router.push("/crm/business")}
+              className="group text-left p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-brand/60 transition-all duration-200 cursor-pointer flex flex-col justify-between"
             >
               <div className="flex items-center justify-between mb-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                  activeTab === "business" ? "bg-brand text-white" : "bg-blue-50 text-brand group-hover:bg-brand group-hover:text-white"
-                }`}>
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-brand group-hover:bg-brand group-hover:text-white flex items-center justify-center transition-colors">
                   <Building2 size={20} />
                 </div>
-                {activeTab === "business" && (
-                  <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
-                )}
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-brand">
+                  Open →
+                </span>
               </div>
               <div>
                 <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
@@ -583,17 +577,11 @@ export default function CrmDashboardPage() {
             {/* 2. Teams */}
             <button
               type="button"
-              onClick={() => setActiveTab("team")}
-              className={`group text-left p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                activeTab === "team"
-                  ? "bg-white border-purple-600 shadow-md ring-2 ring-purple-500/20"
-                  : "bg-white border-gray-200/80 shadow-sm hover:shadow-md hover:border-gray-300"
-              }`}
+              onClick={() => router.push("/crm/teams")}
+              className="group text-left p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-purple-500/60 transition-all duration-200 cursor-pointer flex flex-col justify-between"
             >
               <div className="flex items-center justify-between mb-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                  activeTab === "team" ? "bg-purple-600 text-white" : "bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white"
-                }`}>
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white flex items-center justify-center transition-colors">
                   <Users size={20} />
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">
@@ -613,17 +601,11 @@ export default function CrmDashboardPage() {
             {/* 3. Customers */}
             <button
               type="button"
-              onClick={() => setActiveTab("customers")}
-              className={`group text-left p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                activeTab === "customers"
-                  ? "bg-white border-emerald-600 shadow-md ring-2 ring-emerald-500/20"
-                  : "bg-white border-gray-200/80 shadow-sm hover:shadow-md hover:border-gray-300"
-              }`}
+              onClick={() => router.push("/crm/customers")}
+              className="group text-left p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-emerald-500/60 transition-all duration-200 cursor-pointer flex flex-col justify-between"
             >
               <div className="flex items-center justify-between mb-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                  activeTab === "customers" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"
-                }`}>
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white flex items-center justify-center transition-colors">
                   <UserCheck size={20} />
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
@@ -643,17 +625,11 @@ export default function CrmDashboardPage() {
             {/* 4. Products */}
             <button
               type="button"
-              onClick={() => setActiveTab("products")}
-              className={`group text-left p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                activeTab === "products"
-                  ? "bg-white border-amber-600 shadow-md ring-2 ring-amber-500/20"
-                  : "bg-white border-gray-200/80 shadow-sm hover:shadow-md hover:border-gray-300"
-              }`}
+              onClick={() => router.push("/crm/products")}
+              className="group text-left p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-amber-500/60 transition-all duration-200 cursor-pointer flex flex-col justify-between"
             >
               <div className="flex items-center justify-between mb-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                  activeTab === "products" ? "bg-amber-600 text-white" : "bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white"
-                }`}>
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white flex items-center justify-center transition-colors">
                   <Package size={20} />
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
@@ -673,22 +649,16 @@ export default function CrmDashboardPage() {
             {/* 5. Terms */}
             <button
               type="button"
-              onClick={() => setActiveTab("terms")}
-              className={`group text-left p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                activeTab === "terms"
-                  ? "bg-white border-indigo-600 shadow-md ring-2 ring-indigo-500/20"
-                  : "bg-white border-gray-200/80 shadow-sm hover:shadow-md hover:border-gray-300"
-              }`}
+              onClick={() => router.push("/crm/terms")}
+              className="group text-left p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-indigo-500/60 transition-all duration-200 cursor-pointer flex flex-col justify-between"
             >
               <div className="flex items-center justify-between mb-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                  activeTab === "terms" ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"
-                }`}>
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition-colors">
                   <FileCheck2 size={20} />
                 </div>
-                {activeTab === "terms" && (
-                  <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-                )}
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
+                  Open →
+                </span>
               </div>
               <div>
                 <h4 className="text-sm font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">

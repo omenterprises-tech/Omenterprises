@@ -263,3 +263,112 @@ export async function DELETE(request: Request) {
     );
   }
 }
+
+export async function PUT(request: Request) {
+  try {
+    const session = await getCrmSession();
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+    }
+
+    const { business, isOwner } = await resolveBusinessAndRole(session.userId);
+    if (!business || !isOwner) {
+      return NextResponse.json(
+        { success: false, error: "Team members have view-only access to team details. Only the business owner can edit team members." },
+        { status: 403 }
+      );
+    }
+
+    const body = await request.json();
+    const { id, fullName, role: memberRole, phoneNumber, password } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Team member ID is required." }, { status: 400 });
+    }
+
+    const memberId = parseInt(id, 10);
+    const memberRows = await db
+      .select()
+      .from(crmTeamMembers)
+      .where(
+        and(
+          eq(crmTeamMembers.id, memberId),
+          eq(crmTeamMembers.businessId, business.id)
+        )
+      )
+      .limit(1);
+
+    if (memberRows.length === 0) {
+      return NextResponse.json({ success: false, error: "Team member not found." }, { status: 404 });
+    }
+
+    const member = memberRows[0];
+    const userUpdateFields: any = {};
+
+    if (fullName && typeof fullName === "string" && fullName.trim()) {
+      userUpdateFields.fullName = fullName.trim();
+    }
+
+    if (phoneNumber !== undefined) {
+      const cleanPhone = String(phoneNumber).replace(/\D/g, "");
+      userUpdateFields.phoneNumber = cleanPhone || "0000000000";
+    }
+
+    if (password && typeof password === "string") {
+      if (password.trim().length > 0) {
+        if (password.trim().length < 6) {
+          return NextResponse.json({ success: false, error: "Password must be at least 6 characters." }, { status: 400 });
+        }
+        const { salt, hash } = hashPassword(password.trim());
+        userUpdateFields.passwordHash = hash;
+        userUpdateFields.salt = salt;
+      }
+    }
+
+    if (Object.keys(userUpdateFields).length > 0) {
+      await db
+        .update(crmUsers)
+        .set(userUpdateFields)
+        .where(eq(crmUsers.id, member.userId));
+    }
+
+    let updatedRole = member.role;
+    if (memberRole && ["Admin", "Manager", "Staff"].includes(memberRole)) {
+      updatedRole = memberRole;
+      await db
+        .update(crmTeamMembers)
+        .set({ role: updatedRole })
+        .where(eq(crmTeamMembers.id, member.id));
+    }
+
+    // Fetch updated user info to return
+    const updatedUserRows = await db
+      .select()
+      .from(crmUsers)
+      .where(eq(crmUsers.id, member.userId))
+      .limit(1);
+
+    const u = updatedUserRows[0];
+
+    return NextResponse.json({
+      success: true,
+      member: {
+        id: member.id,
+        userId: member.userId,
+        name: u?.fullName || "Team Member",
+        email: u?.email || "",
+        phone: u?.phoneNumber || "",
+        role: updatedRole,
+        status: member.status,
+        isOwner: false,
+      },
+    });
+  } catch (error: any) {
+    console.error("Update team member error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to update team member." },
+      { status: 500 }
+    );
+  }
+}
+

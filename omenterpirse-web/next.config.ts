@@ -30,6 +30,16 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  async redirects() {
+    return [
+      { source: '/business', destination: '/crm/business', permanent: false },
+      { source: '/teams', destination: '/crm/teams', permanent: false },
+      { source: '/team', destination: '/crm/teams', permanent: false },
+      { source: '/customers', destination: '/crm/customers', permanent: false },
+      { source: '/products', destination: '/crm/products', permanent: false },
+      { source: '/terms', destination: '/crm/terms', permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;
