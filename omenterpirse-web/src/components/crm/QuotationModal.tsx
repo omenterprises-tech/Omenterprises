@@ -42,7 +42,7 @@ export function CreateQuotationModal({
     return d.toISOString().split("T")[0];
   });
   const [items, setItems] = useState<ItemRow[]>([
-    { id: "1", description: "", quantity: 1, unitPrice: 0, taxPercent: 18, total: 0 },
+    { id: "1", description: "", quantity: 1, unitPrice: 0, taxPercent: 0, total: 0 },
   ]);
   const [notes, setNotes] = useState("Thank you for your business. Please contact us if you have any questions.");
   const [terms, setTerms] = useState("1. Payment terms: 50% advance, balance before dispatch.\n2. Quote is valid for 30 days.");
@@ -88,7 +88,7 @@ export function CreateQuotationModal({
   const addItemRow = () => {
     setItems((prev) => [
       ...prev,
-      { id: String(Date.now()), description: "", quantity: 1, unitPrice: 0, taxPercent: 18, total: 0 },
+      { id: String(Date.now()), description: "", quantity: 1, unitPrice: 0, taxPercent: 0, total: 0 },
     ]);
   };
 

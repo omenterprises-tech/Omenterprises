@@ -84,7 +84,7 @@ function MakeQuotationContent() {
   const [cfgQuantity, setCfgQuantity] = useState("1");
   const [cfgPrice, setCfgPrice] = useState("");
   const [cfgDescription, setCfgDescription] = useState("");
-  const [cfgTaxPercent, setCfgTaxPercent] = useState("18");
+  const [cfgTaxPercent, setCfgTaxPercent] = useState("");
   const [cfgHsn, setCfgHsn] = useState("");
   const [cfgUnit, setCfgUnit] = useState("COILS");
 
@@ -197,9 +197,9 @@ function MakeQuotationContent() {
                     : "",
                   quantity: Number(it.quantity) || 1,
                   unitPrice: Number(it.unitPrice) || 0,
-                  taxPercent: Number(it.taxPercent) || 18,
+                  taxPercent: it.taxPercent !== undefined && it.taxPercent !== null ? Number(it.taxPercent) : 0,
                   total: Number(it.total) || (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0),
-                  hsn: it.hsn || "85446020",
+                  hsn: it.hsn || "-",
                   unit: it.unit || "PCS",
                 }))
               );
@@ -246,7 +246,10 @@ function MakeQuotationContent() {
 
   // Financial Calculations
   const subtotal = useMemo(() => {
-    return selectedItems.reduce((acc, it) => acc + (Number(it.total) || 0), 0);
+    return selectedItems.reduce(
+      (acc, it) => acc + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
+      0
+    );
   }, [selectedItems]);
 
   const otherChargeAmount = useMemo(() => {
@@ -313,12 +316,30 @@ function MakeQuotationContent() {
     setEditingItemIndex(editIndex);
     setCfgName(prod.name || "");
     setCfgPrice(
-      prod.basePrice !== undefined ? String(prod.basePrice) : prod.price !== undefined ? String(prod.price) : "0"
+      prod.unitPrice !== undefined
+        ? String(prod.unitPrice)
+        : prod.basePrice !== undefined
+        ? String(prod.basePrice)
+        : prod.price !== undefined
+        ? String(prod.price)
+        : "0"
     );
-    setCfgQuantity(editIndex !== null && selectedItems[editIndex] ? String(selectedItems[editIndex].quantity) : "1");
+    setCfgQuantity(
+      editIndex !== null && selectedItems[editIndex]
+        ? String(selectedItems[editIndex].quantity)
+        : prod.quantity !== undefined
+        ? String(prod.quantity)
+        : "1"
+    );
     setCfgDescription(prod.description || "");
-    setCfgTaxPercent(prod.gst !== undefined && prod.gst !== null ? String(prod.gst) : "18");
-    setCfgHsn(prod.hsn || "85446020");
+    setCfgTaxPercent(
+      prod.taxPercent !== undefined && prod.taxPercent !== null
+        ? String(prod.taxPercent)
+        : prod.gst !== undefined && prod.gst !== null
+        ? String(prod.gst)
+        : ""
+    );
+    setCfgHsn(prod.hsn && prod.hsn !== "-" ? prod.hsn : "");
     setCfgUnit(prod.unit || "COILS");
 
     setIsProductSelectOpen(false);
@@ -335,14 +356,14 @@ function MakeQuotationContent() {
 
     const itemObj: QuotationItem = {
       id: editingItemIndex !== null ? selectedItems[editingItemIndex].id : `item-${Date.now()}`,
-      productId: currentProductObj?.id,
+      productId: currentProductObj?.id || (editingItemIndex !== null ? selectedItems[editingItemIndex]?.productId : undefined),
       name: cfgName.trim() || currentProductObj?.name || "Item",
       quantity: qty,
       unitPrice,
       description: cfgDescription.trim(),
       taxPercent: taxRate,
       total,
-      hsn: cfgHsn.trim() || "85446020",
+      hsn: cfgHsn.trim() || "-",
       unit: cfgUnit.trim() || "COILS",
     };
 
@@ -803,8 +824,8 @@ function MakeQuotationContent() {
                     )}
 
                     <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
-                      <span>HSN: {prod.hsn || "85446020"}</span>
-                      <span>GST: {prod.gst || 18}%</span>
+                      <span>HSN: {prod.hsn || "-"}</span>
+                      <span>GST: {prod.gst !== undefined && prod.gst !== null ? `${prod.gst}%` : "0%"}</span>
                       <span className="text-xs font-bold text-brand group-hover:underline">
                         + Select & Configure →
                       </span>
@@ -1225,14 +1246,14 @@ function MakeQuotationContent() {
                             </span>
                           )}
                         </td>
-                        <td className="p-3 text-center text-gray-500">{item.hsn || "85446020"}</td>
+                        <td className="p-3 text-center text-gray-500">{item.hsn || "-"}</td>
                         <td className="p-3 text-center font-bold text-gray-800">
                           {item.quantity} <span className="text-[10px] text-gray-500 uppercase">{item.unit || "COILS"}</span>
                         </td>
                         <td className="p-3 text-right font-medium text-gray-800">
                           ₹{item.unitPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </td>
-                        <td className="p-3 text-center font-medium text-gray-600">{item.taxPercent}%</td>
+                        <td className="p-3 text-center font-medium text-gray-600">{item.taxPercent || 0}%</td>
                         <td className="p-3 text-right font-bold text-gray-900">
                           ₹{item.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </td>
@@ -1532,14 +1553,27 @@ function MakeQuotationContent() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">GST Rate (%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={cfgTaxPercent}
+                    onChange={(e) => setCfgTaxPercent(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-brand"
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">HSN Code</label>
                   <input
                     type="text"
                     value={cfgHsn}
                     onChange={(e) => setCfgHsn(e.target.value)}
-                    placeholder="85446020"
+                    placeholder="Optional HSN"
                     className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-brand"
                   />
                 </div>

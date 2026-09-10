@@ -262,7 +262,7 @@ export default function ProductModal({
                       max="100"
                       value={gst}
                       onChange={(e) => setGst(e.target.value)}
-                      placeholder="18"
+                      placeholder="0"
                       className="w-full px-4 py-3 pr-10 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm pointer-events-none">
@@ -300,7 +300,7 @@ export default function ProductModal({
                   type="text"
                   value={hsn}
                   onChange={(e) => setHsn(e.target.value)}
-                  placeholder="e.g. 85446020"
+                  placeholder="e.g. HSN / SAC code"
                   className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
                 />
               </div>

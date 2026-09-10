@@ -595,7 +595,7 @@ export default function QuotationDetailPage({
                   items.map((it, idx) => {
                     const qty = Number(it.quantity) || 1;
                     const price = Number(it.unitPrice) || 0;
-                    const taxRate = Number(it.taxPercent) || 18;
+                    const taxRate = it.taxPercent !== undefined && it.taxPercent !== null ? Number(it.taxPercent) : 0;
                     const baseTotal = qty * price;
                     const gstAmount = (baseTotal * taxRate) / 100;
                     const rowTotal = baseTotal + gstAmount;
@@ -616,7 +616,7 @@ export default function QuotationDetailPage({
                           )}
                         </td>
                         <td className="py-3 px-3 text-center text-gray-600 font-medium text-xs">
-                          {it.hsn || "85446020"}
+                          {it.hsn || "-"}
                         </td>
                         <td className="py-3 px-3 text-center font-bold text-gray-900">
                           <div>{qty}</div>
