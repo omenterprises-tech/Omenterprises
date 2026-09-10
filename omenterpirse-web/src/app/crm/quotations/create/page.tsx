@@ -18,9 +18,6 @@ import {
   AlertCircle,
   Calculator,
   Building2,
-  Phone,
-  Mail,
-  MapPin,
 } from "lucide-react";
 import CustomerModal from "@/components/crm/CustomerModal";
 import ProductModal from "@/components/crm/ProductModal";
@@ -98,7 +95,8 @@ function MakeQuotationContent() {
   const [ocAmount, setOcAmount] = useState("");
   const [ocIsTaxable, setOcIsTaxable] = useState(false);
 
-  // 4. Terms & Conditions State
+  // 4. Terms & Conditions State & Selection Page View
+  const [isTermsPageOpen, setIsTermsPageOpen] = useState(false);
   const [termsList, setTermsList] = useState<TermItem[]>([]);
   const [selectedTermIds, setSelectedTermIds] = useState<string[]>([]);
   const [isEditingTerms, setIsEditingTerms] = useState(false);
@@ -833,7 +831,156 @@ function MakeQuotationContent() {
   }
 
   // =========================================================================
-  // VIEW 3: MAIN MAKE QUOTATION PAGE (EXACT ORDER + CLEAN CARDS)
+  // VIEW 3: DEDICATED NEW PAGE FOR TERMS & CONDITIONS SELECTION
+  // =========================================================================
+  if (isTermsPageOpen) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] text-gray-900 font-inter flex flex-col pb-28">
+        {/* Full-Screen Sticky Header */}
+        <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200/80 shadow-xs">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex items-center space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsTermsPageOpen(false)}
+                  className="p-2 rounded-xl text-gray-500 hover:text-brand hover:bg-brand/5 transition-colors cursor-pointer mr-1"
+                  title="Back to Quotation"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900 tracking-tight">
+                    Select Terms & Conditions
+                  </h1>
+                  <p className="text-xs text-gray-500 font-medium">
+                    {selectedTermIds.length} of {termsList.length} clauses selected for quotation
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingTerms((prev) => !prev)}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors cursor-pointer"
+                >
+                  <Edit3 size={13} />
+                  <span>{isEditingTerms ? "Finish Editing" : "Edit Points"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={addNewTermItem}
+                  className="w-8 h-8 rounded-full bg-gray-100 hover:bg-brand hover:text-white text-gray-700 flex items-center justify-center transition-all cursor-pointer shadow-xs"
+                  title="Add Clause"
+                >
+                  <Plus size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsTermsPageOpen(false)}
+                  className="px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-sm hover:shadow-md transition-all flex items-center space-x-1 cursor-pointer ml-1"
+                >
+                  <Check size={14} />
+                  <span>Done</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Terms Content */}
+        <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-4">
+          {/* Select All Card */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-gray-900">Select All Clauses</h3>
+              <p className="text-xs text-gray-500">Include all standard terms in quotation</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={selectedTermIds.length === termsList.length && termsList.length > 0}
+              onChange={handleSelectAllTerms}
+              className="w-5 h-5 rounded-md accent-brand cursor-pointer"
+            />
+          </div>
+
+          {/* List of Clauses */}
+          <div className="space-y-3">
+            {termsList.map((term, idx) => (
+              <div
+                key={term.id}
+                className={`p-4 sm:p-5 bg-white rounded-2xl sm:rounded-3xl border shadow-xs flex items-center justify-between gap-4 transition-all ${
+                  selectedTermIds.includes(term.id)
+                    ? "border-brand/40 bg-blue-50/10"
+                    : "border-gray-200/80 hover:border-gray-300"
+                }`}
+              >
+                <div className="flex items-center space-x-3 flex-1">
+                  <span className="text-xs font-bold text-gray-400 w-5 shrink-0">{idx + 1}.</span>
+                  {isEditingTerms ? (
+                    <input
+                      type="text"
+                      value={term.text}
+                      onChange={(e) => updateTermText(term.id, e.target.value)}
+                      placeholder="Type terms condition clause..."
+                      className="w-full border-b border-gray-300 focus:border-brand text-xs sm:text-sm text-gray-900 py-1.5 focus:outline-none"
+                    />
+                  ) : (
+                    <span className="text-xs sm:text-sm font-medium text-gray-800 leading-relaxed">
+                      {term.text}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2.5 shrink-0">
+                  {isEditingTerms && (
+                    <button
+                      type="button"
+                      onClick={() => removeTermItem(term.id)}
+                      className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                      title="Delete Clause"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                  <input
+                    type="checkbox"
+                    checked={selectedTermIds.includes(term.id)}
+                    onChange={() => handleToggleTerm(term.id)}
+                    className="w-5 h-5 rounded-md accent-brand cursor-pointer"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom Add Clause Quick Button */}
+          <div className="pt-2 flex justify-between items-center">
+            <button
+              type="button"
+              onClick={addNewTermItem}
+              className="inline-flex items-center space-x-1.5 px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-200/90 text-gray-700 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <Plus size={14} />
+              <span>+ Add New Clause</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsTermsPageOpen(false)}
+              className="px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer"
+            >
+              Done ({selectedTermIds.length} Selected)
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW 4: MAIN MAKE QUOTATION PAGE (EXACT ORDER + CLEAN CARDS)
   // =========================================================================
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-gray-900 font-inter flex flex-col pb-36 sm:pb-32">
@@ -1212,99 +1359,37 @@ function MakeQuotationContent() {
         )}
 
         {/* ---------------- 4. TERMS & CONDITIONS CARD ---------------- */}
-        <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3.5">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
-                <FileText size={17} />
-              </div>
-              <div>
-                <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
-                  TERMS & CONDITIONS
-                </h2>
-                <p className="text-[11px] text-gray-500">
-                  {selectedTermIds.length} of {termsList.length} clauses selected for quotation
-                </p>
-              </div>
+        <div
+          onClick={() => setIsTermsPageOpen(true)}
+          className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs hover:border-brand/50 hover:shadow-sm cursor-pointer transition-all flex items-center justify-between group"
+        >
+          <div className="flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-brand/10 text-brand flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+              <FileText size={20} />
             </div>
-
-            <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={() => setIsEditingTerms((prev) => !prev)}
-                className="flex items-center space-x-1 px-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors cursor-pointer"
-              >
-                <Edit3 size={13} />
-                <span>{isEditingTerms ? "Finish Editing" : "Edit Points"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={addNewTermItem}
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-brand hover:text-white text-gray-700 flex items-center justify-center transition-all cursor-pointer shadow-xs"
-                title="Add Clause"
-              >
-                <Plus size={16} />
-              </button>
+            <div>
+              <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight group-hover:text-brand transition-colors">
+                TERMS & CONDITIONS
+              </h2>
+              <p className="text-xs text-gray-500 font-medium mt-0.5">
+                {selectedTermIds.length > 0
+                  ? `${selectedTermIds.length} of ${termsList.length} clauses selected for quotation`
+                  : "Tap to select and configure quotation clauses"}
+              </p>
             </div>
           </div>
 
-          {/* Select All Checkbox */}
-          <div className="flex items-center justify-between px-3.5 py-2.5 bg-gray-50 rounded-xl text-xs font-bold text-gray-700">
-            <span>Select All Clauses</span>
-            <input
-              type="checkbox"
-              checked={selectedTermIds.length === termsList.length && termsList.length > 0}
-              onChange={handleSelectAllTerms}
-              className="w-4 h-4 rounded-md accent-brand cursor-pointer"
-            />
+          <div className="flex items-center space-x-2">
+            {selectedTermIds.length > 0 && (
+              <span className="text-xs font-bold px-2.5 py-1 bg-blue-50 text-brand rounded-xl border border-blue-100 hidden sm:inline-block">
+                {selectedTermIds.length} Selected
+              </span>
+            )}
+            <div className="w-9 h-9 rounded-full bg-gray-100 group-hover:bg-brand group-hover:text-white text-gray-700 flex items-center justify-center transition-all shadow-xs shrink-0">
+              <Plus size={18} />
+            </div>
           </div>
-
-          {/* Terms Points Checklist */}
-          <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-            {termsList.map((term, idx) => (
-              <div
-                key={term.id}
-                className="p-3.5 bg-white rounded-xl border border-gray-200/90 shadow-xs flex items-center justify-between gap-3 hover:border-gray-300 transition-all"
-              >
-                <div className="flex items-center space-x-2.5 flex-1">
-                  <span className="text-xs font-bold text-gray-400 w-5">{idx + 1}.</span>
-                  {isEditingTerms ? (
-                    <input
-                      type="text"
-                      value={term.text}
-                      onChange={(e) => updateTermText(term.id, e.target.value)}
-                      placeholder="Type terms condition clause..."
-                      className="w-full border-b border-gray-300 focus:border-brand text-xs text-gray-900 py-1 focus:outline-none"
-                    />
-                  ) : (
-                    <span className="text-xs font-medium text-gray-800 leading-snug">
-                      {term.text}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center space-x-2 shrink-0">
-                  {isEditingTerms && (
-                    <button
-                      type="button"
-                      onClick={() => removeTermItem(term.id)}
-                      className="p-1 text-gray-400 hover:text-rose-600 transition-colors"
-                      title="Delete Clause"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                  <input
-                    type="checkbox"
-                    checked={selectedTermIds.includes(term.id)}
-                    onChange={() => handleToggleTerm(term.id)}
-                    className="w-4 h-4 rounded-md accent-brand cursor-pointer"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        </div>
 
         {/* ---------------- 5. ROUND OFF CHARGE CHECKBOX ---------------- */}
         <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs">
