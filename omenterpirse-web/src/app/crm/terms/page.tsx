@@ -441,7 +441,7 @@ export default function CrmTermsPage() {
                 className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
               >
                 <Plus size={14} />
-                <span>+ Add Point</span>
+                <span>Add Point</span>
               </button>
             </div>
           </div>
@@ -457,7 +457,7 @@ export default function CrmTermsPage() {
                   <div>
                     <h4 className="text-sm font-bold text-gray-800">No Terms Points Yet</h4>
                     <p className="text-xs text-gray-500 mt-1 max-w-sm">
-                      Click "+ Add Point" or pick from the Quick Clauses below to add your first point.
+                      Click "Add Point" or pick from the Quick Clauses below to add your first point.
                     </p>
                   </div>
                   <button
@@ -465,7 +465,7 @@ export default function CrmTermsPage() {
                     onClick={() => addPoint("")}
                     className="px-4 py-2 rounded-xl bg-brand text-white text-xs font-bold shadow hover:bg-brand-hover cursor-pointer"
                   >
-                    + Add First Point
+                    Add First Point
                   </button>
                 </div>
               ) : (
@@ -531,7 +531,7 @@ export default function CrmTermsPage() {
                   className="w-full py-3 rounded-2xl border-2 border-dashed border-gray-200 hover:border-indigo-400 hover:bg-indigo-50/40 text-gray-600 hover:text-indigo-700 text-xs font-bold flex items-center justify-center space-x-1.5 cursor-pointer transition-all"
                 >
                   <Plus size={16} />
-                  <span>+ Add Another Point</span>
+                  <span>Add Another Point</span>
                 </button>
               )}
             </div>

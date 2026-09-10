@@ -560,7 +560,7 @@ function MakeQuotationContent() {
                 className="px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-sm hover:shadow-md transition-all flex items-center space-x-1.5 cursor-pointer"
               >
                 <Plus size={15} />
-                <span>+ Add Customer</span>
+                <span>Add Customer</span>
               </button>
             </div>
           </div>
@@ -614,7 +614,7 @@ function MakeQuotationContent() {
                 className="inline-flex items-center space-x-1.5 px-5 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-md cursor-pointer transition-all"
               >
                 <Plus size={15} />
-                <span>+ Add Customer</span>
+                <span>Add Customer</span>
               </button>
             </div>
           ) : (
@@ -732,7 +732,7 @@ function MakeQuotationContent() {
                 className="px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-sm hover:shadow-md transition-all flex items-center space-x-1.5 cursor-pointer"
               >
                 <Plus size={15} />
-                <span>+ New Product</span>
+                <span>New Product</span>
               </button>
             </div>
           </div>
@@ -786,7 +786,7 @@ function MakeQuotationContent() {
                 className="inline-flex items-center space-x-1.5 px-5 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-md cursor-pointer transition-all"
               >
                 <Plus size={15} />
-                <span>+ Add Product</span>
+                <span>Add Product</span>
               </button>
             </div>
           ) : (
@@ -827,7 +827,7 @@ function MakeQuotationContent() {
                       <span>HSN: {prod.hsn || "-"}</span>
                       <span>GST: {prod.gst !== undefined && prod.gst !== null ? `${prod.gst}%` : "0%"}</span>
                       <span className="text-xs font-bold text-brand group-hover:underline">
-                        + Select & Configure →
+                        Select & Configure →
                       </span>
                     </div>
                   </div>
@@ -984,7 +984,7 @@ function MakeQuotationContent() {
               className="inline-flex items-center space-x-1.5 px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-200/90 text-gray-700 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
             >
               <Plus size={14} />
-              <span>+ Add New Clause</span>
+              <span>Add New Clause</span>
             </button>
 
             <button
@@ -1292,7 +1292,7 @@ function MakeQuotationContent() {
                   className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl border border-gray-200 hover:border-brand text-brand hover:bg-brand/5 text-xs font-bold transition-all cursor-pointer"
                 >
                   <Plus size={14} />
-                  <span>+ Add Another Product</span>
+                  <span>Add Another Product</span>
                 </button>
               </div>
             </div>
