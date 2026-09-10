@@ -4,6 +4,7 @@ import { crmQuotations } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getCrmSession } from "@/lib/crmAuth";
 import { resolveBusinessAndRole } from "@/lib/crmBusinessResolver";
+import { formatDisplayDate } from "@/lib/crmCurrencyData";
 
 export async function GET(
   request: Request,
@@ -82,8 +83,8 @@ export async function PATCH(
     if (body.customerAddress !== undefined) updateData.customerAddress = body.customerAddress;
     if (body.customerGstin !== undefined) updateData.customerGstin = body.customerGstin;
     if (body.customerId !== undefined) updateData.customerId = body.customerId ? Number(body.customerId) : null;
-    if (body.quotationDate !== undefined) updateData.quotationDate = body.quotationDate;
-    if (body.validUntil !== undefined) updateData.validUntil = body.validUntil;
+    if (body.quotationDate !== undefined) updateData.quotationDate = formatDisplayDate(body.quotationDate, business.dateFormat);
+    if (body.validUntil !== undefined) updateData.validUntil = body.validUntil ? formatDisplayDate(body.validUntil, business.dateFormat) : null;
     if (body.items !== undefined) updateData.items = typeof body.items === "string" ? body.items : JSON.stringify(body.items);
     if (body.subtotal !== undefined) updateData.subtotal = Number(body.subtotal) || 0;
     if (body.taxTotal !== undefined) updateData.taxTotal = Number(body.taxTotal) || 0;

@@ -14,6 +14,7 @@ import {
   Filter,
 } from "lucide-react";
 import { ViewQuotationModal } from "@/components/crm/QuotationModal";
+import { formatDisplayDate } from "@/lib/crmCurrencyData";
 
 export default function CrmQuotationsListPage() {
   const router = useRouter();
@@ -299,7 +300,9 @@ export default function CrmQuotationsListPage() {
                       >
                         {q.quotationNumber}
                       </td>
-                      <td className="py-4 text-xs text-gray-500">{q.quotationDate}</td>
+                      <td className="py-4 text-xs text-gray-500">
+                        {formatDisplayDate(q.quotationDate, business?.dateFormat)}
+                      </td>
                       <td className="py-4 font-semibold text-gray-900 text-xs sm:text-sm">
                         <div>{q.customerName}</div>
                         {q.customerPhone && (

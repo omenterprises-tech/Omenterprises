@@ -4,6 +4,7 @@ import { crmQuotations } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getCrmSession } from "@/lib/crmAuth";
 import { resolveBusinessAndRole } from "@/lib/crmBusinessResolver";
+import { formatDisplayDate } from "@/lib/crmCurrencyData";
 
 export async function GET() {
   try {
@@ -100,8 +101,8 @@ export async function POST(request: Request) {
       .values({
         businessId: business.id,
         quotationNumber: qNum,
-        quotationDate: quotationDate || new Date().toISOString().split("T")[0],
-        validUntil: validUntil || null,
+        quotationDate: formatDisplayDate(quotationDate || new Date(), business.dateFormat),
+        validUntil: validUntil ? formatDisplayDate(validUntil, business.dateFormat) : null,
         customerId: customerId ? Number(customerId) : null,
         customerName: customerName.trim(),
         customerEmail: customerEmail?.trim() || null,

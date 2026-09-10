@@ -75,3 +75,59 @@ export function formatDateWithPattern(pattern: string, date: Date = new Date()):
     .replace("MM", month)
     .replace("yyyy", year);
 }
+
+/**
+ * Formats any date string (ISO, YYYY-MM-DD, DD/MM/YYYY, etc.) or Date object
+ * into the desired pattern (default: "dd/MM/yyyy").
+ */
+export function formatDisplayDate(
+  dateValue: string | Date | null | undefined,
+  pattern?: string | null
+): string {
+  if (!dateValue) return "-";
+
+  const targetPattern = pattern || "dd/MM/yyyy";
+
+  // If already a Date object
+  if (dateValue instanceof Date) {
+    if (isNaN(dateValue.getTime())) return "-";
+    return formatDateWithPattern(targetPattern, dateValue);
+  }
+
+  const str = String(dateValue).trim();
+  if (!str) return "-";
+
+  // Check if string is in YYYY-MM-DD format (e.g. 2026-09-10, 2026/09/10, etc.)
+  const ymdMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (ymdMatch) {
+    const year = ymdMatch[1];
+    const month = ymdMatch[2].padStart(2, "0");
+    const day = ymdMatch[3].padStart(2, "0");
+    return targetPattern
+      .replace("dd", day)
+      .replace("MM", month)
+      .replace("yyyy", year);
+  }
+
+  // Check if string is in DD/MM/YYYY or DD-MM-YYYY format (e.g. 10/09/2026)
+  const dmyMatch = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+  if (dmyMatch) {
+    const day = dmyMatch[1].padStart(2, "0");
+    const month = dmyMatch[2].padStart(2, "0");
+    const year = dmyMatch[3];
+    return targetPattern
+      .replace("dd", day)
+      .replace("MM", month)
+      .replace("yyyy", year);
+  }
+
+  // Fallback: try parsing with Date constructor
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    return formatDateWithPattern(targetPattern, parsed);
+  }
+
+  // If unparseable, return the string as is
+  return str;
+}
+

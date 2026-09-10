@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import CustomerModal from "@/components/crm/CustomerModal";
 import ProductModal from "@/components/crm/ProductModal";
+import { formatDateWithPattern, formatDisplayDate } from "@/lib/crmCurrencyData";
 
 interface QuotationItem {
   id: string;
@@ -124,6 +125,9 @@ function MakeQuotationContent() {
         }
         setUser(data.user);
         setBusiness(data.business);
+        if (!editId && data.business?.dateFormat) {
+          setQuotationDate(formatDateWithPattern(data.business.dateFormat, new Date()));
+        }
 
         // Fetch customers, products, terms
         const [custRes, prodRes, termsRes] = await Promise.all([
@@ -162,7 +166,8 @@ function MakeQuotationContent() {
         }));
 
         setTermsList(mappedTerms);
-        setSelectedTermIds(mappedTerms.map((t) => t.id));
+        // Do not select any terms and conditions by default per user requirement
+        setSelectedTermIds([]);
 
         // Load existing quotation if in edit mode
         if (editId) {
@@ -170,7 +175,7 @@ function MakeQuotationContent() {
           if (qRes.success && qRes.quotation) {
             const q = qRes.quotation;
             setQuotationNo(q.quotationNumber || "-");
-            if (q.quotationDate) setQuotationDate(q.quotationDate);
+            if (q.quotationDate) setQuotationDate(formatDisplayDate(q.quotationDate, data.business?.dateFormat));
             if (q.notes) setOtherInfo(q.notes);
 
             setSelectedCustomer({
@@ -524,7 +529,7 @@ function MakeQuotationContent() {
           .filter(Boolean)
           .join(", "),
         customerGstin: selectedCustomer.gstin || null,
-        quotationDate,
+        quotationDate: formatDisplayDate(quotationDate, business?.dateFormat),
         items: itemsPayload,
         subtotal,
         taxTotal,

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { X, Plus, Trash2, Loader2, AlertCircle, Printer, CheckCircle2, Building2 } from "lucide-react";
+import { formatDisplayDate } from "@/lib/crmCurrencyData";
 
 interface ItemRow {
   id: string;
@@ -45,7 +46,7 @@ export function CreateQuotationModal({
     { id: "1", description: "", quantity: 1, unitPrice: 0, taxPercent: 0, total: 0 },
   ]);
   const [notes, setNotes] = useState("Thank you for your business. Please contact us if you have any questions.");
-  const [terms, setTerms] = useState("1. Payment terms: 50% advance, balance before dispatch.\n2. Quote is valid for 30 days.");
+  const [terms, setTerms] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -128,8 +129,8 @@ export function CreateQuotationModal({
           customerPhone: customerPhone.trim() || null,
           customerAddress: customerAddress.trim() || null,
           customerGstin: customerGstin.trim() || null,
-          quotationDate,
-          validUntil,
+          quotationDate: formatDisplayDate(quotationDate, business?.dateFormat),
+          validUntil: validUntil ? formatDisplayDate(validUntil, business?.dateFormat) : null,
           items,
           subtotal,
           taxTotal,
@@ -617,9 +618,9 @@ export function ViewQuotationModal({
                 QUOTATION
               </span>
               <p className="text-sm font-black text-gray-900 pt-1">{quotation.quotationNumber}</p>
-              <p className="text-xs text-gray-500">Date: {quotation.quotationDate}</p>
+              <p className="text-xs text-gray-500">Date: {formatDisplayDate(quotation.quotationDate, business?.dateFormat)}</p>
               {quotation.validUntil && (
-                <p className="text-xs text-gray-500">Valid Until: {quotation.validUntil}</p>
+                <p className="text-xs text-gray-500">Valid Until: {formatDisplayDate(quotation.validUntil, business?.dateFormat)}</p>
               )}
             </div>
           </div>

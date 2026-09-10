@@ -22,6 +22,7 @@ import {
   Send,
   Check,
 } from "lucide-react";
+import { formatDisplayDate } from "@/lib/crmCurrencyData";
 
 interface QuotationItem {
   id?: string;
@@ -205,7 +206,7 @@ export default function QuotationDetailPage({
         customerPhone: quotation.customerPhone,
         customerAddress: quotation.customerAddress,
         customerGstin: quotation.customerGstin,
-        quotationDate: new Date().toISOString().split("T")[0],
+        quotationDate: formatDisplayDate(new Date(), business?.dateFormat),
         validUntil: quotation.validUntil,
         items,
         subtotal: quotation.subtotal,
@@ -580,7 +581,7 @@ export default function QuotationDetailPage({
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 font-medium">
-                  {quotation.customerName} • {quotation.quotationDate}
+                  {quotation.customerName} • {formatDisplayDate(quotation.quotationDate, business?.dateFormat)}
                 </p>
               </div>
             </div>
@@ -700,12 +701,16 @@ export default function QuotationDetailPage({
               </div>
               <div>
                 <span className="font-bold text-gray-500 uppercase text-[11px] tracking-wider block">Date</span>
-                <span className="font-semibold text-gray-800 text-xs sm:text-sm">{quotation.quotationDate}</span>
+                <span className="font-semibold text-gray-800 text-xs sm:text-sm">
+                  {formatDisplayDate(quotation.quotationDate, business?.dateFormat)}
+                </span>
               </div>
               {quotation.validUntil && (
                 <div>
                   <span className="font-bold text-gray-500 uppercase text-[11px] tracking-wider block">Valid Until</span>
-                  <span className="text-gray-700 text-xs">{quotation.validUntil}</span>
+                  <span className="text-gray-700 text-xs">
+                    {formatDisplayDate(quotation.validUntil, business?.dateFormat)}
+                  </span>
                 </div>
               )}
             </div>
