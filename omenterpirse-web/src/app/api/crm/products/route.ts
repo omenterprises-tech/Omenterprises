@@ -1,15 +1,4 @@
-
-const fs = require('fs');
-const path = require('path');
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(process.cwd(), relPath);
-  fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-  fs.writeFileSync(fullPath, content, 'utf8');
-  console.log('✓ Wrote:', relPath);
-}
-
-const productsRoute = `import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { products } from "@/db/schema";
 import { getCrmSession } from "@/lib/crmAuth";
@@ -107,7 +96,3 @@ export async function DELETE(request: Request) {
     );
   }
 }
-`;
-
-writeFile('src/app/api/crm/products/route.ts', productsRoute);
-

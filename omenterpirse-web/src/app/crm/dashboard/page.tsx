@@ -28,6 +28,10 @@ import {
   FileText,
   Printer,
   UserCheck,
+  Package,
+  FileCheck2,
+  PlusCircle,
+  Layers,
 } from "lucide-react";
 import { formatDateWithPattern } from "@/lib/crmCurrencyData";
 import CustomerModal from "@/components/crm/CustomerModal";
@@ -38,7 +42,9 @@ export default function CrmDashboardPage() {
   const [user, setUser] = useState<any>(null);
   const [business, setBusiness] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"quotations" | "customers" | "business" | "team">("quotations");
+  const [activeTab, setActiveTab] = useState<
+    "quotations" | "customers" | "business" | "team" | "products" | "terms"
+  >("quotations");
 
   // Permissions
   const [canManageTeam, setCanManageTeam] = useState(true);
@@ -66,6 +72,21 @@ export default function CrmDashboardPage() {
   // Customers state
   const [customers, setCustomers] = useState<any[]>([]);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+
+  // Products state
+  const [products, setProducts] = useState<any[]>([]);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductCategory, setNewProductCategory] = useState("General");
+  const [newProductPrice, setNewProductPrice] = useState("");
+  const [newProductDesc, setNewProductDesc] = useState("");
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
+  const [productError, setProductError] = useState("");
+
+  // Terms & Conditions state
+  const [standardTerms, setStandardTerms] = useState("");
+  const [isSavingTerms, setIsSavingTerms] = useState(false);
+  const [termsFeedback, setTermsFeedback] = useState("");
 
   const openAddMemberModal = () => {
     setInviteName("");
@@ -123,6 +144,18 @@ export default function CrmDashboardPage() {
     }
   };
 
+  const loadProducts = async () => {
+    try {
+      const res = await fetch("/api/crm/products");
+      const data = await res.json();
+      if (data.success && data.products) {
+        setProducts(data.products);
+      }
+    } catch (err) {
+      console.error("Failed to load products:", err);
+    }
+  };
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -139,8 +172,11 @@ export default function CrmDashboardPage() {
 
         setUser(data.user);
         setBusiness(data.business);
+        if (data.business?.otherInfo) {
+          setStandardTerms(data.business.otherInfo);
+        }
 
-        await Promise.all([loadTeam(), loadQuotations(), loadCustomers()]);
+        await Promise.all([loadTeam(), loadQuotations(), loadCustomers(), loadProducts()]);
       } catch (err) {
         console.error("Failed to load CRM session:", err);
       } finally {
@@ -149,6 +185,108 @@ export default function CrmDashboardPage() {
     }
     loadData();
   }, [router]);
+
+  const handleCreateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProductName.trim()) {
+      setProductError("Product name is required.");
+      return;
+    }
+    if (!newProductPrice || isNaN(Number(newProductPrice)) || Number(newProductPrice) < 0) {
+      setProductError("Please enter a valid price.");
+      return;
+    }
+
+    setIsSubmittingProduct(true);
+    setProductError("");
+
+    try {
+      const res = await fetch("/api/crm/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newProductName.trim(),
+          category: newProductCategory.trim() || "General",
+          basePrice: parseFloat(newProductPrice),
+          description: newProductDesc.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.product) {
+        setProducts((prev) => [data.product, ...prev]);
+        setIsProductModalOpen(false);
+        setNewProductName("");
+        setNewProductCategory("General");
+        setNewProductPrice("");
+        setNewProductDesc("");
+      } else {
+        setProductError(data.error || "Failed to create product.");
+      }
+    } catch (err: any) {
+      setProductError(err.message || "Failed to save product.");
+    } finally {
+      setIsSubmittingProduct(false);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: number) => {
+    if (!confirm("Are you sure you want to delete this product?")) return;
+    try {
+      const res = await fetch(`/api/crm/products?id=${productId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setProducts((prev) => prev.filter((p) => p.id !== productId));
+      } else {
+        alert(data.error || "Failed to delete product.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to delete product.");
+    }
+  };
+
+  const handleSaveTerms = async () => {
+    if (!canManageBusiness) return;
+    setIsSavingTerms(true);
+    setTermsFeedback("");
+
+    try {
+      const res = await fetch("/api/crm/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessName: business?.businessName || "",
+          contactName: business?.contactName || user?.fullName || "",
+          mobileNumber: business?.mobileNumber || user?.phoneNumber || "",
+          email: business?.email || user?.email || "",
+          addressLine1: business?.addressLine1 || "",
+          addressLine2: business?.addressLine2 || "",
+          addressLine3: business?.addressLine3 || "",
+          otherInfo: standardTerms.trim(),
+          businessCategory: business?.businessCategory || "",
+          taxLabel: business?.taxLabel || "GSTIN",
+          taxNumber: business?.taxNumber || "",
+          state: business?.state || "",
+          logoUrl: business?.logoUrl || null,
+          signatureUrl: business?.signatureUrl || null,
+          signatureType: business?.signatureType || "draw",
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setBusiness(data.business);
+        setTermsFeedback("Terms & Conditions saved successfully!");
+        setTimeout(() => setTermsFeedback(""), 4000);
+      } else {
+        setTermsFeedback(data.error || "Failed to save terms.");
+      }
+    } catch (err: any) {
+      setTermsFeedback(err.message || "Failed to save terms.");
+    } finally {
+      setIsSavingTerms(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -373,95 +511,258 @@ export default function CrmDashboardPage() {
           </div>
         </div>
 
-        {/* NAVIGATION TABS */}
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 font-playfair tracking-tight">
-                {activeTab === "quotations" && "Quotations"}
-                {activeTab === "customers" && "Customers & Clients"}
-                {activeTab === "business" && "Business Profile"}
-                {activeTab === "team" && "Team Members"}
-              </h2>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-                {activeTab === "quotations" && "Generate, track, and manage official quotations for clients"}
-                {activeTab === "customers" && "Manage your client database and direct contact details"}
-                {activeTab === "business" && "Official company information registered by the business owner"}
-                {activeTab === "team" && "Team access and permissions for your business account"}
-              </p>
-            </div>
-
-            {/* Four Tab Toggle Buttons */}
-            <div className="flex bg-gray-200/80 p-1.5 rounded-2xl shrink-0 overflow-x-auto">
-              <button
-                type="button"
-                onClick={() => setActiveTab("quotations")}
-                className={"flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer shrink-0 " + (
-                  activeTab === "quotations"
-                    ? "bg-white text-brand shadow-md"
-                    : "text-gray-600 hover:text-gray-900"
-                )}
-              >
-                <FileText size={15} />
-                <span>Quotations</span>
-                {quotations.length > 0 && (
-                  <span className="w-5 h-5 rounded-full bg-brand/10 text-brand text-[10px] font-bold flex items-center justify-center">
-                    {quotations.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("customers")}
-                className={"flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer shrink-0 " + (
-                  activeTab === "customers"
-                    ? "bg-white text-brand shadow-md"
-                    : "text-gray-600 hover:text-gray-900"
-                )}
-              >
-                <UserCheck size={15} />
-                <span>Customers</span>
-                {customers.length > 0 && (
-                  <span className="w-5 h-5 rounded-full bg-brand/10 text-brand text-[10px] font-bold flex items-center justify-center">
-                    {customers.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("business")}
-                className={"flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer shrink-0 " + (
-                  activeTab === "business"
-                    ? "bg-white text-brand shadow-md"
-                    : "text-gray-600 hover:text-gray-900"
-                )}
-              >
-                <Building2 size={15} />
-                <span>Business</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("team")}
-                className={"flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer shrink-0 " + (
-                  activeTab === "team"
-                    ? "bg-white text-brand shadow-md"
-                    : "text-gray-600 hover:text-gray-900"
-                )}
-              >
-                <Users size={15} />
-                <span>Team</span>
-                {teamMembers.length > 0 && (
-                  <span className="w-5 h-5 rounded-full bg-brand/10 text-brand text-[10px] font-bold flex items-center justify-center">
-                    {teamMembers.length}
-                  </span>
-                )}
-              </button>
-            </div>
+        {/* ================= MANAGE SECTION ================= */}
+        <div className="space-y-3">
+          <div className="flex items-center space-x-2">
+            <h3 className="text-xs font-black uppercase tracking-widest text-gray-500">
+              Manage
+            </h3>
+            <div className="h-px flex-1 bg-gray-200" />
           </div>
 
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-3.5">
+            {/* 1. Business */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("business")}
+              className={`group text-left p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                activeTab === "business"
+                  ? "bg-white border-brand shadow-md ring-2 ring-brand/20"
+                  : "bg-white border-gray-200/80 shadow-sm hover:shadow-md hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                  activeTab === "business" ? "bg-brand text-white" : "bg-blue-50 text-brand group-hover:bg-brand group-hover:text-white"
+                }`}>
+                  <Building2 size={20} />
+                </div>
+                {activeTab === "business" && (
+                  <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
+                )}
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
+                  Business
+                </h4>
+                <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                  Profile & Branding
+                </p>
+              </div>
+            </button>
+
+            {/* 2. Teams */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("team")}
+              className={`group text-left p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                activeTab === "team"
+                  ? "bg-white border-purple-600 shadow-md ring-2 ring-purple-500/20"
+                  : "bg-white border-gray-200/80 shadow-sm hover:shadow-md hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                  activeTab === "team" ? "bg-purple-600 text-white" : "bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white"
+                }`}>
+                  <Users size={20} />
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">
+                  {teamMembers.length}
+                </span>
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-gray-900 group-hover:text-purple-600 transition-colors">
+                  Teams
+                </h4>
+                <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                  Access & Roles
+                </p>
+              </div>
+            </button>
+
+            {/* 3. Customers */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("customers")}
+              className={`group text-left p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                activeTab === "customers"
+                  ? "bg-white border-emerald-600 shadow-md ring-2 ring-emerald-500/20"
+                  : "bg-white border-gray-200/80 shadow-sm hover:shadow-md hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                  activeTab === "customers" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"
+                }`}>
+                  <UserCheck size={20} />
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                  {customers.length}
+                </span>
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-gray-900 group-hover:text-emerald-600 transition-colors">
+                  Customers
+                </h4>
+                <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                  Client Directory
+                </p>
+              </div>
+            </button>
+
+            {/* 4. Products */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("products")}
+              className={`group text-left p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                activeTab === "products"
+                  ? "bg-white border-amber-600 shadow-md ring-2 ring-amber-500/20"
+                  : "bg-white border-gray-200/80 shadow-sm hover:shadow-md hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                  activeTab === "products" ? "bg-amber-600 text-white" : "bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white"
+                }`}>
+                  <Package size={20} />
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                  {products.length}
+                </span>
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-gray-900 group-hover:text-amber-600 transition-colors">
+                  Products
+                </h4>
+                <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                  Items & Catalog
+                </p>
+              </div>
+            </button>
+
+            {/* 5. Terms */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("terms")}
+              className={`group text-left p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                activeTab === "terms"
+                  ? "bg-white border-indigo-600 shadow-md ring-2 ring-indigo-500/20"
+                  : "bg-white border-gray-200/80 shadow-sm hover:shadow-md hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                  activeTab === "terms" ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"
+                }`}>
+                  <FileCheck2 size={20} />
+                </div>
+                {activeTab === "terms" && (
+                  <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+                )}
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                  Terms
+                </h4>
+                <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                  Rules & Policies
+                </p>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* ================= DISCOVER SECTION ================= */}
+        <div className="space-y-3">
+          <div className="flex items-center space-x-2">
+            <h3 className="text-xs font-black uppercase tracking-widest text-gray-500">
+              Discover
+            </h3>
+            <div className="h-px flex-1 bg-gray-200" />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 max-w-2xl">
+            {/* 1. Quotation */}
+            <button
+              type="button"
+              onClick={() => setIsCreateQuotationOpen(true)}
+              className="group text-left p-4 rounded-2xl border border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-brand/50 transition-all duration-200 cursor-pointer flex items-center justify-between"
+            >
+              <div className="flex items-center space-x-3.5">
+                <div className="w-11 h-11 rounded-xl bg-blue-50 text-brand group-hover:bg-brand group-hover:text-white flex items-center justify-center transition-colors shrink-0">
+                  <PlusCircle size={22} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
+                    Quotation
+                  </h4>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Create new commercial quote
+                  </p>
+                </div>
+              </div>
+              <span className="inline-flex items-center px-3 py-1 rounded-xl bg-brand/10 text-brand font-bold text-xs group-hover:bg-brand group-hover:text-white transition-all shrink-0">
+                + Create
+              </span>
+            </button>
+
+            {/* 2. Quotation list */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("quotations")}
+              className={`group text-left p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex items-center justify-between ${
+                activeTab === "quotations"
+                  ? "bg-white border-brand shadow-md ring-2 ring-brand/20"
+                  : "bg-white border-gray-200/80 shadow-sm hover:shadow-md hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center space-x-3.5">
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors shrink-0 ${
+                  activeTab === "quotations" ? "bg-brand text-white" : "bg-blue-50 text-brand group-hover:bg-brand group-hover:text-white"
+                }`}>
+                  <FileText size={22} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
+                    Quotation list
+                  </h4>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    View & track all quotations ({quotations.length})
+                  </p>
+                </div>
+              </div>
+              <span className={`inline-flex items-center px-3 py-1 rounded-xl font-bold text-xs transition-all shrink-0 ${
+                activeTab === "quotations"
+                  ? "bg-brand text-white"
+                  : "bg-gray-100 text-gray-700 group-hover:bg-brand group-hover:text-white"
+              }`}>
+                View List
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* ACTIVE VIEW SECTION */}
+        <div className="space-y-6 pt-2">
+          <div className="border-b border-gray-200 pb-3">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 font-playfair tracking-tight">
+              {activeTab === "quotations" && "Quotations"}
+              {activeTab === "customers" && "Customers & Clients"}
+              {activeTab === "business" && "Business Profile"}
+              {activeTab === "team" && "Team Members"}
+              {activeTab === "products" && "Products & Catalog"}
+              {activeTab === "terms" && "Terms & Conditions"}
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+              {activeTab === "quotations" && "Generate, track, and manage official quotations for clients"}
+              {activeTab === "customers" && "Manage your client database and direct contact details"}
+              {activeTab === "business" && "Official company information registered by the business owner"}
+              {activeTab === "team" && "Team access and permissions for your business account"}
+              {activeTab === "products" && "Manage standard catalog items and parts for your quotes"}
+              {activeTab === "terms" && "Configure standard payment, delivery, and warranty policies for quotations"}
+            </p>
+          </div>
           {/* ================= TAB 1: QUOTATIONS ================= */}
           {activeTab === "quotations" && (
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm space-y-6 animate-in fade-in duration-200">
@@ -966,6 +1267,221 @@ export default function CrmDashboardPage() {
               </div>
             </div>
           )}
+
+          {/* ================= TAB 5: PRODUCTS ================= */}
+          {activeTab === "products" && (
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm space-y-6 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <Package size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Products & Catalog</h3>
+                    <p className="text-xs text-gray-500">Standard items, parts, and rates for your commercial quotations</p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsProductModalOpen(true)}
+                  className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer self-start sm:self-auto"
+                >
+                  <Plus size={15} />
+                  <span>Add Product</span>
+                </button>
+              </div>
+
+              {products.length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
+                  <div className="w-16 h-16 rounded-2xl bg-amber-50/60 border border-amber-200/60 flex items-center justify-center text-amber-500">
+                    <Package size={28} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-800">No Products Added Yet</h4>
+                    <p className="text-xs text-gray-500 mt-1 max-w-sm">
+                      Build your product catalog with prices and categories to speed up quotation creation.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsProductModalOpen(true)}
+                    className="mt-2 px-4 py-2 rounded-xl bg-brand text-white text-xs font-bold shadow hover:bg-brand-hover transition-all cursor-pointer"
+                  >
+                    + Add First Product
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                        <th className="pb-3">Product Name</th>
+                        <th className="pb-3">Category</th>
+                        <th className="pb-3">Description</th>
+                        <th className="pb-3">Base Price</th>
+                        <th className="pb-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {products.map((prod) => (
+                        <tr key={prod.id} className="hover:bg-gray-50/60 transition-colors">
+                          <td className="py-4 font-bold text-gray-900 text-xs sm:text-sm">
+                            {prod.name}
+                          </td>
+                          <td className="py-4 text-xs">
+                            <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 font-semibold border border-amber-100">
+                              {prod.category || "General"}
+                            </span>
+                          </td>
+                          <td className="py-4 text-xs text-gray-500 max-w-xs truncate">
+                            {prod.description || "—"}
+                          </td>
+                          <td className="py-4 font-bold text-gray-900 text-xs sm:text-sm">
+                            ₹{Number(prod.basePrice).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteProduct(prod.id)}
+                              className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              title="Delete product"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ================= TAB 6: TERMS ================= */}
+          {activeTab === "terms" && (
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm space-y-6 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <FileCheck2 size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Standard Terms & Conditions</h3>
+                    <p className="text-xs text-gray-500">
+                      Default policies, validity, payment terms, and delivery schedules for your quotations
+                    </p>
+                  </div>
+                </div>
+
+                {canManageBusiness && (
+                  <button
+                    type="button"
+                    onClick={handleSaveTerms}
+                    disabled={isSavingTerms}
+                    className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer self-start sm:self-auto disabled:opacity-60"
+                  >
+                    {isSavingTerms ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck size={15} />
+                        <span>Save Default Terms</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              {termsFeedback && (
+                <div className={`p-3.5 rounded-2xl text-xs font-medium flex items-center space-x-2 animate-in fade-in ${
+                  termsFeedback.includes("success")
+                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                    : "bg-rose-50 text-rose-700 border border-rose-200"
+                }`}>
+                  <CheckCircle2 size={16} className="shrink-0" />
+                  <span>{termsFeedback}</span>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div className="bg-blue-50/70 border border-blue-100 p-4 rounded-2xl flex items-start space-x-3 text-xs text-blue-900">
+                  <AlertCircle size={17} className="shrink-0 mt-0.5 text-blue-600" />
+                  <div>
+                    <p className="font-bold">Quotation Auto-Population</p>
+                    <p className="text-blue-800/80 mt-0.5">
+                      These terms are automatically populated into the Terms & Conditions section of every newly generated quotation.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+                    Standard Commercial Terms
+                  </label>
+                  <textarea
+                    value={standardTerms}
+                    onChange={(e) => setStandardTerms(e.target.value)}
+                    disabled={!canManageBusiness}
+                    rows={6}
+                    placeholder="Enter standard validity, payment schedule, delivery timelines, taxes, and warranty policies..."
+                    className="w-full px-4 py-3 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand disabled:bg-gray-50 disabled:text-gray-600"
+                  />
+                </div>
+
+                {canManageBusiness ? (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[11px] font-bold uppercase text-gray-400">Quick Insert Clauses:</span>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Validity: 30 days from quote date.` : "• Validity: 30 days from quote date.")}
+                        className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
+                      >
+                        + 30 Days Validity
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Payment: 100% advance against Proforma Invoice.` : "• Payment: 100% advance against Proforma Invoice.")}
+                        className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
+                      >
+                        + 100% Advance Payment
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Delivery: 5 to 7 working days from confirmed PO.` : "• Delivery: 5 to 7 working days from confirmed PO.")}
+                        className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
+                      >
+                        + Delivery Timeline
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Warranty: 12 months manufacturer warranty from invoice date.` : "• Warranty: 12 months manufacturer warranty from invoice date.")}
+                        className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
+                      >
+                        + 12 Months Warranty
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Taxes: GST as applicable at the time of delivery.` : "• Taxes: GST as applicable at the time of delivery.")}
+                        className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
+                      >
+                        + GST Clause
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 italic">
+                    Terms & conditions can only be updated by the primary business owner.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
@@ -1182,6 +1698,118 @@ export default function CrmDashboardPage() {
         business={business}
         onStatusChange={handleQuotationStatusChange}
       />
+
+      {/* Product Creation Modal */}
+      {isProductModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 sm:p-8 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-5">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Add New Product</h3>
+                <p className="text-xs text-gray-500">Save items, parts, or services for quotations</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsProductModalOpen(false)}
+                className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {productError && (
+              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-center gap-2">
+                <AlertCircle size={15} className="shrink-0 text-rose-600" />
+                <span>{productError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateProduct} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                  Product / Item Name *
+                </label>
+                <input
+                  type="text"
+                  value={newProductName}
+                  onChange={(e) => setNewProductName(e.target.value)}
+                  placeholder="e.g. 33kV Switchgear Panel"
+                  required
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                    Base Price (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={newProductPrice}
+                    onChange={(e) => setNewProductPrice(e.target.value)}
+                    placeholder="0.00"
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                    Category
+                  </label>
+                  <input
+                    type="text"
+                    value={newProductCategory}
+                    onChange={(e) => setNewProductCategory(e.target.value)}
+                    placeholder="e.g. Electrical"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                  Description / Specifications
+                </label>
+                <textarea
+                  value={newProductDesc}
+                  onChange={(e) => setNewProductDesc(e.target.value)}
+                  placeholder="Technical specs, model numbers, warranty..."
+                  rows={3}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand font-normal"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsProductModalOpen(false)}
+                  className="flex-1 py-3 border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs rounded-xl cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingProduct}
+                  className="flex-1 py-3 bg-brand hover:bg-brand-hover text-white font-bold text-xs rounded-xl shadow cursor-pointer transition-all flex items-center justify-center space-x-1.5 disabled:opacity-60"
+                >
+                  {isSubmittingProduct ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Add Product</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
