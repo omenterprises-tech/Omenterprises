@@ -7,10 +7,18 @@ import { INDIAN_STATES } from "@/lib/crmCategoriesData";
 interface CustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCustomerCreated: (customer: any) => void;
+  onCustomerCreated?: (customer: any) => void;
+  onCustomerSaved?: (customer: any) => void;
+  initialCustomer?: any | null;
 }
 
-export default function CustomerModal({ isOpen, onClose, onCustomerCreated }: CustomerModalProps) {
+export default function CustomerModal({
+  isOpen,
+  onClose,
+  onCustomerCreated,
+  onCustomerSaved,
+  initialCustomer,
+}: CustomerModalProps) {
   const [name, setName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
@@ -22,6 +30,33 @@ export default function CustomerModal({ isOpen, onClose, onCustomerCreated }: Cu
   const [gstin, setGstin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const isEditing = Boolean(initialCustomer?.id);
+
+  React.useEffect(() => {
+    if (initialCustomer) {
+      setName(initialCustomer.name || "");
+      setCompanyName(initialCustomer.companyName || "");
+      setEmail(initialCustomer.email || "");
+      setPhone(initialCustomer.phone || "");
+      setAddress(initialCustomer.address || "");
+      setCity(initialCustomer.city || "");
+      setState(initialCustomer.state || "");
+      setPincode(initialCustomer.pincode || "");
+      setGstin(initialCustomer.gstin || "");
+    } else {
+      setName("");
+      setCompanyName("");
+      setEmail("");
+      setPhone("");
+      setAddress("");
+      setCity("");
+      setState("");
+      setPincode("");
+      setGstin("");
+    }
+    setError("");
+  }, [initialCustomer, isOpen]);
 
   if (!isOpen) return null;
 
@@ -36,28 +71,39 @@ export default function CustomerModal({ isOpen, onClose, onCustomerCreated }: Cu
     setError("");
 
     try {
-      const res = await fetch("/api/crm/customers", {
-        method: "POST",
+      const url = "/api/crm/customers";
+      const method = isEditing ? "PUT" : "POST";
+      const payload: any = {
+        name: name.trim(),
+        companyName: companyName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        pincode: pincode.trim(),
+        gstin: gstin.trim(),
+      };
+      if (isEditing && initialCustomer?.id) {
+        payload.id = initialCustomer.id;
+      }
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          companyName: companyName.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          address: address.trim(),
-          city: city.trim(),
-          state: state.trim(),
-          pincode: pincode.trim(),
-          gstin: gstin.trim(),
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
       if (data.success && data.customer) {
-        onCustomerCreated(data.customer);
+        if (isEditing) {
+          if (onCustomerSaved) onCustomerSaved(data.customer);
+        } else {
+          if (onCustomerCreated) onCustomerCreated(data.customer);
+        }
         onClose();
       } else {
-        setError(data.error || "Failed to create customer.");
+        setError(data.error || "Failed to save customer.");
       }
     } catch (err: any) {
       setError(err.message || "Failed to save customer.");
@@ -71,8 +117,12 @@ export default function CustomerModal({ isOpen, onClose, onCustomerCreated }: Cu
       <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-6 sm:p-8 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-5">
           <div>
-            <h3 className="text-lg font-bold text-gray-900">Add New Customer</h3>
-            <p className="text-xs text-gray-500">Save client details for quotations and orders</p>
+            <h3 className="text-lg font-bold text-gray-900">
+              {isEditing ? "Edit Customer" : "Add New Customer"}
+            </h3>
+            <p className="text-xs text-gray-500">
+              {isEditing ? "Update client contact and tax details" : "Save client details for quotations and orders"}
+            </p>
           </div>
           <button
             type="button"
@@ -240,7 +290,7 @@ export default function CustomerModal({ isOpen, onClose, onCustomerCreated }: Cu
                   <span>Saving...</span>
                 </>
               ) : (
-                <span>Save Customer</span>
+                <span>{isEditing ? "Update Customer" : "Save Customer"}</span>
               )}
             </button>
           </div>

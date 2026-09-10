@@ -73,6 +73,58 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PUT(request: Request) {
+  try {
+    const session = await getCrmSession();
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { id, name, description, basePrice, category } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Product ID is required." }, { status: 400 });
+    }
+
+    if (!name || !name.trim()) {
+      return NextResponse.json({ success: false, error: "Product name is required." }, { status: 400 });
+    }
+
+    const price = parseFloat(basePrice);
+    if (isNaN(price) || price < 0) {
+      return NextResponse.json({ success: false, error: "Valid price is required." }, { status: 400 });
+    }
+
+    const updated = await db
+      .update(products)
+      .set({
+        name: name.trim(),
+        description: description ? description.trim() : null,
+        basePrice: price,
+        salePrice: price,
+        category: category ? category.trim() : "General",
+      })
+      .where(eq(products.id, parseInt(id, 10)))
+      .returning();
+
+    if (!updated.length) {
+      return NextResponse.json({ success: false, error: "Product not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      product: updated[0],
+    });
+  } catch (error: any) {
+    console.error("Update product error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to update product." },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     const session = await getCrmSession();

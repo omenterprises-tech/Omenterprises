@@ -3,40 +3,7 @@ import { db } from "@/db";
 import { crmUsers, crmBusinesses, crmTeamMembers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getCrmSession, hashPassword } from "@/lib/crmAuth";
-
-async function resolveBusinessAndRole(userId: number) {
-  // Check if owner
-  const ownerBiz = await db
-    .select()
-    .from(crmBusinesses)
-    .where(eq(crmBusinesses.userId, userId))
-    .limit(1);
-
-  if (ownerBiz.length > 0) {
-    return { business: ownerBiz[0], role: "Owner" };
-  }
-
-  // Check if team member
-  const membership = await db
-    .select()
-    .from(crmTeamMembers)
-    .where(eq(crmTeamMembers.userId, userId))
-    .limit(1);
-
-  if (membership.length > 0) {
-    const teamBiz = await db
-      .select()
-      .from(crmBusinesses)
-      .where(eq(crmBusinesses.id, membership[0].businessId))
-      .limit(1);
-
-    if (teamBiz.length > 0) {
-      return { business: teamBiz[0], role: membership[0].role };
-    }
-  }
-
-  return { business: null, role: null };
-}
+import { resolveBusinessAndRole } from "@/lib/crmBusinessResolver";
 
 export async function GET() {
   try {
@@ -45,7 +12,7 @@ export async function GET() {
       return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
     }
 
-    const { business, role } = await resolveBusinessAndRole(session.userId);
+    const { business, role, isOwner } = await resolveBusinessAndRole(session.userId);
     if (!business) {
       return NextResponse.json({ success: false, error: "Business not found." }, { status: 404 });
     }
@@ -111,7 +78,7 @@ export async function GET() {
       success: true,
       members,
       callerRole: role,
-      canManageTeam: role === "Owner" || role === "Admin",
+      canManageTeam: Boolean(isOwner), // Team members have view-only access!
     });
   } catch (error: any) {
     console.error("Fetch team error:", error);
@@ -129,14 +96,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
     }
 
-    const { business, role } = await resolveBusinessAndRole(session.userId);
+    const { business, isOwner } = await resolveBusinessAndRole(session.userId);
     if (!business) {
       return NextResponse.json({ success: false, error: "Business not found." }, { status: 404 });
     }
 
-    if (role !== "Owner" && role !== "Admin") {
+    // Strictly enforce view-only access for team members: only the primary owner can add members
+    if (!isOwner) {
       return NextResponse.json(
-        { success: false, error: "Only an Owner or Admin can add team members." },
+        { success: false, error: "Team members have view-only access to team details. Only the business owner can add team members." },
         { status: 403 }
       );
     }
@@ -148,7 +116,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Member full name is required." }, { status: 400 });
     }
 
-    if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    if (!email || typeof email !== "string" || !/^[^s@]+@[^s@]+.[^s@]+$/.test(email.trim())) {
       return NextResponse.json({ success: false, error: "Please provide a valid email address." }, { status: 400 });
     }
 
@@ -214,7 +182,7 @@ export async function POST(request: Request) {
           phoneNumber: cleanPhone || "0000000000",
           passwordHash: hash,
           salt: salt,
-          isOnboardingCompleted: true, // Bypass business setup!
+          isOnboardingCompleted: true,
           createdAt: new Date().toISOString(),
         })
         .returning({ id: crmUsers.id });
@@ -262,10 +230,10 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
     }
 
-    const { business, role } = await resolveBusinessAndRole(session.userId);
-    if (!business || (role !== "Owner" && role !== "Admin")) {
+    const { business, isOwner } = await resolveBusinessAndRole(session.userId);
+    if (!business || !isOwner) {
       return NextResponse.json(
-        { success: false, error: "Only an Owner or Admin can remove team members." },
+        { success: false, error: "Team members have view-only access to team details. Only the business owner can remove team members." },
         { status: 403 }
       );
     }

@@ -47,7 +47,7 @@ export default function CrmDashboardPage() {
   >("quotations");
 
   // Permissions
-  const [canManageTeam, setCanManageTeam] = useState(true);
+  const [canManageTeam, setCanManageTeam] = useState(false);
   const canManageBusiness = Boolean(user?.isOwner ?? (user?.role === "Owner"));
 
   // Team management state
@@ -72,10 +72,12 @@ export default function CrmDashboardPage() {
   // Customers state
   const [customers, setCustomers] = useState<any[]>([]);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<any | null>(null);
 
   // Products state
   const [products, setProducts] = useState<any[]>([]);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [newProductName, setNewProductName] = useState("");
   const [newProductCategory, setNewProductCategory] = useState("General");
   const [newProductPrice, setNewProductPrice] = useState("");
@@ -87,6 +89,42 @@ export default function CrmDashboardPage() {
   const [standardTerms, setStandardTerms] = useState("");
   const [isSavingTerms, setIsSavingTerms] = useState(false);
   const [termsFeedback, setTermsFeedback] = useState("");
+
+  const openAddCustomer = () => {
+    setEditingCustomer(null);
+    setIsCustomerModalOpen(true);
+  };
+
+  const openEditCustomer = (cust: any) => {
+    setEditingCustomer(cust);
+    setIsCustomerModalOpen(true);
+  };
+
+  const openAddProduct = () => {
+    setEditingProduct(null);
+    setNewProductName("");
+    setNewProductCategory("General");
+    setNewProductPrice("");
+    setNewProductDesc("");
+    setProductError("");
+    setIsProductModalOpen(true);
+  };
+
+  const openEditProduct = (prod: any) => {
+    setEditingProduct(prod);
+    setNewProductName(prod.name || "");
+    setNewProductCategory(prod.category || "General");
+    setNewProductPrice(prod.basePrice !== undefined ? String(prod.basePrice) : "");
+    setNewProductDesc(prod.description || "");
+    setProductError("");
+    setIsProductModalOpen(true);
+  };
+
+  const closeProductModal = () => {
+    setIsProductModalOpen(false);
+    setEditingProduct(null);
+    setProductError("");
+  };
 
   const openAddMemberModal = () => {
     setInviteName("");
@@ -172,6 +210,7 @@ export default function CrmDashboardPage() {
 
         setUser(data.user);
         setBusiness(data.business);
+        setCanManageTeam(Boolean(data.user?.isOwner ?? (data.user?.role === "Owner")));
         if (data.business?.otherInfo) {
           setStandardTerms(data.business.otherInfo);
         }
@@ -186,7 +225,7 @@ export default function CrmDashboardPage() {
     loadData();
   }, [router]);
 
-  const handleCreateProduct = async (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProductName.trim()) {
       setProductError("Product name is required.");
@@ -201,10 +240,12 @@ export default function CrmDashboardPage() {
     setProductError("");
 
     try {
+      const isEditing = Boolean(editingProduct?.id);
       const res = await fetch("/api/crm/products", {
-        method: "POST",
+        method: isEditing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ...(isEditing ? { id: editingProduct.id } : {}),
           name: newProductName.trim(),
           category: newProductCategory.trim() || "General",
           basePrice: parseFloat(newProductPrice),
@@ -214,14 +255,16 @@ export default function CrmDashboardPage() {
 
       const data = await res.json();
       if (data.success && data.product) {
-        setProducts((prev) => [data.product, ...prev]);
-        setIsProductModalOpen(false);
-        setNewProductName("");
-        setNewProductCategory("General");
-        setNewProductPrice("");
-        setNewProductDesc("");
+        if (isEditing) {
+          setProducts((prev) =>
+            prev.map((p) => (p.id === data.product.id ? data.product : p))
+          );
+        } else {
+          setProducts((prev) => [data.product, ...prev]);
+        }
+        closeProductModal();
       } else {
-        setProductError(data.error || "Failed to create product.");
+        setProductError(data.error || `Failed to ${isEditing ? "update" : "create"} product.`);
       }
     } catch (err: any) {
       setProductError(err.message || "Failed to save product.");
@@ -246,36 +289,22 @@ export default function CrmDashboardPage() {
   };
 
   const handleSaveTerms = async () => {
-    if (!canManageBusiness) return;
     setIsSavingTerms(true);
     setTermsFeedback("");
 
     try {
-      const res = await fetch("/api/crm/profile", {
+      const res = await fetch("/api/crm/terms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          businessName: business?.businessName || "",
-          contactName: business?.contactName || user?.fullName || "",
-          mobileNumber: business?.mobileNumber || user?.phoneNumber || "",
-          email: business?.email || user?.email || "",
-          addressLine1: business?.addressLine1 || "",
-          addressLine2: business?.addressLine2 || "",
-          addressLine3: business?.addressLine3 || "",
-          otherInfo: standardTerms.trim(),
-          businessCategory: business?.businessCategory || "",
-          taxLabel: business?.taxLabel || "GSTIN",
-          taxNumber: business?.taxNumber || "",
-          state: business?.state || "",
-          logoUrl: business?.logoUrl || null,
-          signatureUrl: business?.signatureUrl || null,
-          signatureType: business?.signatureType || "draw",
+          terms: standardTerms.trim(),
         }),
       });
 
       const data = await res.json();
       if (data.success) {
-        setBusiness(data.business);
+        setBusiness((prev: any) => ({ ...prev, otherInfo: data.terms }));
+        setStandardTerms(data.terms || "");
         setTermsFeedback("Terms & Conditions saved successfully!");
         setTimeout(() => setTermsFeedback(""), 4000);
       } else {
@@ -905,7 +934,7 @@ export default function CrmDashboardPage() {
 
                 <button
                   type="button"
-                  onClick={() => setIsCustomerModalOpen(true)}
+                  onClick={openAddCustomer}
                   className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer self-start sm:self-auto"
                 >
                   <Plus size={15} />
@@ -926,7 +955,7 @@ export default function CrmDashboardPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setIsCustomerModalOpen(true)}
+                    onClick={openAddCustomer}
                     className="mt-2 px-4 py-2 rounded-xl bg-brand text-white text-xs font-bold shadow hover:bg-brand-hover transition-all cursor-pointer"
                   >
                     + Add First Customer
@@ -974,6 +1003,14 @@ export default function CrmDashboardPage() {
                                 className="px-3 py-1.5 rounded-lg bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold transition-colors cursor-pointer"
                               >
                                 + Quote
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openEditCustomer(c)}
+                                className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                title="Edit customer details"
+                              >
+                                <Edit3 size={14} />
                               </button>
                               <button
                                 type="button"
@@ -1161,6 +1198,21 @@ export default function CrmDashboardPage() {
           {/* ================= TAB 4: TEAM ================= */}
           {activeTab === "team" && (
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm space-y-6 animate-in fade-in duration-200">
+              {/* Read-Only Banner for Team Members */}
+              {!canManageTeam && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl flex items-start space-x-3 text-xs text-purple-900">
+                  <AlertCircle size={18} className="shrink-0 mt-0.5 text-purple-600" />
+                  <div>
+                    <strong className="block text-sm font-bold text-purple-950 mb-0.5">
+                      Team Roster (View Access Only)
+                    </strong>
+                    <span>
+                      You are viewing the team members roster for {businessName}. As a <strong>{user?.role || "Team Member"}</strong>, you have view access to team details. Adding or removing team members is managed by the business owner.
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
@@ -1284,7 +1336,7 @@ export default function CrmDashboardPage() {
 
                 <button
                   type="button"
-                  onClick={() => setIsProductModalOpen(true)}
+                  onClick={openAddProduct}
                   className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer self-start sm:self-auto"
                 >
                   <Plus size={15} />
@@ -1305,7 +1357,7 @@ export default function CrmDashboardPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setIsProductModalOpen(true)}
+                    onClick={openAddProduct}
                     className="mt-2 px-4 py-2 rounded-xl bg-brand text-white text-xs font-bold shadow hover:bg-brand-hover transition-all cursor-pointer"
                   >
                     + Add First Product
@@ -1341,14 +1393,24 @@ export default function CrmDashboardPage() {
                             ₹{Number(prod.basePrice).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                           </td>
                           <td className="py-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteProduct(prod.id)}
-                              className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                              title="Delete product"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            <div className="flex items-center justify-end space-x-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openEditProduct(prod)}
+                                className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                title="Edit product"
+                              >
+                                <Edit3 size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteProduct(prod.id)}
+                                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Delete product"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1375,26 +1437,24 @@ export default function CrmDashboardPage() {
                   </div>
                 </div>
 
-                {canManageBusiness && (
-                  <button
-                    type="button"
-                    onClick={handleSaveTerms}
-                    disabled={isSavingTerms}
-                    className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer self-start sm:self-auto disabled:opacity-60"
-                  >
-                    {isSavingTerms ? (
-                      <>
-                        <Loader2 size={15} className="animate-spin" />
-                        <span>Saving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <ShieldCheck size={15} />
-                        <span>Save Default Terms</span>
-                      </>
-                    )}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleSaveTerms}
+                  disabled={isSavingTerms}
+                  className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer self-start sm:self-auto disabled:opacity-60"
+                >
+                  {isSavingTerms ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck size={15} />
+                      <span>Save Default Terms</span>
+                    </>
+                  )}
+                </button>
               </div>
 
               {termsFeedback && (
@@ -1426,59 +1486,56 @@ export default function CrmDashboardPage() {
                   <textarea
                     value={standardTerms}
                     onChange={(e) => setStandardTerms(e.target.value)}
-                    disabled={!canManageBusiness}
+                    disabled={isSavingTerms}
                     rows={6}
                     placeholder="Enter standard validity, payment schedule, delivery timelines, taxes, and warranty policies..."
                     className="w-full px-4 py-3 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand disabled:bg-gray-50 disabled:text-gray-600"
                   />
                 </div>
 
-                {canManageBusiness ? (
-                  <div className="space-y-1.5 pt-1">
-                    <span className="text-[11px] font-bold uppercase text-gray-400">Quick Insert Clauses:</span>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Validity: 30 days from quote date.` : "• Validity: 30 days from quote date.")}
-                        className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
-                      >
-                        + 30 Days Validity
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Payment: 100% advance against Proforma Invoice.` : "• Payment: 100% advance against Proforma Invoice.")}
-                        className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
-                      >
-                        + 100% Advance Payment
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Delivery: 5 to 7 working days from confirmed PO.` : "• Delivery: 5 to 7 working days from confirmed PO.")}
-                        className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
-                      >
-                        + Delivery Timeline
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Warranty: 12 months manufacturer warranty from invoice date.` : "• Warranty: 12 months manufacturer warranty from invoice date.")}
-                        className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
-                      >
-                        + 12 Months Warranty
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Taxes: GST as applicable at the time of delivery.` : "• Taxes: GST as applicable at the time of delivery.")}
-                        className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
-                      >
-                        + GST Clause
-                      </button>
-                    </div>
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[11px] font-bold uppercase text-gray-400">Quick Insert Clauses:</span>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Validity: 30 days from quote date.` : "• Validity: 30 days from quote date.")}
+                      className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
+                    >
+                      + 30 Days Validity
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Payment: 100% advance against Proforma Invoice.` : "• Payment: 100% advance against Proforma Invoice.")}
+                      className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
+                    >
+                      + 100% Advance Payment
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Delivery: 5 to 7 working days from confirmed PO.` : "• Delivery: 5 to 7 working days from confirmed PO.")}
+                      className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
+                    >
+                      + Delivery Timeline
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Warranty: 12 months manufacturer warranty from invoice date.` : "• Warranty: 12 months manufacturer warranty from invoice date.")}
+                      className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
+                    >
+                      + 12 Months Warranty
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStandardTerms((prev) => prev ? `${prev}\n• Taxes: GST as applicable at the time of delivery.` : "• Taxes: GST as applicable at the time of delivery.")}
+                      className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium cursor-pointer transition-colors"
+                    >
+                      + GST Clause
+                    </button>
                   </div>
-                ) : (
-                  <p className="text-xs text-gray-500 italic">
-                    Terms & conditions can only be updated by the primary business owner.
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Standard terms are shared across your business and automatically loaded into new quotations.
                   </p>
-                )}
+                </div>
               </div>
             </div>
           )}
@@ -1664,12 +1721,21 @@ export default function CrmDashboardPage() {
         </div>
       )}
 
-      {/* Customer Creation Modal */}
+      {/* Customer Creation / Edit Modal */}
       <CustomerModal
         isOpen={isCustomerModalOpen}
-        onClose={() => setIsCustomerModalOpen(false)}
+        initialCustomer={editingCustomer}
+        onClose={() => {
+          setIsCustomerModalOpen(false);
+          setEditingCustomer(null);
+        }}
         onCustomerCreated={(newCust) => {
           setCustomers((prev) => [newCust, ...prev]);
+        }}
+        onCustomerSaved={(updatedCust) => {
+          setCustomers((prev) =>
+            prev.map((c) => (c.id === updatedCust.id ? updatedCust : c))
+          );
         }}
       />
 
@@ -1699,18 +1765,24 @@ export default function CrmDashboardPage() {
         onStatusChange={handleQuotationStatusChange}
       />
 
-      {/* Product Creation Modal */}
+      {/* Product Creation / Edit Modal */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 sm:p-8 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-5">
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Add New Product</h3>
-                <p className="text-xs text-gray-500">Save items, parts, or services for quotations</p>
+                <h3 className="text-lg font-bold text-gray-900">
+                  {editingProduct ? "Edit Product" : "Add New Product"}
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {editingProduct
+                    ? "Update item rates, category, and specifications"
+                    : "Save items, parts, or services for quotations"}
+                </p>
               </div>
               <button
                 type="button"
-                onClick={() => setIsProductModalOpen(false)}
+                onClick={closeProductModal}
                 className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
               >
                 <X size={18} />
@@ -1724,7 +1796,7 @@ export default function CrmDashboardPage() {
               </div>
             )}
 
-            <form onSubmit={handleCreateProduct} className="space-y-3.5">
+            <form onSubmit={handleSaveProduct} className="space-y-3.5">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
                   Product / Item Name *
@@ -1786,7 +1858,7 @@ export default function CrmDashboardPage() {
               <div className="pt-2 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsProductModalOpen(false)}
+                  onClick={closeProductModal}
                   className="flex-1 py-3 border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs rounded-xl cursor-pointer transition-colors"
                 >
                   Cancel
@@ -1802,7 +1874,7 @@ export default function CrmDashboardPage() {
                       <span>Saving...</span>
                     </>
                   ) : (
-                    <span>Add Product</span>
+                    <span>{editingProduct ? "Save Changes" : "Add Product"}</span>
                   )}
                 </button>
               </div>

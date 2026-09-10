@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { crmCustomers } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { getCrmSession } from "@/lib/crmAuth";
 import { resolveBusinessAndRole } from "@/lib/crmBusinessResolver";
 
@@ -87,6 +87,69 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PUT(request: Request) {
+  try {
+    const session = await getCrmSession();
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+    }
+
+    const { business } = await resolveBusinessAndRole(session.userId);
+    if (!business) {
+      return NextResponse.json({ success: false, error: "Business not found." }, { status: 404 });
+    }
+
+    const body = await request.json();
+    const { id, name, companyName, email, phone, address, city, state, pincode, gstin } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Customer ID is required." }, { status: 400 });
+    }
+
+    if (!name || !name.trim()) {
+      return NextResponse.json({ success: false, error: "Customer name is required." }, { status: 400 });
+    }
+
+    const customerId = parseInt(id, 10);
+    const updated = await db
+      .update(crmCustomers)
+      .set({
+        name: name.trim(),
+        companyName: companyName ? companyName.trim() : null,
+        email: email ? email.trim() : null,
+        phone: phone ? phone.trim() : null,
+        address: address ? address.trim() : null,
+        city: city ? city.trim() : null,
+        state: state ? state.trim() : null,
+        pincode: pincode ? pincode.trim() : null,
+        gstin: gstin ? gstin.trim() : null,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(crmCustomers.id, customerId),
+          eq(crmCustomers.businessId, business.id)
+        )
+      )
+      .returning();
+
+    if (!updated.length) {
+      return NextResponse.json({ success: false, error: "Customer not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      customer: updated[0],
+    });
+  } catch (error: any) {
+    console.error("Update customer error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to update customer." },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     const session = await getCrmSession();
@@ -106,7 +169,14 @@ export async function DELETE(request: Request) {
     }
 
     const id = parseInt(idParam, 10);
-    await db.delete(crmCustomers).where(eq(crmCustomers.id, id));
+    await db
+      .delete(crmCustomers)
+      .where(
+        and(
+          eq(crmCustomers.id, id),
+          eq(crmCustomers.businessId, business.id)
+        )
+      );
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
