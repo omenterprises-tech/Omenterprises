@@ -138,12 +138,12 @@ export default function CustomerModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
-        {/* Dark Header */}
-        <div className="bg-[#1E1E1E] text-white px-4 py-3.5 flex items-center space-x-3 shrink-0">
+        {/* Blue Theme Header */}
+        <div className="bg-brand text-white px-5 py-4 flex items-center space-x-3 shrink-0 shadow-sm">
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full text-white/90 hover:text-white hover:bg-white/15 transition-colors cursor-pointer"
             title="Back / Close"
           >
             <ArrowLeft size={20} />
@@ -325,7 +325,7 @@ export default function CustomerModal({
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 bg-[#1E1E1E] hover:bg-black text-white font-bold text-sm rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-4 bg-brand hover:bg-brand-hover text-white font-bold text-sm rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
             >
               {loading ? (
                 <>

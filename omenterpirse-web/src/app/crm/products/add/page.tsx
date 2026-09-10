@@ -79,20 +79,20 @@ export default function AddProductPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1E1E1E] flex flex-col justify-start items-center font-inter">
-      {/* Mobile-style Frame Container */}
-      <div className="w-full max-w-md min-h-screen bg-white flex flex-col shadow-2xl">
-        {/* Dark Mobile Header */}
-        <div className="bg-[#1E1E1E] text-white px-4 py-4 flex items-center space-x-3 sticky top-0 z-30 shadow-sm">
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-start items-center font-inter">
+      {/* Container */}
+      <div className="w-full max-w-md min-h-screen bg-white flex flex-col shadow-xl">
+        {/* Blue Theme Header */}
+        <div className="bg-brand text-white px-5 py-4 flex items-center space-x-3 sticky top-0 z-30 shadow-xs">
           <button
             type="button"
             onClick={() => router.push("/crm/products")}
-            className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full text-white/90 hover:text-white hover:bg-white/15 transition-colors cursor-pointer"
             title="Back to Products"
           >
-            <ArrowLeft size={22} />
+            <ArrowLeft size={20} />
           </button>
-          <h1 className="text-lg font-bold tracking-tight text-white">
+          <h1 className="text-base font-bold tracking-tight text-white">
             Add Product
           </h1>
         </div>
@@ -230,7 +230,7 @@ export default function AddProductPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 bg-[#1E1E1E] hover:bg-black text-white font-bold text-sm rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-4 bg-brand hover:bg-brand-hover text-white font-bold text-sm rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
             >
               {loading ? (
                 <>
@@ -238,7 +238,7 @@ export default function AddProductPage() {
                   <span>Saving...</span>
                 </>
               ) : (
-                <span>Add</span>
+                <span>Add Product</span>
               )}
             </button>
           </div>
