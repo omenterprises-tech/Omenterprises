@@ -66,8 +66,9 @@ export default function QuotationDetailPage({
   // Duplicate Loading
   const [isDuplicating, setIsDuplicating] = useState(false);
 
-  // Share Modal
+  // Share Modal & PDF Generation
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -240,26 +241,147 @@ export default function QuotationDetailPage({
     router.push(`/crm/quotations/create?edit=${quotation.id}`);
   };
 
-  // Handle Native Share or Share Modal
+  // Helper to generate high-resolution PDF Blob
+  const generateQuotationPdfBlob = async (): Promise<Blob | null> => {
+    const element = document.getElementById("quotation-sheet");
+    if (!element) return null;
+
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const { jsPDF } = await import("jspdf");
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pdfWidth = 210;
+      const pdfHeight = 297;
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      if (imgHeight <= pdfHeight) {
+        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, imgHeight);
+      } else {
+        let heightLeft = imgHeight;
+        let position = 0;
+
+        pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
+        heightLeft -= pdfHeight;
+
+        while (heightLeft > 0) {
+          position -= pdfHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
+          heightLeft -= pdfHeight;
+        }
+      }
+
+      return pdf.output("blob");
+    } catch (err) {
+      console.error("Failed to generate PDF blob:", err);
+      return null;
+    }
+  };
+
+  // Helper to trigger direct download of a Blob
+  const downloadPdfFile = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  };
+
+  // Handle Share as PDF File
   const handleShare = async () => {
     if (!quotation) return;
-    const shareTitle = `Quotation ${quotation.quotationNumber} from ${business?.businessName || "OM Enterprises"}`;
-    const shareText = `Please find attached quotation ${quotation.quotationNumber} for amount ₹${Number(quotation.grandTotal).toLocaleString("en-IN")}.`;
-    const shareUrl = window.location.href;
+    setIsGeneratingPdf(true);
 
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: shareTitle,
-          text: shareText,
-          url: shareUrl,
-        });
-        return;
-      } catch (err) {
-        // Fallback to modal
+    try {
+      const blob = await generateQuotationPdfBlob();
+      if (blob) {
+        const fileName = `Quotation_${quotation.quotationNumber || "Doc"}.pdf`;
+        const file = new File([blob], fileName, { type: "application/pdf" });
+
+        // If device supports sharing files directly (e.g. mobile devices, Safari, Edge)
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: `Quotation ${quotation.quotationNumber}`,
+              text: `Please find attached quotation ${quotation.quotationNumber} for amount ₹${Number(quotation.grandTotal).toLocaleString("en-IN")}.`,
+            });
+            setIsGeneratingPdf(false);
+            return;
+          } catch (shareErr: any) {
+            if (shareErr?.name === "AbortError") {
+              setIsGeneratingPdf(false);
+              return;
+            }
+          }
+        }
       }
+    } catch (err) {
+      console.error("PDF generation/sharing error:", err);
     }
+
+    setIsGeneratingPdf(false);
     setIsShareModalOpen(true);
+  };
+
+  // Handle direct download from modal
+  const handleDownloadPdf = async () => {
+    if (!quotation) return;
+    setIsGeneratingPdf(true);
+    const blob = await generateQuotationPdfBlob();
+    if (blob) {
+      const fileName = `Quotation_${quotation.quotationNumber || "Doc"}.pdf`;
+      downloadPdfFile(blob, fileName);
+      showToast("Quotation PDF downloaded successfully!");
+    } else {
+      showToast("Falling back to print dialog...");
+      handlePrint();
+    }
+    setIsGeneratingPdf(false);
+    setIsShareModalOpen(false);
+  };
+
+  // Handle WhatsApp PDF sharing
+  const handleWhatsAppPdfShare = async () => {
+    if (!quotation) return;
+    setIsGeneratingPdf(true);
+    const blob = await generateQuotationPdfBlob();
+    const fileName = `Quotation_${quotation.quotationNumber || "Doc"}.pdf`;
+    if (blob) {
+      downloadPdfFile(blob, fileName);
+    }
+    setIsGeneratingPdf(false);
+    setIsShareModalOpen(false);
+
+    showToast("PDF downloaded! Attach the file to your WhatsApp chat.");
+
+    const rawPhone = quotation.customerPhone?.replace(/[^0-9]/g, "") || "";
+    const cleanPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
+    const msg = `Hello ${quotation.customerName}, please find attached Quotation ${quotation.quotationNumber} for ₹${Number(quotation.grandTotal).toLocaleString("en-IN")} from ${business?.businessName || "OM Enterprises"}.`;
+    
+    const waUrl = cleanPhone
+      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+
+    window.open(waUrl, "_blank");
   };
 
   // Trigger Print / PDF
@@ -430,11 +552,12 @@ export default function QuotationDetailPage({
               <button
                 type="button"
                 onClick={handleShare}
-                className="hidden sm:inline-flex items-center space-x-1 px-3.5 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold transition-colors cursor-pointer"
-                title="Share Quotation"
+                disabled={isGeneratingPdf}
+                className="hidden sm:inline-flex items-center space-x-1 px-3.5 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                title="Share Quotation as PDF"
               >
-                <Share2 size={14} />
-                <span>Share</span>
+                {isGeneratingPdf ? <Loader2 size={14} className="animate-spin text-brand" /> : <Share2 size={14} />}
+                <span>{isGeneratingPdf ? "Generating PDF..." : "Share PDF"}</span>
               </button>
 
               <button
@@ -517,6 +640,7 @@ export default function QuotationDetailPage({
                 <img
                   src={business.logoUrl}
                   alt="Logo"
+                  crossOrigin="anonymous"
                   className="w-20 h-20 sm:w-24 sm:h-24 print:w-16 print:h-16 object-contain rounded-xl border border-gray-100 shadow-xs"
                 />
               ) : (
@@ -790,6 +914,7 @@ export default function QuotationDetailPage({
                     <img
                       src={business.signatureUrl}
                       alt="Signature"
+                      crossOrigin="anonymous"
                       className="max-h-full max-w-full object-contain"
                     />
                   ) : (
@@ -846,10 +971,11 @@ export default function QuotationDetailPage({
         <button
           type="button"
           onClick={handleShare}
-          className="flex flex-col items-center justify-center py-1 px-2 text-gray-700 hover:text-brand transition-colors cursor-pointer"
+          disabled={isGeneratingPdf}
+          className="flex flex-col items-center justify-center py-1 px-2 text-gray-700 hover:text-brand transition-colors cursor-pointer disabled:opacity-50"
         >
-          <Share2 size={20} />
-          <span className="text-[10px] font-bold mt-0.5">Share</span>
+          {isGeneratingPdf ? <Loader2 size={20} className="animate-spin text-brand" /> : <Share2 size={20} />}
+          <span className="text-[10px] font-bold mt-0.5">Share PDF</span>
         </button>
 
         <button
@@ -901,64 +1027,62 @@ export default function QuotationDetailPage({
 
 
 
-      {/* ================= SHARE OPTIONS MODAL ================= */}
+      {/* ================= SHARE OPTIONS MODAL (PDF ONLY) ================= */}
       {isShareModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <div className="flex items-center space-x-2">
                 <Share2 size={18} className="text-brand" />
-                <h4 className="text-base font-bold text-gray-900">Share Quotation</h4>
+                <h4 className="text-base font-bold text-gray-900">Share Quotation PDF</h4>
               </div>
               <button
                 type="button"
                 onClick={() => setIsShareModalOpen(false)}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded-full"
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-full cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="space-y-2.5">
-              {/* WhatsApp Share */}
-              <a
-                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                  `Hello ${quotation.customerName}, please find the quotation ${quotation.quotationNumber} from ${business?.businessName || "OM Enterprises"} for ₹${quotation.grandTotal}: ${typeof window !== "undefined" ? window.location.href : ""}`
-                )}`}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => setIsShareModalOpen(false)}
-                className="w-full py-3 bg-[#25D366] hover:bg-[#1EBE5D] text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center space-x-2 cursor-pointer"
-              >
-                <Send size={15} />
-                <span>Share via WhatsApp</span>
-              </a>
+            <p className="text-xs text-gray-600 leading-relaxed">
+              Export and share your quotation as an official PDF document:
+            </p>
 
-              {/* Print / Save PDF */}
+            <div className="space-y-2.5 pt-1">
+              {/* 1. Direct Download PDF */}
               <button
                 type="button"
-                onClick={() => {
-                  setIsShareModalOpen(false);
-                  window.print();
-                }}
-                className="w-full py-3 bg-brand hover:bg-brand-hover text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center space-x-2 cursor-pointer"
+                onClick={handleDownloadPdf}
+                disabled={isGeneratingPdf}
+                className="w-full py-3 bg-brand hover:bg-brand-hover text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
               >
-                <Printer size={15} />
-                <span>Print / Save as PDF</span>
+                {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                <span>Download PDF Document</span>
               </button>
 
-              {/* Copy Link */}
+              {/* 2. WhatsApp PDF Share */}
+              <button
+                type="button"
+                onClick={handleWhatsAppPdfShare}
+                disabled={isGeneratingPdf}
+                className="w-full py-3 bg-[#25D366] hover:bg-[#1EBE5D] text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+              >
+                {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                <span>Send PDF via WhatsApp</span>
+              </button>
+
+              {/* 3. Print / Save as PDF */}
               <button
                 type="button"
                 onClick={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                  showToast("Quotation link copied to clipboard!");
                   setIsShareModalOpen(false);
+                  handlePrint();
                 }}
                 className="w-full py-3 border border-gray-300 text-gray-700 font-bold text-xs rounded-xl hover:bg-gray-50 transition-all cursor-pointer flex items-center justify-center space-x-2"
               >
-                <Copy size={15} />
-                <span>Copy Quotation Link</span>
+                <Printer size={15} />
+                <span>Print / Save via Print Dialog</span>
               </button>
             </div>
           </div>
