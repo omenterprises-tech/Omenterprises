@@ -11,18 +11,13 @@ import {
   Edit3,
   Loader2,
   Check,
-  CheckSquare,
-  Square,
   X,
   User,
   Package,
   FileText,
   DollarSign,
   AlertCircle,
-  Building2,
-  Percent,
-  PlusCircle,
-  HelpCircle,
+  Calculator,
 } from "lucide-react";
 import CustomerModal from "@/components/crm/CustomerModal";
 import ProductModal from "@/components/crm/ProductModal";
@@ -67,14 +62,14 @@ function MakeQuotationContent() {
   );
   const [otherInfo, setOtherInfo] = useState("");
 
-  // Customer State
+  // 1. Customer State
   const [customers, setCustomers] = useState<any[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [isCustomerSelectOpen, setIsCustomerSelectOpen] = useState(false);
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
 
-  // Products State
+  // 2. Products State
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [selectedItems, setSelectedItems] = useState<QuotationItem[]>([]);
   const [isProductSelectOpen, setIsProductSelectOpen] = useState(false);
@@ -91,22 +86,24 @@ function MakeQuotationContent() {
   const [cfgDescription, setCfgDescription] = useState("");
   const [cfgTaxPercent, setCfgTaxPercent] = useState("18");
   const [cfgHsn, setCfgHsn] = useState("");
-  const [cfgUnit, setCfgUnit] = useState("PCS");
+  const [cfgUnit, setCfgUnit] = useState("COILS");
 
-  // Other Charge State
+  // 3. Other Charge State
   const [isOtherChargeOpen, setIsOtherChargeOpen] = useState(false);
   const [otherCharge, setOtherCharge] = useState<OtherChargeData | null>(null);
   const [ocLabel, setOcLabel] = useState("Transportation / Delivery Charges");
   const [ocAmount, setOcAmount] = useState("");
   const [ocIsTaxable, setOcIsTaxable] = useState(false);
 
-  // Terms & Conditions State
-  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  // 4. Terms & Conditions State
   const [termsList, setTermsList] = useState<TermItem[]>([]);
   const [selectedTermIds, setSelectedTermIds] = useState<string[]>([]);
   const [isEditingTerms, setIsEditingTerms] = useState(false);
 
-  // Submission
+  // 5. Round Off State
+  const [isRoundOff, setIsRoundOff] = useState(true);
+
+  // Submission State
   const [isGenerating, setIsGenerating] = useState(false);
   const [submissionError, setSubmissionError] = useState("");
 
@@ -246,7 +243,7 @@ function MakeQuotationContent() {
     init();
   }, [router, editId]);
 
-  // Calculations
+  // Financial Calculations
   const subtotal = useMemo(() => {
     return selectedItems.reduce((acc, it) => acc + (Number(it.total) || 0), 0);
   }, [selectedItems]);
@@ -266,9 +263,22 @@ function MakeQuotationContent() {
     return Math.round((itemsTax + ocTax) * 100) / 100;
   }, [selectedItems, otherCharge, otherChargeAmount]);
 
-  const amountDue = useMemo(() => {
-    return Math.round((subtotal + otherChargeAmount + taxTotal) * 100) / 100;
+  const rawAmountDue = useMemo(() => {
+    return subtotal + otherChargeAmount + taxTotal;
   }, [subtotal, otherChargeAmount, taxTotal]);
+
+  const roundOffDifference = useMemo(() => {
+    if (!isRoundOff) return 0;
+    const rounded = Math.round(rawAmountDue);
+    return Math.round((rounded - rawAmountDue) * 100) / 100;
+  }, [rawAmountDue, isRoundOff]);
+
+  const amountDue = useMemo(() => {
+    if (isRoundOff) {
+      return Math.round(rawAmountDue);
+    }
+    return Math.round(rawAmountDue * 100) / 100;
+  }, [rawAmountDue, isRoundOff]);
 
   // Filtered customers
   const filteredCustomers = useMemo(() => {
@@ -385,6 +395,11 @@ function MakeQuotationContent() {
     setTermsList((prev) => prev.map((t) => (t.id === id ? { ...t, text } : t)));
   };
 
+  const removeTermItem = (id: string) => {
+    setTermsList((prev) => prev.filter((t) => t.id !== id));
+    setSelectedTermIds((prev) => prev.filter((item) => item !== id));
+  };
+
   const addNewTermItem = () => {
     const newId = `term-${Date.now()}`;
     const newTerm = { id: newId, text: "" };
@@ -398,12 +413,12 @@ function MakeQuotationContent() {
     setSubmissionError("");
 
     if (!selectedCustomer) {
-      setSubmissionError("Please select a customer (TO CUSTOMER) for this quotation.");
+      setSubmissionError("Please select a customer under 'TO (CUSTOMER)' for this quotation.");
       return;
     }
 
     if (selectedItems.length === 0) {
-      setSubmissionError("Please add at least one product under PRODUCTS.");
+      setSubmissionError("Please add at least one product under 'PRODUCTS'.");
       return;
     }
 
@@ -487,10 +502,10 @@ function MakeQuotationContent() {
   const businessName = business?.businessName || "OM ENTERPRISES";
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-gray-900 font-inter flex flex-col pb-16">
+    <div className="min-h-screen bg-[#F8FAFC] text-gray-900 font-inter flex flex-col pb-36 sm:pb-32">
       {/* ================= FULL-SCREEN TOP HEADER (Website Brand Styling) ================= */}
       <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200/80 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
               <button
@@ -504,14 +519,14 @@ function MakeQuotationContent() {
               <div>
                 <div className="flex items-center space-x-2">
                   <h1 className="text-lg font-bold text-gray-900 tracking-tight">
-                    {editId ? "Edit Quotation" : "Create New Quotation"}
+                    {editId ? "Edit Quotation" : "Make Quotation"}
                   </h1>
                   <span className="text-[10px] bg-brand/10 text-brand font-bold uppercase px-2.5 py-0.5 rounded-full">
-                    {editId ? quotationNo : "Draft"}
+                    {editId ? quotationNo : "New"}
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 font-medium">
-                  {businessName} • Formal Client Quotation
+                  {businessName} • Formal Quotation Generator
                 </p>
               </div>
             </div>
@@ -522,33 +537,15 @@ function MakeQuotationContent() {
                 onClick={() => router.push("/crm/quotations")}
                 className="hidden sm:inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors cursor-pointer"
               >
-                View Quotation Ledger
-              </button>
-              <button
-                type="button"
-                onClick={handleGenerateQuotation}
-                disabled={isGenerating}
-                className="px-5 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>{editId ? "Saving..." : "Generating..."}</span>
-                  </>
-                ) : (
-                  <>
-                    <Check size={15} />
-                    <span>{editId ? "Update Quotation" : "Generate Quotation"}</span>
-                  </>
-                )}
+                Quotation Ledger
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* ================= FULL-SCREEN MAIN WORKSPACE ================= */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+      {/* ================= MAIN VERTICAL STACK ================= */}
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
         {/* Error Notification */}
         {submissionError && (
           <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-xs text-rose-800 font-medium animate-in fade-in">
@@ -575,7 +572,7 @@ function MakeQuotationContent() {
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
-                Quotation Number
+                Quotation No
               </label>
               <div className="px-3.5 py-2.5 bg-gray-100/70 rounded-xl border border-gray-200 text-sm font-bold text-gray-700">
                 {quotationNo === "-" ? "Auto-generated on save" : quotationNo}
@@ -597,410 +594,487 @@ function MakeQuotationContent() {
           </div>
         </div>
 
-        {/* Workspace 2-Column Responsive Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* LEFT COLUMN: Customer & Products (7 Columns on large screens) */}
-          <div className="lg:col-span-8 space-y-6">
-            {/* 1. TO (CUSTOMER) SECTION */}
-            <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
-                    <User size={16} />
-                  </div>
-                  <h3 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
-                    TO (CUSTOMER)
-                  </h3>
-                </div>
-
-                {!selectedCustomer ? (
-                  <button
-                    type="button"
-                    onClick={() => setIsCustomerSelectOpen(true)}
-                    className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-                  >
-                    <Plus size={14} />
-                    <span>Select Customer</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsCustomerSelectOpen(true)}
-                    className="text-xs font-bold text-brand hover:underline cursor-pointer"
-                  >
-                    Change Customer
-                  </button>
-                )}
+        {/* ---------------- 1. TO (CUSTOMER) ---------------- */}
+        <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3.5">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
+                <User size={17} />
               </div>
-
-              {!selectedCustomer ? (
-                <div
-                  onClick={() => setIsCustomerSelectOpen(true)}
-                  className="p-8 border-2 border-dashed border-gray-200 hover:border-brand rounded-2xl text-center cursor-pointer transition-colors bg-gray-50/50 hover:bg-blue-50/20 group"
-                >
-                  <div className="w-12 h-12 rounded-full bg-brand/10 text-brand flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
-                    <Plus size={22} />
-                  </div>
-                  <h4 className="text-sm font-bold text-gray-800">Add Customer to Quotation</h4>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Click to select from registered customers or register a new one
-                  </p>
-                </div>
-              ) : (
-                <div className="p-4 rounded-2xl bg-blue-50/40 border border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-bold text-gray-900">{selectedCustomer.name}</h4>
-                      {selectedCustomer.companyName && (
-                        <span className="text-xs font-semibold px-2 py-0.5 bg-blue-100 text-brand rounded-md">
-                          {selectedCustomer.companyName}
-                        </span>
-                      )}
-                    </div>
-                    {selectedCustomer.addressLine1 && (
-                      <p className="text-xs text-gray-600">{selectedCustomer.addressLine1}</p>
-                    )}
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 pt-0.5">
-                      {selectedCustomer.phone && <span>Phone: {selectedCustomer.phone}</span>}
-                      {selectedCustomer.email && <span>Email: {selectedCustomer.email}</span>}
-                      {selectedCustomer.gstin && (
-                        <span className="font-semibold text-brand">GSTIN: {selectedCustomer.gstin}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCustomer(null)}
-                    className="p-2 text-gray-400 hover:text-rose-600 hover:bg-white rounded-xl transition-colors cursor-pointer self-end sm:self-center"
-                    title="Remove Customer"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              )}
+              <div>
+                <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+                  TO (CUSTOMER)
+                </h2>
+                <p className="text-[11px] text-gray-500">
+                  {selectedCustomer ? "Client selected for quotation" : "Add recipient customer details"}
+                </p>
+              </div>
             </div>
 
-            {/* 2. PRODUCTS SECTION */}
-            <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
-                    <Package size={16} />
-                  </div>
-                  <h3 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
-                    PRODUCTS ({selectedItems.length})
-                  </h3>
-                </div>
+            <button
+              type="button"
+              onClick={() => setIsCustomerSelectOpen(true)}
+              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-brand hover:text-white text-gray-700 flex items-center justify-center transition-all cursor-pointer shadow-xs"
+              title={selectedCustomer ? "Change Customer" : "Add Customer"}
+            >
+              <Plus size={16} />
+            </button>
+          </div>
 
+          {!selectedCustomer ? (
+            <div
+              onClick={() => setIsCustomerSelectOpen(true)}
+              className="p-6 border-2 border-dashed border-gray-200 hover:border-brand rounded-2xl text-center cursor-pointer transition-all bg-gray-50/50 hover:bg-blue-50/20 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
+                <Plus size={20} />
+              </div>
+              <h4 className="text-sm font-bold text-gray-800">Select or Add Customer</h4>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Click here to choose an existing client or register a new customer
+              </p>
+            </div>
+          ) : (
+            <div className="p-4 rounded-2xl bg-blue-50/40 border border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-bold text-gray-900">{selectedCustomer.name}</h4>
+                  {selectedCustomer.companyName && (
+                    <span className="text-xs font-semibold px-2.5 py-0.5 bg-blue-100 text-brand rounded-md">
+                      {selectedCustomer.companyName}
+                    </span>
+                  )}
+                </div>
+                {selectedCustomer.addressLine1 && (
+                  <p className="text-xs text-gray-600">{selectedCustomer.addressLine1}</p>
+                )}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 pt-0.5">
+                  {selectedCustomer.phone && <span>Phone: {selectedCustomer.phone}</span>}
+                  {selectedCustomer.email && <span>Email: {selectedCustomer.email}</span>}
+                  {selectedCustomer.gstin && (
+                    <span className="font-semibold text-brand">GSTIN: {selectedCustomer.gstin}</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 self-end sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => setIsCustomerSelectOpen(true)}
+                  className="px-3 py-1.5 bg-white border border-gray-200 hover:border-brand text-brand hover:bg-brand/5 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                >
+                  Change
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCustomer(null)}
+                  className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-white rounded-xl transition-colors cursor-pointer"
+                  title="Remove Customer"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* ---------------- 2. PRODUCTS ---------------- */}
+        <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3.5">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
+                <Package size={17} />
+              </div>
+              <div>
+                <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+                  PRODUCTS
+                </h2>
+                <p className="text-[11px] text-gray-500">
+                  {selectedItems.length} {selectedItems.length === 1 ? "item" : "items"} added
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsProductSelectOpen(true)}
+              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-brand hover:text-white text-gray-700 flex items-center justify-center transition-all cursor-pointer shadow-xs"
+              title="Add Product"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+
+          {selectedItems.length === 0 ? (
+            <div
+              onClick={() => setIsProductSelectOpen(true)}
+              className="p-6 border-2 border-dashed border-gray-200 hover:border-brand rounded-2xl text-center cursor-pointer transition-all bg-gray-50/50 hover:bg-blue-50/20 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
+                <Plus size={20} />
+              </div>
+              <h4 className="text-sm font-bold text-gray-800">Add Products / Line Items</h4>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Select from catalog or define custom product with rate, quantity, and GST
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="overflow-x-auto border border-gray-200 rounded-2xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-50 border-b border-gray-200 font-extrabold text-gray-700 uppercase tracking-wider text-[11px]">
+                    <tr>
+                      <th className="p-3 text-center w-10">#</th>
+                      <th className="p-3">Item Description</th>
+                      <th className="p-3 text-center w-16">HSN</th>
+                      <th className="p-3 text-center w-20">Qty</th>
+                      <th className="p-3 text-right w-24">Rate (₹)</th>
+                      <th className="p-3 text-center w-16">GST %</th>
+                      <th className="p-3 text-right w-28">Amount (₹)</th>
+                      <th className="p-3 text-center w-16">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {selectedItems.map((item, idx) => (
+                      <tr key={item.id} className="hover:bg-blue-50/30 transition-colors">
+                        <td className="p-3 text-center font-medium text-gray-400">{idx + 1}</td>
+                        <td className="p-3">
+                          <span className="font-bold text-gray-900 block">{item.name}</span>
+                          {item.description && (
+                            <span className="text-[11px] text-gray-500 font-normal block mt-0.5">
+                              {item.description}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center text-gray-500">{item.hsn || "85446020"}</td>
+                        <td className="p-3 text-center font-bold text-gray-800">
+                          {item.quantity} <span className="text-[10px] text-gray-500 uppercase">{item.unit || "COILS"}</span>
+                        </td>
+                        <td className="p-3 text-right font-medium text-gray-800">
+                          ₹{item.unitPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-3 text-center font-medium text-gray-600">{item.taxPercent}%</td>
+                        <td className="p-3 text-right font-bold text-gray-900">
+                          ₹{item.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-3 text-center">
+                          <div className="flex items-center justify-center space-x-1">
+                            <button
+                              type="button"
+                              onClick={() => openProductConfigurator(item, idx)}
+                              className="p-1 text-gray-400 hover:text-brand transition-colors cursor-pointer"
+                              title="Edit Item"
+                            >
+                              <Edit3 size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedItems((prev) => prev.filter((_, i) => i !== idx))
+                              }
+                              className="p-1 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
+                              title="Remove Item"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex justify-end">
                 <button
                   type="button"
                   onClick={() => setIsProductSelectOpen(true)}
-                  className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl border border-gray-200 hover:border-brand text-brand hover:bg-brand/5 text-xs font-bold transition-all cursor-pointer"
                 >
                   <Plus size={14} />
-                  <span>+ Add Product</span>
+                  <span>+ Add Another Product</span>
                 </button>
               </div>
+            </div>
+          )}
+        </section>
 
-              {selectedItems.length === 0 ? (
-                <div
-                  onClick={() => setIsProductSelectOpen(true)}
-                  className="p-8 border-2 border-dashed border-gray-200 hover:border-brand rounded-2xl text-center cursor-pointer transition-colors bg-gray-50/50 hover:bg-blue-50/20 group"
-                >
-                  <div className="w-12 h-12 rounded-full bg-brand/10 text-brand flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
-                    <Plus size={22} />
-                  </div>
-                  <h4 className="text-sm font-bold text-gray-800">Add Products / Services</h4>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Select from catalog with custom quantities, rates, and notes
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto border border-gray-200 rounded-2xl">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-gray-50 border-b border-gray-200 font-extrabold text-gray-700 uppercase tracking-wider text-[11px]">
-                      <tr>
-                        <th className="p-3 text-center w-10">#</th>
-                        <th className="p-3">Item Description</th>
-                        <th className="p-3 text-center w-16">HSN</th>
-                        <th className="p-3 text-center w-20">Qty</th>
-                        <th className="p-3 text-right w-24">Rate (₹)</th>
-                        <th className="p-3 text-center w-16">GST %</th>
-                        <th className="p-3 text-right w-28">Amount (₹)</th>
-                        <th className="p-3 text-center w-16">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {selectedItems.map((item, idx) => (
-                        <tr key={item.id} className="hover:bg-blue-50/30 transition-colors">
-                          <td className="p-3 text-center font-medium text-gray-400">{idx + 1}</td>
-                          <td className="p-3">
-                            <span className="font-bold text-gray-900 block">{item.name}</span>
-                            {item.description && (
-                              <span className="text-[11px] text-gray-500 font-normal block mt-0.5">
-                                {item.description}
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-3 text-center text-gray-500">{item.hsn || "85446020"}</td>
-                          <td className="p-3 text-center font-bold text-gray-800">
-                            {item.quantity} <span className="text-[10px] text-gray-500 uppercase">{item.unit || "COILS"}</span>
-                          </td>
-                          <td className="p-3 text-right font-medium text-gray-800">
-                            ₹{item.unitPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="p-3 text-center font-medium text-gray-600">{item.taxPercent}%</td>
-                          <td className="p-3 text-right font-bold text-gray-900">
-                            ₹{item.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="p-3 text-center">
-                            <div className="flex items-center justify-center space-x-1">
-                              <button
-                                type="button"
-                                onClick={() => openProductConfigurator(item, idx)}
-                                className="p-1 text-gray-400 hover:text-brand transition-colors cursor-pointer"
-                                title="Edit Item"
-                              >
-                                <Edit3 size={15} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setSelectedItems((prev) => prev.filter((_, i) => i !== idx))
-                                }
-                                className="p-1 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
-                                title="Remove Item"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+        {/* ---------------- 3. OTHER CHARGES ---------------- */}
+        <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3.5">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
+                <DollarSign size={17} />
+              </div>
+              <div>
+                <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+                  OTHER CHARGES
+                </h2>
+                <p className="text-[11px] text-gray-500">
+                  {otherCharge ? "Additional charges configured" : "Optional freight, transport, packaging, or handling"}
+                </p>
+              </div>
             </div>
 
-            {/* 3. TERMS & CONDITIONS SECTION */}
-            <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
-                    <FileText size={16} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
-                      TERMS & CONDITIONS
-                    </h3>
-                    <p className="text-xs text-gray-500">
-                      {selectedTermIds.length} of {termsList.length} clauses selected for quote
-                    </p>
-                  </div>
-                </div>
+            <button
+              type="button"
+              onClick={() => {
+                setOcLabel(otherCharge?.label || "Transportation / Delivery Charges");
+                setOcAmount(otherCharge ? String(otherCharge.amount) : "");
+                setOcIsTaxable(otherCharge ? otherCharge.isTaxable : false);
+                setIsOtherChargeOpen(true);
+              }}
+              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-brand hover:text-white text-gray-700 flex items-center justify-center transition-all cursor-pointer shadow-xs"
+              title={otherCharge ? "Edit Other Charge" : "Add Other Charge"}
+            >
+              <Plus size={16} />
+            </button>
+          </div>
 
-                <div className="flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingTerms((prev) => !prev)}
-                    className="flex items-center space-x-1 px-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors cursor-pointer"
-                  >
-                    <Edit3 size={13} />
-                    <span>{isEditingTerms ? "Finish Editing" : "Edit Points"}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={addNewTermItem}
-                    className="flex items-center space-x-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    <Plus size={13} />
-                    <span>+ Add Clause</span>
-                  </button>
+          {!otherCharge ? (
+            <div
+              onClick={() => {
+                setOcLabel("Transportation / Delivery Charges");
+                setOcAmount("");
+                setOcIsTaxable(false);
+                setIsOtherChargeOpen(true);
+              }}
+              className="p-5 border border-dashed border-gray-200 hover:border-brand rounded-2xl flex items-center justify-between cursor-pointer transition-colors bg-gray-50/50 hover:bg-blue-50/20 group"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Plus size={16} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-gray-800">Add Other Charge</h4>
+                  <p className="text-[11px] text-gray-500">Freight, courier, packaging, or installation charges</p>
                 </div>
               </div>
-
-              {/* Select All Checkbox */}
-              <div className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold text-gray-700">
-                <span>Select All Clauses</span>
-                <input
-                  type="checkbox"
-                  checked={selectedTermIds.length === termsList.length && termsList.length > 0}
-                  onChange={handleSelectAllTerms}
-                  className="w-4 h-4 rounded-md accent-brand cursor-pointer"
-                />
+              <span className="text-xs font-bold text-brand group-hover:underline">+ Add</span>
+            </div>
+          ) : (
+            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-between">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-900">{otherCharge.label}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${otherCharge.isTaxable ? "bg-amber-100 text-amber-800" : "bg-gray-200 text-gray-700"}`}>
+                    {otherCharge.isTaxable ? "+18% GST Applicable" : "Non-Taxable"}
+                  </span>
+                </div>
+                <div className="text-sm font-extrabold text-gray-900">
+                  ₹{otherCharge.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </div>
               </div>
 
-              {/* Terms Points Checklist */}
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {termsList.map((term) => (
-                  <div
-                    key={term.id}
-                    className="p-3 bg-white rounded-xl border border-gray-200/90 shadow-xs flex items-center justify-between gap-3 hover:border-gray-300 transition-all"
-                  >
-                    {isEditingTerms ? (
-                      <input
-                        type="text"
-                        value={term.text}
-                        onChange={(e) => updateTermText(term.id, e.target.value)}
-                        placeholder="Type terms condition clause..."
-                        className="w-full border-b border-gray-300 focus:border-brand text-xs text-gray-900 py-1 focus:outline-none"
-                      />
-                    ) : (
-                      <span className="text-xs font-medium text-gray-800 leading-snug">
-                        {term.text}
-                      </span>
-                    )}
-
-                    <input
-                      type="checkbox"
-                      checked={selectedTermIds.includes(term.id)}
-                      onChange={() => handleToggleTerm(term.id)}
-                      className="w-4 h-4 rounded-md accent-brand shrink-0 cursor-pointer"
-                    />
-                  </div>
-                ))}
+              <div className="flex items-center space-x-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOcLabel(otherCharge.label);
+                    setOcAmount(String(otherCharge.amount));
+                    setOcIsTaxable(otherCharge.isTaxable);
+                    setIsOtherChargeOpen(true);
+                  }}
+                  className="p-1.5 text-gray-500 hover:text-brand hover:bg-white rounded-lg transition-all cursor-pointer"
+                  title="Edit Charge"
+                >
+                  <Edit3 size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOtherCharge(null)}
+                  className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all cursor-pointer"
+                  title="Remove Charge"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
+            </div>
+          )}
+        </section>
+
+        {/* ---------------- 4. TERMS & CONDITIONS ---------------- */}
+        <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3.5">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
+                <FileText size={17} />
+              </div>
+              <div>
+                <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+                  TERMS & CONDITIONS
+                </h2>
+                <p className="text-[11px] text-gray-500">
+                  {selectedTermIds.length} of {termsList.length} clauses selected for quotation
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => setIsEditingTerms((prev) => !prev)}
+                className="flex items-center space-x-1 px-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors cursor-pointer"
+              >
+                <Edit3 size={13} />
+                <span>{isEditingTerms ? "Finish Editing" : "Edit Points"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={addNewTermItem}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-brand hover:text-white text-gray-700 flex items-center justify-center transition-all cursor-pointer shadow-xs"
+                title="Add Clause"
+              >
+                <Plus size={16} />
+              </button>
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Financial Summary & Other Charges (4 Columns on large screens) */}
-          <div className="lg:col-span-4 space-y-6">
-            {/* OTHER CHARGE CARD */}
-            <div className="bg-white rounded-2xl sm:rounded-3xl p-5 border border-gray-200/80 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center font-bold">
-                    <DollarSign size={14} />
-                  </div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">
-                    Other Charges
-                  </h4>
+          {/* Select All Checkbox */}
+          <div className="flex items-center justify-between px-3.5 py-2.5 bg-gray-50 rounded-xl text-xs font-bold text-gray-700">
+            <span>Select All Clauses</span>
+            <input
+              type="checkbox"
+              checked={selectedTermIds.length === termsList.length && termsList.length > 0}
+              onChange={handleSelectAllTerms}
+              className="w-4 h-4 rounded-md accent-brand cursor-pointer"
+            />
+          </div>
+
+          {/* Terms Points Checklist */}
+          <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+            {termsList.map((term, idx) => (
+              <div
+                key={term.id}
+                className="p-3.5 bg-white rounded-xl border border-gray-200/90 shadow-xs flex items-center justify-between gap-3 hover:border-gray-300 transition-all"
+              >
+                <div className="flex items-center space-x-2.5 flex-1">
+                  <span className="text-xs font-bold text-gray-400 w-5">{idx + 1}.</span>
+                  {isEditingTerms ? (
+                    <input
+                      type="text"
+                      value={term.text}
+                      onChange={(e) => updateTermText(term.id, e.target.value)}
+                      placeholder="Type terms condition clause..."
+                      className="w-full border-b border-gray-300 focus:border-brand text-xs text-gray-900 py-1 focus:outline-none"
+                    />
+                  ) : (
+                    <span className="text-xs font-medium text-gray-800 leading-snug">
+                      {term.text}
+                    </span>
+                  )}
                 </div>
 
-                {!otherCharge && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOcLabel("Transportation / Delivery Charges");
-                      setOcAmount("");
-                      setOcIsTaxable(false);
-                      setIsOtherChargeOpen(true);
-                    }}
-                    className="text-xs font-bold text-brand hover:underline cursor-pointer"
-                  >
-                    + Add Charge
-                  </button>
-                )}
-              </div>
-
-              {!otherCharge ? (
-                <p className="text-xs text-gray-500">
-                  Add optional freight, insurance, packaging, or installation charges.
-                </p>
-              ) : (
-                <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-gray-900 block">{otherCharge.label}</span>
-                    <span className="text-[11px] text-gray-500">
-                      ₹{otherCharge.amount.toLocaleString("en-IN")}{" "}
-                      {otherCharge.isTaxable ? "(+18% GST applicable)" : "(Non-taxable)"}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-2 shrink-0">
+                  {isEditingTerms && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setOcLabel(otherCharge.label);
-                        setOcAmount(String(otherCharge.amount));
-                        setOcIsTaxable(otherCharge.isTaxable);
-                        setIsOtherChargeOpen(true);
-                      }}
-                      className="p-1 text-gray-400 hover:text-brand"
-                    >
-                      <Edit3 size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOtherCharge(null)}
-                      className="p-1 text-gray-400 hover:text-rose-600"
+                      onClick={() => removeTermItem(term.id)}
+                      className="p-1 text-gray-400 hover:text-rose-600 transition-colors"
+                      title="Delete Clause"
                     >
                       <Trash2 size={14} />
                     </button>
-                  </div>
+                  )}
+                  <input
+                    type="checkbox"
+                    checked={selectedTermIds.includes(term.id)}
+                    onChange={() => handleToggleTerm(term.id)}
+                    className="w-4 h-4 rounded-md accent-brand cursor-pointer"
+                  />
                 </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ---------------- 5. ROUND OFF CHARGE CHECKBOX ---------------- */}
+        <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start sm:items-center space-x-3">
+              <input
+                type="checkbox"
+                id="round-off-checkbox"
+                checked={isRoundOff}
+                onChange={(e) => setIsRoundOff(e.target.checked)}
+                className="w-5 h-5 mt-0.5 sm:mt-0 rounded-md accent-brand cursor-pointer shrink-0"
+              />
+              <label
+                htmlFor="round-off-checkbox"
+                className="cursor-pointer select-none"
+              >
+                <span className="text-sm font-bold text-gray-900 block">
+                  Round off total amount to nearest Rupee
+                </span>
+                <span className="text-xs text-gray-500 block mt-0.5">
+                  Automatically rounds the grand total to the nearest whole rupee (₹)
+                </span>
+              </label>
+            </div>
+
+            {isRoundOff && (
+              <div className="self-end sm:self-center px-3 py-1.5 bg-blue-50 border border-blue-200 text-brand rounded-xl text-xs font-bold flex items-center space-x-1.5">
+                <Calculator size={14} />
+                <span>
+                  Adjustment: {roundOffDifference >= 0 ? `+₹${roundOffDifference.toFixed(2)}` : `-₹${Math.abs(roundOffDifference).toFixed(2)}`}
+                </span>
+              </div>
+            )}
+          </div>
+        </section>
+      </main>
+
+      {/* ================= DYNAMIC STICKY FOOTER (ALWAYS VISIBLE AT BOTTOM) ================= */}
+      <footer className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200/90 shadow-[0_-4px_25px_rgba(0,0,0,0.08)] py-3 sm:py-3.5 px-4 sm:px-8">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+          {/* Left / Center: Live Financial Breakdown */}
+          <div className="w-full sm:w-auto flex flex-wrap items-baseline justify-between sm:justify-start gap-x-4 gap-y-1">
+            <div className="flex items-baseline space-x-2">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                Amount Due:
+              </span>
+              <span className="text-2xl sm:text-3xl font-black text-brand tracking-tight">
+                ₹{amountDue.toLocaleString("en-IN", { minimumFractionDigits: isRoundOff ? 0 : 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            <div className="text-[11px] text-gray-500 flex flex-wrap gap-x-2.5 font-medium">
+              <span>Subtotal: ₹{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+              {otherCharge && otherCharge.amount > 0 && (
+                <span>• Other: ₹{otherCharge.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+              )}
+              <span>• GST: ₹{taxTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+              {isRoundOff && roundOffDifference !== 0 && (
+                <span className="text-brand font-semibold">
+                  • Round-Off: {roundOffDifference > 0 ? "+" : ""}₹{roundOffDifference.toFixed(2)}
+                </span>
               )}
             </div>
+          </div>
 
-            {/* FINANCIAL TOTALS SUMMARY CARD */}
-            <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-md space-y-4">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 border-b border-gray-100 pb-2.5">
-                Quotation Financial Breakdown
-              </h4>
-
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between text-gray-600">
-                  <span>Items Subtotal ({selectedItems.length}):</span>
-                  <span className="font-semibold text-gray-900">
-                    ₹{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-
-                {otherCharge && Number(otherCharge.amount) > 0 && (
-                  <div className="flex justify-between text-gray-600">
-                    <span>{otherCharge.label}:</span>
-                    <span className="font-semibold text-gray-900">
-                      ₹{otherCharge.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex justify-between text-gray-600">
-                  <span>Tax Amount (GST):</span>
-                  <span className="font-semibold text-gray-900">
-                    ₹{taxTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-
-                <div className="border-t border-gray-200 pt-3 flex justify-between items-center text-sm font-black text-brand">
-                  <span>Total Amount Due:</span>
-                  <span className="text-lg text-brand">
-                    ₹{amountDue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-2 space-y-2.5">
-                <button
-                  type="button"
-                  onClick={handleGenerateQuotation}
-                  disabled={isGenerating}
-                  className="w-full py-3.5 bg-brand hover:bg-brand-hover text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg hover:shadow-xl transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>{editId ? "Updating Quotation..." : "Generating Quotation..."}</span>
-                    </>
-                  ) : (
-                    <span>{editId ? "Update Quotation" : "Generate Official Quotation"}</span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => router.push(editId ? `/crm/quotations/${editId}` : "/crm/dashboard")}
-                  className="w-full py-2.5 rounded-xl border border-gray-200 hover:bg-gray-100 text-gray-600 font-bold text-xs transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+          {/* Right: Prominent Generate / Save Button */}
+          <div className="w-full sm:w-auto flex items-center justify-end space-x-3">
+            <button
+              type="button"
+              onClick={handleGenerateQuotation}
+              disabled={isGenerating}
+              className="w-full sm:w-auto px-7 py-3 bg-brand hover:bg-brand-hover text-white rounded-xl text-sm font-extrabold tracking-wide shadow-md hover:shadow-xl transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>{editId ? "Updating..." : "Generating..."}</span>
+                </>
+              ) : (
+                <>
+                  <Check size={17} />
+                  <span>{editId ? "Update Quotation" : "Generate"}</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
-      </main>
+      </footer>
 
       {/* ================= MODAL 1: SELECT CUSTOMER ================= */}
       {isCustomerSelectOpen && (
