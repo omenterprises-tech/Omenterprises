@@ -1334,12 +1334,7 @@ function MakeQuotationContent() {
                                 {item.quantity} <span className="text-[10px] text-gray-500 uppercase">{item.unit || "COILS"}</span>
                               </td>
                               <td className="p-3 text-right font-medium text-gray-800">
-                                <div>₹{basePrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-                                {item.quantity > 1 && (
-                                  <div className="text-[10px] text-gray-400 font-normal">
-                                    @₹{item.unitPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })} / {item.unit || "unit"}
-                                  </div>
-                                )}
+                                ₹{basePrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                               </td>
                               <td className="p-3 text-right font-medium text-gray-600">
                                 <div>₹{gstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>

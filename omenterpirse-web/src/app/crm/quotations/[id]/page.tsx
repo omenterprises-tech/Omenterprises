@@ -878,12 +878,7 @@ export default function QuotationDetailPage({
                               </div>
                             </td>
                             <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-semibold text-gray-900">
-                              <div>{formatRs(baseTotal)}</div>
-                              {qty > 1 && (
-                                <div className="text-[10px] text-gray-500 font-normal">
-                                  @{formatRs(price)} / {it.unit || "unit"}
-                                </div>
-                              )}
+                              {formatRs(baseTotal)}
                             </td>
                             <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-medium text-gray-700">
                               <div>{formatRs(gstAmount)}</div>
