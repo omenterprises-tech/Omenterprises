@@ -262,38 +262,58 @@ export default function QuotationDetailPage({
         onclone: (clonedDoc) => {
           const sheet = clonedDoc.getElementById("quotation-sheet");
           if (sheet) {
+            sheet.style.width = "794px";
+            sheet.style.maxWidth = "794px";
+            sheet.style.minWidth = "794px";
+            sheet.style.padding = "20px 28px 16px 28px";
+            sheet.style.margin = "0";
+            sheet.style.boxSizing = "border-box";
+            sheet.style.borderRadius = "0";
+            sheet.style.border = "none";
+            sheet.style.boxShadow = "none";
             sheet.style.backgroundColor = "#ffffff";
           }
         },
       });
 
       const imgData = canvas.toDataURL("image/png");
+      const pdfWidth = 210;
+      const pdfHeight = 297;
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      // 1. Single-page document: fits within or near standard A4 height
+      if (imgHeight <= pdfHeight * 1.1) {
+        const pageHeight = Math.min(imgHeight, pdfHeight);
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "mm",
+          format: [pdfWidth, pageHeight],
+        });
+
+        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pageHeight);
+        return pdf.output("blob");
+      }
+
+      // 2. Multi-page document: for quotations with many line items
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
         format: "a4",
       });
 
-      const pdfWidth = 210;
-      const pdfHeight = 297;
-      const imgProps = pdf.getImageProperties(imgData);
-      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      let heightLeft = imgHeight;
+      let position = 0;
 
-      if (imgHeight <= pdfHeight) {
-        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, imgHeight);
-      } else {
-        let heightLeft = imgHeight;
-        let position = 0;
+      pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
+      heightLeft -= pdfHeight;
 
+      // Only add a new page if the leftover content is substantial (> 25mm),
+      // preventing accidental blank pages caused by trailing whitespace or padding
+      while (heightLeft > 25) {
+        position -= pdfHeight;
+        pdf.addPage();
         pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
         heightLeft -= pdfHeight;
-
-        while (heightLeft > 0) {
-          position -= pdfHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
-          heightLeft -= pdfHeight;
-        }
       }
 
       return pdf.output("blob");
