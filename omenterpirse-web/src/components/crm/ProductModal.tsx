@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { ArrowLeft, Loader2, AlertCircle, Check, Package } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { ArrowLeft, Loader2, AlertCircle, Check, Package, Plus, Trash2, Layers } from "lucide-react";
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -18,7 +18,10 @@ export default function ProductModal({
   onProductSaved,
   initialProduct,
 }: ProductModalProps) {
+  // Hierarchical categories: Level 0 = Main Category (a), Level 1 = Sub-Category (b), Level 2 = Sub-Category (c)...
+  const [categories, setCategories] = useState<string[]>(["", "", ""]);
   const [name, setName] = useState("");
+  const [isManualName, setIsManualName] = useState(false);
   const [price, setPrice] = useState("");
   const [gst, setGst] = useState("");
   const [description, setDescription] = useState("");
@@ -31,8 +34,51 @@ export default function ProductModal({
 
   const isEditing = Boolean(initialProduct?.id);
 
+  // Compile reverse hierarchical name: c b a
+  const compiledName = useMemo(() => {
+    return [...categories]
+      .map((c) => c.trim())
+      .filter((c) => c.length > 0)
+      .reverse()
+      .join(" ");
+  }, [categories]);
+
+  // Keep name synced to compiled reverse name if not manually edited
+  useEffect(() => {
+    if (!isManualName) {
+      setName(compiledName);
+    }
+  }, [compiledName, isManualName]);
+
   useEffect(() => {
     if (initialProduct) {
+      let loadedHierarchy: string[] = [];
+      if (initialProduct.specifications) {
+        try {
+          const parsed =
+            typeof initialProduct.specifications === "string"
+              ? JSON.parse(initialProduct.specifications)
+              : initialProduct.specifications;
+          if (Array.isArray(parsed?.hierarchy) && parsed.hierarchy.length > 0) {
+            loadedHierarchy = [...parsed.hierarchy];
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (loadedHierarchy.length > 0) {
+        while (loadedHierarchy.length < 3) {
+          loadedHierarchy.push("");
+        }
+        setCategories(loadedHierarchy);
+        setIsManualName(false);
+      } else {
+        const cat = initialProduct.category && initialProduct.category !== "General" ? initialProduct.category : "";
+        setCategories([cat, "", ""]);
+        setIsManualName(true);
+      }
+
       setName(initialProduct.name || "");
       setPrice(
         initialProduct.basePrice !== undefined && initialProduct.basePrice !== null
@@ -46,7 +92,9 @@ export default function ProductModal({
       setUnit(initialProduct.unit || "");
       setHsn(initialProduct.hsn || "");
     } else {
+      setCategories(["", "", ""]);
       setName("");
+      setIsManualName(false);
       setPrice("");
       setGst("");
       setDescription("");
@@ -57,14 +105,32 @@ export default function ProductModal({
     setGeneralError("");
   }, [initialProduct, isOpen]);
 
+  const updateCategoryLevel = (index: number, val: string) => {
+    setCategories((prev) => {
+      const next = [...prev];
+      next[index] = val;
+      return next;
+    });
+    if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }));
+  };
+
+  const addCategoryLevel = () => {
+    setCategories((prev) => [...prev, ""]);
+  };
+
+  const removeCategoryLevel = (index: number) => {
+    setCategories((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: { name?: string; price?: string } = {};
 
-    if (!name.trim()) {
-      newErrors.name = "Product Name is required";
+    const finalName = (name.trim() || compiledName.trim());
+    if (!finalName) {
+      newErrors.name = "Main Category is required to build product name";
     }
 
     if (!price || String(price).trim() === "") {
@@ -86,7 +152,12 @@ export default function ProductModal({
       const url = "/api/crm/products";
       const method = isEditing ? "PUT" : "POST";
       const payload: any = {
-        name: name.trim(),
+        name: finalName,
+        category: categories[0]?.trim() || "General",
+        specifications: {
+          hierarchy: categories.map((c) => c.trim()).filter(Boolean),
+          notes: description.trim(),
+        },
         price: parseFloat(price),
         gst: gst.trim() !== "" ? parseFloat(gst) : null,
         description: description.trim() || null,
@@ -184,34 +255,47 @@ export default function ProductModal({
         )}
 
         <form id="product-modal-form" onSubmit={handleSubmit} className="space-y-6">
-          {/* Card 1: Product Name & Pricing */}
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-200/80 shadow-xs space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 border-b border-gray-100 pb-2.5">
-              Product Overview & Rates
-            </h3>
+          {/* Card 1: Category Hierarchy (Reverse Order Display) */}
+          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-200/80 shadow-xs space-y-5">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800 flex items-center gap-1.5">
+                  <Layers size={14} className="text-brand" />
+                  <span>Category Hierarchy (Reverse Order Display)</span>
+                </h3>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Main Category (a) → Sub-Category (b) → Sub-Category (c)... Shown in documents as{" "}
+                  <strong className="text-brand font-black">c b a</strong>
+                </p>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-brand border border-blue-100 uppercase tracking-wider">
+                Electrical Trade
+              </span>
+            </div>
 
             <div className="space-y-4">
+              {/* Level 1: Main Category (a) */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Product Name <span className="text-rose-500">*</span>
+                <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
+                  <span>
+                    Main Category (a) <span className="text-rose-500">*</span>
+                  </span>
+                  <span className="text-[10px] text-gray-400 font-normal">e.g. Brand / Main Group</span>
                 </label>
                 <div className="relative">
                   <input
                     type="text"
-                    value={name}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                      if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }));
-                    }}
-                    placeholder="e.g. Copper Armoured Cable 4 Core 16 Sq mm"
-                    className={`w-full px-4 py-3 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white focus:ring-2 transition-all ${
+                    value={categories[0] || ""}
+                    onChange={(e) => updateCategoryLevel(0, e.target.value)}
+                    placeholder="e.g. POLYCAB, HAVELLS, WIRES & CABLES"
+                    className={`w-full px-4 py-2.5 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white focus:ring-2 transition-all ${
                       errors.name
                         ? "border border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20"
                         : "border border-gray-200 focus:ring-brand/30 focus:border-brand"
                     }`}
                   />
                   <Package
-                    size={18}
+                    size={16}
                     className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
                   />
                 </div>
@@ -223,52 +307,185 @@ export default function ProductModal({
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Base Price (₹) <span className="text-rose-500">*</span>
-                  </label>
+              {/* Level 2: Sub-Category (b) */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
+                  <span>
+                    Sub-Category (b)
+                  </span>
+                  <span className="text-[10px] text-gray-400 font-normal">e.g. Cable Type / Series</span>
+                </label>
+                <input
+                  type="text"
+                  value={categories[1] || ""}
+                  onChange={(e) => updateCategoryLevel(1, e.target.value)}
+                  placeholder="e.g. 4 CORE ARMOURED, COPPER FLEXIBLE, MCB DP"
+                  className="w-full px-4 py-2.5 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
+                />
+              </div>
+
+              {/* Level 3: Sub-Category (c - Size / Spec) */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
+                  <span>
+                    Sub-Category (c - Size / Spec / Rating)
+                  </span>
+                  <span className="text-[10px] text-gray-400 font-normal">e.g. Size, Gauge, Amperage</span>
+                </label>
+                <input
+                  type="text"
+                  value={categories[2] || ""}
+                  onChange={(e) => updateCategoryLevel(2, e.target.value)}
+                  placeholder="e.g. 16 SQ MM, 2.5 SQ MM, 32A C-CURVE"
+                  className="w-full px-4 py-2.5 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
+                />
+              </div>
+
+              {/* Optional Further Sub-Categories (Level 4, 5...) */}
+              {categories.slice(3).map((cat, idx) => {
+                const realIdx = idx + 3;
+                const letter = String.fromCharCode(100 + idx); // d, e, f...
+                return (
+                  <div key={realIdx} className="flex items-center space-x-2">
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Sub-Category ({letter} - Level {realIdx + 1})
+                      </label>
+                      <input
+                        type="text"
+                        value={cat}
+                        onChange={(e) => updateCategoryLevel(realIdx, e.target.value)}
+                        placeholder={`e.g. Color, Voltage, Grade (Level ${letter})`}
+                        className="w-full px-4 py-2.5 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeCategoryLevel(realIdx)}
+                      className="mt-5 p-2.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                      title="Remove Level"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* Add Sub-Category Button */}
+              <div className="pt-0.5">
+                <button
+                  type="button"
+                  onClick={addCategoryLevel}
+                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-brand hover:text-brand-hover bg-brand/5 hover:bg-brand/10 rounded-xl transition-colors cursor-pointer"
+                >
+                  <Plus size={14} />
+                  <span>+ Add Sub-Category Level</span>
+                </button>
+              </div>
+
+              {/* Live Preview Box (c b a) */}
+              <div className="mt-3 p-4 rounded-2xl bg-gray-50 border border-gray-200/80 space-y-1">
+                <div className="flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                  <span>Document Display Name (Reverse Order: c b a)</span>
+                  <span className="text-brand font-bold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                    {compiledName ? "Auto-Compiled" : "Awaiting Input"}
+                  </span>
+                </div>
+                <div className="text-sm font-black text-gray-900 tracking-tight break-words">
+                  {compiledName || (
+                    <span className="text-gray-400 font-normal italic text-xs">
+                      e.g. 16 SQ MM 4 CORE ARMOURED POLYCAB
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Manual Name Fine-Tune Expander */}
+              <div className="pt-1">
+                <details className="group">
+                  <summary className="text-[11px] font-bold text-gray-500 hover:text-brand cursor-pointer select-none">
+                    ▸ Fine-tune compiled product name manually
+                  </summary>
+                  <div className="pt-2 space-y-1.5">
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        setIsManualName(true);
+                      }}
+                      placeholder="Product name"
+                      className="w-full px-4 py-2.5 bg-white rounded-xl text-sm font-semibold text-gray-900 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
+                    />
+                    {isManualName && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsManualName(false);
+                          setName(compiledName);
+                        }}
+                        className="text-[10px] font-bold text-brand hover:underline cursor-pointer"
+                      >
+                        Reset to auto-compiled name ({compiledName})
+                      </button>
+                    )}
+                  </div>
+                </details>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Pricing & GST */}
+          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-200/80 shadow-xs space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 border-b border-gray-100 pb-2.5">
+              Pricing & Tax
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Base Price (₹) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={price}
+                  onChange={(e) => {
+                    setPrice(e.target.value);
+                    if (errors.price) setErrors((prev) => ({ ...prev, price: undefined }));
+                  }}
+                  placeholder="0.00"
+                  className={`w-full px-4 py-2.5 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white focus:ring-2 transition-all ${
+                    errors.price
+                      ? "border border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20"
+                      : "border border-gray-200 focus:ring-brand/30 focus:border-brand"
+                  }`}
+                />
+                {errors.price && (
+                  <p className="text-xs text-rose-600 font-medium mt-1 pl-1 flex items-center gap-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{errors.price}</span>
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">GST Rate (%)</label>
+                <div className="relative">
                   <input
                     type="number"
                     step="0.01"
                     min="0"
-                    value={price}
-                    onChange={(e) => {
-                      setPrice(e.target.value);
-                      if (errors.price) setErrors((prev) => ({ ...prev, price: undefined }));
-                    }}
-                    placeholder="0.00"
-                    className={`w-full px-4 py-3 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white focus:ring-2 transition-all ${
-                      errors.price
-                        ? "border border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20"
-                        : "border border-gray-200 focus:ring-brand/30 focus:border-brand"
-                    }`}
+                    max="100"
+                    value={gst}
+                    onChange={(e) => setGst(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-4 py-2.5 pr-10 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
                   />
-                  {errors.price && (
-                    <p className="text-xs text-rose-600 font-medium mt-1 pl-1 flex items-center gap-1">
-                      <AlertCircle size={12} className="shrink-0" />
-                      <span>{errors.price}</span>
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">GST Rate (%)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={gst}
-                      onChange={(e) => setGst(e.target.value)}
-                      placeholder="0"
-                      className="w-full px-4 py-3 pr-10 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm pointer-events-none">
-                      %
-                    </span>
-                  </div>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm pointer-events-none">
+                    %
+                  </span>
                 </div>
               </div>
             </div>

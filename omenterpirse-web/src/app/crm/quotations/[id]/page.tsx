@@ -630,7 +630,7 @@ export default function QuotationDetailPage({
         {/* ================= A4 WHITE QUOTATION SHEET (Website Theme & Exact Design) ================= */}
         <div
           id="quotation-sheet"
-          className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-gray-200 p-6 sm:p-12 space-y-6 print:shadow-none print:rounded-none print:border-none print:p-0 print:w-full print:space-y-2"
+          className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-gray-200 p-6 sm:p-8 space-y-3 sm:space-y-4 print:shadow-none print:rounded-none print:border-none print:p-0 print:w-full print:space-y-2"
         >
           {/* ================= 1. TOP HEADER (Logo, Business Info, Quotation Heading) ================= */}
           <div className="grid grid-cols-12 gap-4 items-start border-b border-gray-200 pb-6 print:pb-2.5 print:gap-2">
@@ -813,8 +813,8 @@ export default function QuotationDetailPage({
           </div>
 
           {/* ================= 5. FINANCIAL TOTALS BREAKDOWN ================= */}
-          <div className="flex justify-end pt-2 print:pt-1">
-            <div className="w-full sm:w-80 print:w-72 space-y-2 print:space-y-1 text-xs sm:text-sm text-gray-800">
+          <div className="flex justify-end pt-1 print:pt-0.5">
+            <div className="w-full sm:w-72 print:w-64 space-y-1 print:space-y-0.5 text-xs text-gray-800">
               <div className="flex justify-between py-0.5">
                 <span className="font-semibold text-gray-600 uppercase text-xs print:text-[11px]">SUB TOTAL</span>
                 <span className="font-bold text-gray-900">{formatRs(quotation.subtotal)}</span>
@@ -834,16 +834,16 @@ export default function QuotationDetailPage({
                 <span className="font-bold text-gray-900">{formatRs(quotation.taxTotal)}</span>
               </div>
 
-              {/* Highlighted Grand Total Banner (Brand Colors) */}
-              <div className="bg-blue-50/80 border-2 border-brand/20 p-3 print:p-2 rounded-xl flex justify-between items-center font-black text-base print:text-sm text-brand mt-1 shadow-xs">
-                <span className="tracking-wide">GRAND TOTAL</span>
-                <span className="text-lg print:text-base">{formatRs(quotation.grandTotal)}</span>
+              {/* Clean Standard Accounting Grand Total Line */}
+              <div className="flex justify-between items-center font-black text-sm print:text-xs text-gray-900 border-t-2 border-b-2 border-gray-900 py-1 mt-1 print:py-0.5">
+                <span className="tracking-wide uppercase">GRAND TOTAL</span>
+                <span className="text-base font-black print:text-sm">{formatRs(quotation.grandTotal)}</span>
               </div>
             </div>
           </div>
 
           {/* ================= 6. CLOSING STATEMENT ================= */}
-          <div className="pt-2 print:pt-1 text-xs sm:text-sm print:text-xs text-gray-700 font-medium">
+          <div className="pt-1 print:pt-0.5 text-xs sm:text-sm print:text-xs text-gray-700 font-medium">
             We hope you find our offer to be in line with your requirement.
           </div>
 

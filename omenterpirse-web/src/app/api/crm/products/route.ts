@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, price, basePrice, gst, description, unit, hsn, category } = body;
+    const { name, price, basePrice, gst, description, unit, hsn, category, specifications } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ success: false, error: "Product Name is required.", field: "name" }, { status: 400 });
@@ -66,6 +66,11 @@ export async function POST(request: Request) {
         unit: unit ? unit.trim() : null,
         hsn: hsn ? hsn.trim() : null,
         category: category ? category.trim() : "General",
+        specifications: specifications
+          ? typeof specifications === "string"
+            ? specifications
+            : JSON.stringify(specifications)
+          : null,
         createdAt: new Date().toISOString(),
       })
       .returning();
@@ -91,7 +96,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, price, basePrice, gst, description, unit, hsn, category } = body;
+    const { id, name, price, basePrice, gst, description, unit, hsn, category, specifications } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: "Product ID is required." }, { status: 400 });
@@ -124,6 +129,11 @@ export async function PUT(request: Request) {
         unit: unit ? unit.trim() : null,
         hsn: hsn ? hsn.trim() : null,
         category: category ? category.trim() : "General",
+        specifications: specifications
+          ? typeof specifications === "string"
+            ? specifications
+            : JSON.stringify(specifications)
+          : null,
       })
       .where(eq(products.id, parseInt(id, 10)))
       .returning();
