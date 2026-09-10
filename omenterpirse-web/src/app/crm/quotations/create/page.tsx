@@ -1282,9 +1282,9 @@ function MakeQuotationContent() {
                           <th className="p-3">Item Description</th>
                           {hasAnyHsn && <th className="p-3 text-center w-16">HSN</th>}
                           <th className="p-3 text-center w-20">Qty</th>
-                          <th className="p-3 text-right w-24">Rate (₹)</th>
-                          <th className="p-3 text-center w-16">GST %</th>
-                          <th className="p-3 text-right w-28">Amount (₹)</th>
+                          <th className="p-3 text-right w-28">Price (₹)</th>
+                          <th className="p-3 text-right w-24">GST</th>
+                          <th className="p-3 text-right w-28">Total (₹)</th>
                           <th className="p-3 text-center w-16">Actions</th>
                         </tr>
                       </thead>
@@ -1310,6 +1310,10 @@ function MakeQuotationContent() {
                             }
                           }
 
+                          const basePrice = item.quantity * item.unitPrice;
+                          const gstAmount = (basePrice * (item.taxPercent || 0)) / 100;
+                          const rowTotal = basePrice + gstAmount;
+
                           return (
                             <tr key={item.id} className="hover:bg-blue-50/30 transition-colors">
                               <td className="p-3 text-center font-medium text-gray-400">{idx + 1}</td>
@@ -1330,11 +1334,21 @@ function MakeQuotationContent() {
                                 {item.quantity} <span className="text-[10px] text-gray-500 uppercase">{item.unit || "COILS"}</span>
                               </td>
                               <td className="p-3 text-right font-medium text-gray-800">
-                                ₹{item.unitPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                <div>₹{basePrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                                {item.quantity > 1 && (
+                                  <div className="text-[10px] text-gray-400 font-normal">
+                                    @₹{item.unitPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })} / {item.unit || "unit"}
+                                  </div>
+                                )}
                               </td>
-                              <td className="p-3 text-center font-medium text-gray-600">{item.taxPercent || 0}%</td>
+                              <td className="p-3 text-right font-medium text-gray-600">
+                                <div>₹{gstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                                <div className="text-[10px] text-gray-400 font-normal">
+                                  {(item.taxPercent || 0).toFixed(2)}%
+                                </div>
+                              </td>
                               <td className="p-3 text-right font-bold text-gray-900">
-                                ₹{item.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                ₹{(item.total || rowTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                               </td>
                               <td className="p-3 text-center">
                                 <div className="flex items-center justify-center space-x-1">
