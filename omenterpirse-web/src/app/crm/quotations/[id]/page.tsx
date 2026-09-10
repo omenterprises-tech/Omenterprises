@@ -20,9 +20,7 @@ import {
   X,
   Printer,
   Download,
-  ExternalLink,
   Send,
-  Clock,
   Check,
 } from "lucide-react";
 
@@ -59,7 +57,7 @@ export default function QuotationDetailPage({
   const [error, setError] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // More menu pop-up state (Image 5)
+  // More menu pop-up state
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   // Status Change Modal
@@ -138,7 +136,6 @@ export default function QuotationDetailPage({
     for (const line of rawLines) {
       const trimmed = line.trim();
       if (trimmed) {
-        // Strip duplicate numbering if present
         const clean = trimmed.replace(/^(\d+[\.\)]\s*|[•\-\*]\s*)/, "").trim();
         if (clean) termsList.push(clean);
       }
@@ -230,7 +227,7 @@ export default function QuotationDetailPage({
         showToast("Quotation duplicated successfully!");
         setTimeout(() => {
           router.push(`/crm/quotations/${data.quotation.id}`);
-        }, 500);
+        }, 400);
       } else {
         alert(data.error || "Failed to duplicate quotation.");
       }
@@ -263,7 +260,7 @@ export default function QuotationDetailPage({
         });
         return;
       } catch (err) {
-        // Fallback to modal if cancelled or unsupported
+        // Fallback to modal
       }
     }
     setIsShareModalOpen(true);
@@ -276,25 +273,25 @@ export default function QuotationDetailPage({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#18181B] text-white">
-        <Loader2 className="w-10 h-10 text-white animate-spin mb-3" />
-        <p className="text-white/80 font-medium text-sm">Opening Quotation Detail...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
+        <Loader2 className="w-10 h-10 text-brand animate-spin mb-3" />
+        <p className="text-gray-600 font-semibold text-sm">Opening Quotation Document...</p>
       </div>
     );
   }
 
   if (error || !quotation) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F4F5F7] p-4 text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] p-4 text-center">
         <AlertCircle className="w-12 h-12 text-rose-500 mb-3" />
         <h3 className="text-lg font-bold text-gray-900 mb-1">Quotation Not Found</h3>
         <p className="text-xs text-gray-500 max-w-sm mb-5">{error || "Unable to locate this quotation record."}</p>
         <button
           type="button"
           onClick={() => router.push("/crm/quotations")}
-          className="px-6 py-2.5 bg-[#18181B] text-white rounded-xl text-xs font-bold shadow hover:bg-black"
+          className="px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow"
         >
-          Back to Quotations
+          Back to Quotation Ledger
         </button>
       </div>
     );
@@ -315,189 +312,283 @@ export default function QuotationDetailPage({
 
   // Status color styles
   const statusColors: Record<string, string> = {
-    Draft: "bg-gray-100 text-gray-800 border-gray-300",
-    Sent: "bg-blue-50 text-blue-800 border-blue-200",
+    Draft: "bg-amber-50 text-amber-800 border-amber-200",
+    Sent: "bg-blue-50 text-brand border-blue-200",
     Accepted: "bg-emerald-50 text-emerald-800 border-emerald-200",
     Declined: "bg-rose-50 text-rose-800 border-rose-200",
   };
 
   return (
-    <div className="min-h-screen bg-[#DDE1E6] flex flex-col items-center text-gray-900 font-inter pb-24 print:bg-white print:p-0 print:pb-0">
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col text-gray-900 font-inter pb-16 print:bg-white print:p-0 print:pb-0">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-5 z-50 px-5 py-3 bg-[#18181B] text-white text-xs font-semibold rounded-2xl shadow-2xl flex items-center space-x-2 animate-in slide-in-from-top duration-200 print:hidden">
+        <div className="fixed top-5 right-5 z-50 px-5 py-3 bg-gray-900 text-white text-xs font-semibold rounded-2xl shadow-2xl flex items-center space-x-2 animate-in slide-in-from-top duration-200 print:hidden">
           <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* ================= TOP SCREEN HEADER BAR (Images 1 & 5) ================= */}
-      <header className="w-full bg-[#18181B] text-white px-4 py-3.5 sticky top-0 z-30 shadow-md flex items-center justify-between print:hidden">
-        <div className="flex items-center space-x-3">
-          <button
-            type="button"
-            onClick={() => router.push("/crm/quotations")}
-            className="p-2 -ml-1 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Back to Quotation List"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <h1 className="text-lg font-bold text-white tracking-tight">Quotation Detail</h1>
-        </div>
+      {/* ================= FULL-SCREEN TOP APP BAR (Website Brand Styling) ================= */}
+      <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200/80 shadow-xs print:hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Left: Back & Title */}
+            <div className="flex items-center space-x-3">
+              <button
+                type="button"
+                onClick={() => router.push("/crm/quotations")}
+                className="p-2 rounded-xl text-gray-500 hover:text-brand hover:bg-brand/5 transition-colors cursor-pointer mr-1"
+                title="Back to Quotation Ledger"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <div>
+                <div className="flex items-center space-x-2.5">
+                  <h1 className="text-lg font-bold text-gray-900 tracking-tight">
+                    {quotation.quotationNumber}
+                  </h1>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
+                      statusColors[quotation.status] || "bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    {quotation.status}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 font-medium">
+                  {quotation.customerName} • {quotation.quotationDate}
+                </p>
+              </div>
+            </div>
 
-        <div className="flex items-center space-x-2">
-          {/* Status Badge */}
-          <span
-            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
-              statusColors[quotation.status] || "bg-white/10 text-white"
-            }`}
-          >
-            {quotation.status}
-          </span>
+            {/* Right: Desktop Action Toolbar (Website Brand Styling) */}
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center space-x-1.5 cursor-pointer"
+                title="Print or Save as PDF"
+              >
+                <Printer size={15} />
+                <span>Print / PDF</span>
+              </button>
 
-          {/* Share icon on top right (Image 1) */}
-          <button
-            type="button"
-            onClick={handleShare}
-            className="p-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Share Quotation"
-          >
-            <Share2 size={19} />
-          </button>
+              <button
+                type="button"
+                onClick={handleShare}
+                className="hidden sm:inline-flex items-center space-x-1 px-3.5 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold transition-colors cursor-pointer"
+                title="Share Quotation"
+              >
+                <Share2 size={14} />
+                <span>Share</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDuplicate}
+                disabled={isDuplicating}
+                className="hidden sm:inline-flex items-center space-x-1 px-3.5 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                title="Create Duplicate"
+              >
+                {isDuplicating ? <Loader2 size={14} className="animate-spin" /> : <Copy size={14} />}
+                <span>Duplicate</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleEdit}
+                className="inline-flex items-center space-x-1 px-3.5 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold transition-colors cursor-pointer"
+                title="Edit Quotation"
+              >
+                <Edit3 size={14} />
+                <span>Edit</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsInvoiceModalOpen(true)}
+                className="hidden md:inline-flex items-center space-x-1 px-3.5 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold transition-colors cursor-pointer"
+                title="Invoice Actions"
+              >
+                <FileSpreadsheet size={14} />
+                <span>Invoice</span>
+              </button>
+
+              {/* Status & Delete More Menu Toggle */}
+              <button
+                type="button"
+                onClick={() => setIsMoreOpen(!isMoreOpen)}
+                className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                  isMoreOpen ? "bg-brand text-white border-brand" : "border-gray-200 hover:bg-gray-100 text-gray-700"
+                }`}
+                title="More Options"
+              >
+                <MoreHorizontal size={18} />
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* ================= MAIN CONTAINER / DOCUMENT SHEET ================= */}
-      <main className="w-full max-w-2xl px-2 sm:px-4 py-4 sm:py-6 print:p-0 print:max-w-none">
-        {/* ================= A4 WHITE QUOTATION SHEET (Images 1, 2, 3, 4) ================= */}
+      {/* ================= MORE OPTIONS POP-UP (Status & Delete) ================= */}
+      {isMoreOpen && (
+        <div className="fixed top-20 right-6 sm:right-12 z-50 w-48 bg-white rounded-2xl shadow-xl border border-gray-200 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150 print:hidden">
+          <button
+            type="button"
+            onClick={() => {
+              setIsMoreOpen(false);
+              setIsStatusModalOpen(true);
+            }}
+            className="w-full px-3 py-2.5 rounded-xl hover:bg-blue-50 text-left text-xs font-bold text-gray-800 hover:text-brand flex items-center space-x-2 transition-colors cursor-pointer"
+          >
+            <Tag size={15} />
+            <span>Change Status</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsMoreOpen(false);
+              handleDelete();
+            }}
+            className="w-full px-3 py-2.5 rounded-xl hover:bg-rose-50 text-left text-xs font-bold text-rose-600 flex items-center space-x-2 transition-colors cursor-pointer"
+          >
+            <Trash2 size={15} />
+            <span>Delete Quotation</span>
+          </button>
+        </div>
+      )}
+
+      {/* ================= FULL-SCREEN MAIN WORKSPACE ================= */}
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 print:p-0 print:max-w-none">
+        {/* ================= A4 WHITE QUOTATION SHEET (Website Theme & Exact Design) ================= */}
         <div
-          id="quotation-print-area"
-          className="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-5 sm:p-8 space-y-5 print:shadow-none print:rounded-none print:p-8 print:w-full print:border-none"
+          id="quotation-sheet"
+          className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-gray-200 p-6 sm:p-12 space-y-6 print:shadow-none print:rounded-none print:border-none print:p-0 print:w-full"
         >
-          {/* ================= TOP HEADER (Image 1 & 2) ================= */}
-          <div className="grid grid-cols-12 gap-2 items-start border-b border-gray-100 pb-4">
+          {/* ================= 1. TOP HEADER (Logo, Business Info, Quotation Heading) ================= */}
+          <div className="grid grid-cols-12 gap-4 items-start border-b border-gray-200 pb-6">
             {/* Left: Business Logo */}
             <div className="col-span-3 sm:col-span-2 flex justify-start">
               {business?.logoUrl ? (
                 <img
                   src={business.logoUrl}
                   alt="Logo"
-                  className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-xl border border-gray-100 shadow-xs"
+                  className="w-20 h-20 sm:w-24 sm:h-24 object-contain rounded-xl border border-gray-100 shadow-xs"
                 />
               ) : (
-                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400 font-bold text-xs border border-gray-200 text-center p-1">
-                  {business?.businessName?.slice(0, 2)?.toUpperCase() || "OM"}
+                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-blue-50 rounded-xl flex items-center justify-center text-brand font-black text-sm border border-blue-100 text-center p-2">
+                  {business?.businessName?.slice(0, 4)?.toUpperCase() || "OM"}
                 </div>
               )}
             </div>
 
-            {/* Middle: Business Details (Image 2) */}
+            {/* Middle: Business Details (Website Brand Deep Blue & Layout) */}
             <div className="col-span-6 sm:col-span-8 text-center space-y-1">
-              <h2 className="text-base sm:text-lg font-black text-[#0B2545] tracking-tight uppercase">
+              <h2 className="text-lg sm:text-2xl font-black text-brand tracking-tight uppercase font-playfair">
                 {business?.businessName || "OM ENTERPRISES"}
               </h2>
 
               {/* Address */}
-              <p className="text-[10px] sm:text-[11px] text-gray-600 leading-snug font-medium max-w-md mx-auto">
+              <p className="text-xs sm:text-sm text-gray-600 leading-snug font-medium max-w-lg mx-auto">
                 {[business?.addressLine1, business?.addressLine2, business?.addressLine3, business?.state]
                   .filter(Boolean)
                   .join(", ") ||
                   "# 5-1-26, Mahalaxmi Complex, R.P. Road, Near Citylight Hotel, Secunderabad - 500003, Telangana state."}
               </p>
 
-              {/* Phone & Email (Image 2) */}
-              <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[10px] sm:text-[11px] text-gray-700 font-medium">
-                <span className="inline-flex items-center gap-1">
-                  <Phone size={11} className="text-gray-500" />
+              {/* Phone & Email */}
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs sm:text-sm text-gray-700 font-medium pt-0.5">
+                <span className="inline-flex items-center gap-1.5">
+                  <Phone size={13} className="text-brand shrink-0" />
                   <span>{business?.mobileNumber || "+91 9246999660 / 9849845555"}</span>
                 </span>
-                <span className="inline-flex items-center gap-1">
-                  <Mail size={11} className="text-gray-500" />
+                <span className="inline-flex items-center gap-1.5">
+                  <Mail size={13} className="text-brand shrink-0" />
                   <span>{business?.email || "om5555enterprises@gmail.com"}</span>
                 </span>
               </div>
 
-              {/* GSTIN (Image 2) */}
+              {/* GSTIN */}
               {(business?.taxNumber || "36ASLPS7570G1Z5") && (
-                <p className="text-[10px] sm:text-[11px] font-bold text-gray-900 tracking-wide">
-                  {business?.taxLabel || "GSTIN"}: {business?.taxNumber || "36ASLPS7570G1Z5"}
+                <p className="text-xs sm:text-sm font-bold text-gray-900 tracking-wide pt-0.5">
+                  {business?.taxLabel || "GSTIN"}: <span className="text-brand">{business?.taxNumber || "36ASLPS7570G1Z5"}</span>
                 </p>
               )}
             </div>
 
-            {/* Right: Quotation Title (Image 1) */}
+            {/* Right: Quotation Heading */}
             <div className="col-span-3 sm:col-span-2 text-right">
-              <h3 className="text-sm sm:text-base font-extrabold text-[#0B2545] tracking-tight">
-                Quotation
-              </h3>
+              <span className="inline-block px-3.5 py-1 bg-brand text-white text-xs sm:text-sm font-extrabold uppercase tracking-wider rounded-lg">
+                QUOTATION
+              </span>
             </div>
           </div>
 
-          {/* ================= METADATA ROW: CUSTOMER (LEFT) & QUOTATION# / DATE (RIGHT) (Image 1) ================= */}
-          <div className="flex justify-between items-start pt-1 text-xs sm:text-sm">
-            {/* Customer Details (Left) */}
-            <div className="space-y-0.5 max-w-[60%]">
-              <span className="font-bold text-gray-900 block text-xs">To,</span>
-              <h4 className="font-black text-gray-900 text-sm">{quotation.customerName}</h4>
+          {/* ================= 2. METADATA: CUSTOMER (LEFT) & QUOTE# / DATE (RIGHT) ================= */}
+          <div className="flex justify-between items-start pt-1 text-xs sm:text-sm gap-4">
+            {/* Customer Details */}
+            <div className="space-y-1 max-w-[65%]">
+              <span className="font-bold text-gray-700 block text-xs uppercase tracking-wider">To,</span>
+              <h4 className="font-black text-gray-900 text-sm sm:text-base">{quotation.customerName}</h4>
               {quotation.customerAddress && (
-                <p className="text-gray-600 text-xs leading-relaxed">{quotation.customerAddress}</p>
+                <p className="text-gray-600 leading-relaxed text-xs sm:text-sm">{quotation.customerAddress}</p>
               )}
               {quotation.customerPhone && (
-                <p className="text-gray-500 text-[11px]">{quotation.customerPhone}</p>
+                <p className="text-gray-500 text-xs">Phone: {quotation.customerPhone}</p>
               )}
               {quotation.customerGstin && (
-                <p className="text-gray-700 text-[11px] font-semibold">
+                <p className="text-brand text-xs font-bold">
                   GSTIN: {quotation.customerGstin}
                 </p>
               )}
             </div>
 
-            {/* Quotation No & Date (Right) */}
-            <div className="text-right space-y-1">
-              <div className="text-xs">
-                <span className="font-bold text-gray-700">Quotation# </span>
-                <span className="font-bold text-gray-900 ml-1">{quotation.quotationNumber}</span>
+            {/* Quotation Number & Date */}
+            <div className="text-right space-y-1.5 shrink-0">
+              <div>
+                <span className="font-bold text-gray-500 uppercase text-[11px] tracking-wider block">Quotation No</span>
+                <span className="font-black text-brand text-sm sm:text-base">{quotation.quotationNumber}</span>
               </div>
-              <div className="text-xs">
-                <span className="font-bold text-gray-700">Date: </span>
-                <span className="text-gray-900 ml-1 font-medium">{quotation.quotationDate}</span>
+              <div>
+                <span className="font-bold text-gray-500 uppercase text-[11px] tracking-wider block">Date</span>
+                <span className="font-semibold text-gray-800 text-xs sm:text-sm">{quotation.quotationDate}</span>
               </div>
               {quotation.validUntil && (
-                <div className="text-[11px] text-gray-500">
-                  <span>Valid Until: </span>
-                  <span className="font-medium">{quotation.validUntil}</span>
+                <div>
+                  <span className="font-bold text-gray-500 uppercase text-[11px] tracking-wider block">Valid Until</span>
+                  <span className="text-gray-700 text-xs">{quotation.validUntil}</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* ================= INTRODUCTORY GREETING (Image 1 & 3) ================= */}
-          <div className="pt-2 space-y-1 text-xs text-gray-800">
-            <p className="font-semibold">Dear Sir/Mam,</p>
-            <p className="text-gray-600">
-              Thank you for your valuable inquiry. We are pleased to quote as below:
+          {/* ================= 3. INTRODUCTORY GREETING ================= */}
+          <div className="pt-2 space-y-1 text-xs sm:text-sm text-gray-800">
+            <p className="font-bold">Dear Sir/Mam,</p>
+            <p className="text-gray-600 leading-relaxed">
+              Thank you for your valuable inquiry. We are pleased to quote our best commercial terms as below:
             </p>
           </div>
 
-          {/* ================= PRODUCTS TABLE (Image 3) ================= */}
-          <div className="overflow-x-auto border-t border-b border-gray-300 py-1">
-            <table className="w-full text-left text-xs border-collapse">
+          {/* ================= 4. PRODUCTS TABLE ================= */}
+          <div className="overflow-x-auto border border-gray-300 rounded-xl py-0.5">
+            <table className="w-full text-left text-xs sm:text-sm border-collapse">
               <thead>
-                <tr className="border-b border-gray-300 text-gray-800 font-extrabold uppercase tracking-wider text-[11px]">
-                  <th className="py-2 px-2 text-center w-8">#</th>
-                  <th className="py-2 px-2">DESCRIPTION</th>
-                  <th className="py-2 px-2 text-center w-20">HSN</th>
-                  <th className="py-2 px-2 text-center w-16">QTY</th>
-                  <th className="py-2 px-2 text-right w-24">PRICE</th>
-                  <th className="py-2 px-2 text-right w-24">GST</th>
-                  <th className="py-2 px-2 text-right w-24">TOTAL</th>
+                <tr className="bg-gray-100 border-b border-gray-300 text-gray-800 font-extrabold uppercase tracking-wider text-[11px]">
+                  <th className="py-2.5 px-3 text-center w-10">#</th>
+                  <th className="py-2.5 px-3">DESCRIPTION</th>
+                  <th className="py-2.5 px-3 text-center w-24">HSN</th>
+                  <th className="py-2.5 px-3 text-center w-20">QTY</th>
+                  <th className="py-2.5 px-3 text-right w-28">PRICE</th>
+                  <th className="py-2.5 px-3 text-right w-28">GST</th>
+                  <th className="py-2.5 px-3 text-right w-32">TOTAL</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-6 text-center text-gray-400">
-                      No items recorded in this quotation.
+                    <td colSpan={7} className="py-8 text-center text-gray-400">
+                      No products recorded in this quotation.
                     </td>
                   </tr>
                 ) : (
@@ -510,39 +601,39 @@ export default function QuotationDetailPage({
                     const rowTotal = baseTotal + gstAmount;
 
                     return (
-                      <tr key={idx} className="align-top">
-                        <td className="py-2.5 px-2 text-center font-medium text-gray-700">
+                      <tr key={idx} className="align-top hover:bg-blue-50/20 transition-colors">
+                        <td className="py-3 px-3 text-center font-medium text-gray-500">
                           {idx + 1}
                         </td>
-                        <td className="py-2.5 px-2">
+                        <td className="py-3 px-3">
                           <span className="font-bold text-gray-900 block leading-snug">
                             {it.name || it.description?.split(" - ")[0] || "Item"}
                           </span>
                           {it.description && (
-                            <span className="text-[10px] text-gray-500 block leading-tight mt-0.5 font-normal">
+                            <span className="text-xs text-gray-500 block leading-relaxed mt-0.5 font-normal">
                               {it.description}
                             </span>
                           )}
                         </td>
-                        <td className="py-2.5 px-2 text-center text-gray-600 font-medium text-[11px]">
+                        <td className="py-3 px-3 text-center text-gray-600 font-medium text-xs">
                           {it.hsn || "85446020"}
                         </td>
-                        <td className="py-2.5 px-2 text-center font-bold text-gray-900">
+                        <td className="py-3 px-3 text-center font-bold text-gray-900">
                           <div>{qty}</div>
-                          <div className="text-[9px] text-gray-500 font-normal uppercase">
+                          <div className="text-[10px] text-gray-500 font-normal uppercase">
                             {it.unit || "COILS"}
                           </div>
                         </td>
-                        <td className="py-2.5 px-2 text-right font-semibold text-gray-900">
+                        <td className="py-3 px-3 text-right font-semibold text-gray-900">
                           {formatRs(price)}
                         </td>
-                        <td className="py-2.5 px-2 text-right font-medium text-gray-700">
+                        <td className="py-3 px-3 text-right font-medium text-gray-700">
                           <div>{formatRs(gstAmount)}</div>
-                          <div className="text-[9px] text-gray-500 font-normal">
+                          <div className="text-[10px] text-gray-500 font-normal">
                             {taxRate.toFixed(2)}%
                           </div>
                         </td>
-                        <td className="py-2.5 px-2 text-right font-black text-gray-900">
+                        <td className="py-3 px-3 text-right font-black text-gray-900">
                           {formatRs(it.total || rowTotal)}
                         </td>
                       </tr>
@@ -553,18 +644,17 @@ export default function QuotationDetailPage({
             </table>
           </div>
 
-          {/* ================= FINANCIAL TOTALS (Image 3) ================= */}
-          <div className="flex justify-end pt-1">
-            <div className="w-full sm:w-72 space-y-1.5 text-xs text-gray-800">
+          {/* ================= 5. FINANCIAL TOTALS BREAKDOWN ================= */}
+          <div className="flex justify-end pt-2">
+            <div className="w-full sm:w-80 space-y-2 text-xs sm:text-sm text-gray-800">
               <div className="flex justify-between py-0.5">
-                <span className="font-semibold text-gray-600 uppercase text-[11px]">SUB TOTAL</span>
+                <span className="font-semibold text-gray-600 uppercase text-xs">SUB TOTAL</span>
                 <span className="font-bold text-gray-900">{formatRs(quotation.subtotal)}</span>
               </div>
 
-              {/* Other Charges if present */}
               {otherCharge && Number(otherCharge.amount) > 0 && (
                 <div className="flex justify-between py-0.5">
-                  <span className="font-semibold text-gray-600 uppercase text-[11px]">
+                  <span className="font-semibold text-gray-600 uppercase text-xs">
                     {otherCharge.label || "OTHER CHARGES"}
                   </span>
                   <span className="font-bold text-gray-900">{formatRs(otherCharge.amount)}</span>
@@ -572,42 +662,42 @@ export default function QuotationDetailPage({
               )}
 
               <div className="flex justify-between py-0.5">
-                <span className="font-semibold text-gray-600 uppercase text-[11px]">GST</span>
+                <span className="font-semibold text-gray-600 uppercase text-xs">GST AMOUNT</span>
                 <span className="font-bold text-gray-900">{formatRs(quotation.taxTotal)}</span>
               </div>
 
-              {/* Grand Total Bar (Image 3) */}
-              <div className="bg-[#E2E8F0] p-2.5 rounded-lg flex justify-between items-center font-black text-sm text-[#0B2545] mt-1 border border-gray-300">
+              {/* Highlighted Grand Total Banner (Brand Colors) */}
+              <div className="bg-blue-50/80 border-2 border-brand/20 p-3 rounded-xl flex justify-between items-center font-black text-base text-brand mt-1 shadow-xs">
                 <span className="tracking-wide">GRAND TOTAL</span>
-                <span className="text-base">{formatRs(quotation.grandTotal)}</span>
+                <span className="text-lg">{formatRs(quotation.grandTotal)}</span>
               </div>
             </div>
           </div>
 
-          {/* ================= CLOSING SENTENCE (Image 4) ================= */}
-          <div className="pt-2 text-xs text-gray-700 font-medium">
+          {/* ================= 6. CLOSING STATEMENT ================= */}
+          <div className="pt-2 text-xs sm:text-sm text-gray-700 font-medium">
             We hope you find our offer to be in line with your requirement.
           </div>
 
-          {/* ================= BOTTOM SECTION: TERMS (LEFT) & PAYMENT INSTRUCTIONS + SIGNATURE (RIGHT) (Image 4) ================= */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2 items-start">
-            {/* Left: TERMS & CONDITIONS */}
-            <div className="space-y-1.5 text-xs">
-              <h5 className="font-extrabold text-gray-900 uppercase tracking-wider text-[11px]">
+          {/* ================= 7. BOTTOM SECTION: TERMS (LEFT) & PAYMENT + SIGNATURE (RIGHT) ================= */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-4 items-start border-t border-gray-100">
+            {/* Left Column: TERMS & CONDITIONS */}
+            <div className="space-y-2 text-xs sm:text-sm">
+              <h5 className="font-black text-gray-900 uppercase tracking-wider text-xs border-b border-gray-200 pb-1 inline-block">
                 TERMS & CONDITIONS:
               </h5>
               {termsList.length === 0 ? (
-                <ul className="space-y-1 text-gray-600 text-xs">
+                <ul className="space-y-1.5 text-gray-600 text-xs">
                   <li>• DELIVERY CHARGES : EXTRA AT ACTUAL</li>
                   <li>• PAYMENT : 100% AGAINST DELIVERY</li>
                   <li>• VALIDITY : 30 DAYS</li>
                   <li>• DELIVERY : READY STOCK</li>
                 </ul>
               ) : (
-                <ul className="space-y-1 text-gray-700 text-xs">
+                <ul className="space-y-1.5 text-gray-700 text-xs">
                   {termsList.map((t, idx) => (
-                    <li key={idx} className="flex items-start gap-1.5">
-                      <span className="font-bold shrink-0">•</span>
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="font-bold text-brand shrink-0">•</span>
                       <span>{t}</span>
                     </li>
                   ))}
@@ -615,43 +705,43 @@ export default function QuotationDetailPage({
               )}
             </div>
 
-            {/* Right: PAYMENT INSTRUCTIONS + SIGNATURE */}
-            <div className="space-y-4 text-xs sm:text-right">
-              {/* Payment Instructions box (Image 4) */}
-              <div className="space-y-0.5 text-xs text-gray-800 sm:text-left sm:ml-auto sm:max-w-xs">
-                <h5 className="font-extrabold text-gray-900 uppercase tracking-wider text-[11px] mb-1">
+            {/* Right Column: PAYMENT INSTRUCTIONS + SIGNATORY */}
+            <div className="space-y-5 text-xs sm:text-sm sm:text-right">
+              {/* Payment Instructions Box */}
+              <div className="space-y-1 text-xs text-gray-800 sm:text-left sm:ml-auto sm:max-w-xs bg-gray-50/70 p-3.5 rounded-xl border border-gray-200">
+                <h5 className="font-black text-brand uppercase tracking-wider text-xs mb-1">
                   PAYMENT INSTRUCTIONS
                 </h5>
                 <p>
-                  <strong className="text-gray-600 uppercase text-[10px] tracking-wider">NAME : </strong>
-                  <span className="font-semibold text-gray-900">{bankDetails.name}</span>
+                  <strong className="text-gray-500 uppercase text-[10px] tracking-wider">NAME : </strong>
+                  <span className="font-bold text-gray-900">{bankDetails.name}</span>
                 </p>
                 <p>
-                  <strong className="text-gray-600 uppercase text-[10px] tracking-wider">BANK : </strong>
-                  <span className="font-semibold text-gray-900">{bankDetails.bank}</span>
+                  <strong className="text-gray-500 uppercase text-[10px] tracking-wider">BANK : </strong>
+                  <span className="font-bold text-gray-900">{bankDetails.bank}</span>
                 </p>
                 <p>
-                  <strong className="text-gray-600 uppercase text-[10px] tracking-wider">A/C NO : </strong>
-                  <span className="font-semibold text-gray-900">{bankDetails.accountNo}</span>
+                  <strong className="text-gray-500 uppercase text-[10px] tracking-wider">A/C NO : </strong>
+                  <span className="font-bold text-gray-900">{bankDetails.accountNo}</span>
                 </p>
                 <p>
-                  <strong className="text-gray-600 uppercase text-[10px] tracking-wider">IFSC CODE : </strong>
-                  <span className="font-semibold text-gray-900">{bankDetails.ifsc}</span>
+                  <strong className="text-gray-500 uppercase text-[10px] tracking-wider">IFSC CODE : </strong>
+                  <span className="font-bold text-gray-900">{bankDetails.ifsc}</span>
                 </p>
                 <p>
-                  <strong className="text-gray-600 uppercase text-[10px] tracking-wider">ACCOUNT TYPE : </strong>
-                  <span className="font-semibold text-gray-900">{bankDetails.accountType}</span>
+                  <strong className="text-gray-500 uppercase text-[10px] tracking-wider">ACCOUNT TYPE : </strong>
+                  <span className="font-bold text-gray-900">{bankDetails.accountType}</span>
                 </p>
               </div>
 
-              {/* Authorized Signatory (Image 4) */}
-              <div className="pt-2 sm:ml-auto sm:max-w-xs space-y-1 sm:text-center">
+              {/* Authorized Signatory Block */}
+              <div className="pt-2 sm:ml-auto sm:max-w-xs space-y-1 text-center">
                 <p className="font-bold text-xs text-gray-900">
                   For, {business?.businessName?.toUpperCase() || "OM ENTERPRISES"}
                 </p>
 
-                {/* Signature Image */}
-                <div className="h-14 flex items-center justify-center">
+                {/* Signature Image or Text */}
+                <div className="h-16 flex items-center justify-center">
                   {business?.signatureUrl ? (
                     <img
                       src={business.signatureUrl}
@@ -659,119 +749,72 @@ export default function QuotationDetailPage({
                       className="max-h-full max-w-full object-contain"
                     />
                   ) : (
-                    <span className="text-sm font-playfair italic text-gray-700 font-bold">
+                    <span className="text-base font-playfair italic text-gray-700 font-bold">
                       {business?.contactName || "Authorized Signature"}
                     </span>
                   )}
                 </div>
 
-                <p className="text-[10px] font-extrabold uppercase tracking-widest text-gray-500">
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 border-t border-gray-200 pt-1">
                   AUTHORIZED SIGNATURE
                 </p>
               </div>
             </div>
           </div>
 
-          {/* ================= PAGE FOOTER (Image 1) ================= */}
-          <div className="pt-6 border-t border-gray-100 flex justify-end items-center text-[10px] text-gray-400">
+          {/* ================= 8. PAGE FOOTER ================= */}
+          <div className="pt-6 border-t border-gray-100 flex justify-end items-center text-xs text-gray-400">
             <span>Page 1 of 1</span>
           </div>
         </div>
       </main>
 
-      {/* ================= FLOATING ACTION MENU ("MORE" BUTTON POP-UP) (Image 5) ================= */}
-      {isMoreOpen && (
-        <div className="fixed bottom-20 right-6 sm:right-10 z-50 flex flex-col items-end space-y-3 animate-in fade-in zoom-in-95 duration-150 print:hidden">
-          {/* 1. Delete Option Pill (Image 5) */}
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="flex items-center space-x-2.5 cursor-pointer group"
-          >
-            <span className="px-3 py-1 bg-black text-white text-xs font-bold rounded-lg shadow-md">
-              Delete
-            </span>
-            <div className="w-12 h-12 rounded-full bg-black text-white flex items-center justify-center shadow-xl group-hover:scale-105 transition-transform">
-              <Trash2 size={20} />
-            </div>
-          </button>
-
-          {/* 2. Status Option Pill (Image 5) */}
-          <button
-            type="button"
-            onClick={() => setIsStatusModalOpen(true)}
-            className="flex items-center space-x-2.5 cursor-pointer group"
-          >
-            <span className="px-3 py-1 bg-black text-white text-xs font-bold rounded-lg shadow-md">
-              Status
-            </span>
-            <div className="w-12 h-12 rounded-full bg-black text-white flex items-center justify-center shadow-xl group-hover:scale-105 transition-transform">
-              <Tag size={20} />
-            </div>
-          </button>
-        </div>
-      )}
-
-      {/* ================= BOTTOM ACTION BAR (Images 1 & 5) ================= */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200/90 shadow-2xl py-2 px-3 sm:px-6 flex items-center justify-around print:hidden max-w-2xl mx-auto rounded-t-3xl">
-        {/* 1. Duplicate */}
+      {/* ================= MOBILE FLOATING BOTTOM TOOLBAR (Only shown on small screens) ================= */}
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-2xl py-2 px-3 flex items-center justify-around print:hidden">
         <button
           type="button"
           onClick={handleDuplicate}
           disabled={isDuplicating}
-          className="flex flex-col items-center justify-center py-1 px-2.5 text-gray-700 hover:text-black transition-colors cursor-pointer group disabled:opacity-50"
+          className="flex flex-col items-center justify-center py-1 px-2 text-gray-700 hover:text-brand transition-colors cursor-pointer"
         >
-          {isDuplicating ? (
-            <Loader2 size={22} className="animate-spin text-black mb-1" />
-          ) : (
-            <Copy size={22} className="group-hover:scale-110 transition-transform text-gray-900 mb-1" />
-          )}
-          <span className="text-[11px] font-bold tracking-tight">Duplicate</span>
+          {isDuplicating ? <Loader2 size={20} className="animate-spin text-brand" /> : <Copy size={20} />}
+          <span className="text-[10px] font-bold mt-0.5">Duplicate</span>
         </button>
 
-        {/* 2. Edit */}
         <button
           type="button"
           onClick={handleEdit}
-          className="flex flex-col items-center justify-center py-1 px-2.5 text-gray-700 hover:text-black transition-colors cursor-pointer group"
+          className="flex flex-col items-center justify-center py-1 px-2 text-gray-700 hover:text-brand transition-colors cursor-pointer"
         >
-          <Edit3 size={22} className="group-hover:scale-110 transition-transform text-gray-900 mb-1" />
-          <span className="text-[11px] font-bold tracking-tight">Edit</span>
+          <Edit3 size={20} />
+          <span className="text-[10px] font-bold mt-0.5">Edit</span>
         </button>
 
-        {/* 3. Invoice */}
         <button
           type="button"
-          onClick={() => setIsInvoiceModalOpen(true)}
-          className="flex flex-col items-center justify-center py-1 px-2.5 text-gray-700 hover:text-black transition-colors cursor-pointer group"
+          onClick={handlePrint}
+          className="flex flex-col items-center justify-center py-1 px-2 text-brand hover:text-brand-hover transition-colors cursor-pointer font-bold"
         >
-          <FileSpreadsheet size={22} className="group-hover:scale-110 transition-transform text-gray-900 mb-1" />
-          <span className="text-[11px] font-bold tracking-tight">Invoice</span>
+          <Printer size={20} />
+          <span className="text-[10px] font-bold mt-0.5">Print/PDF</span>
         </button>
 
-        {/* 4. Share */}
         <button
           type="button"
           onClick={handleShare}
-          className="flex flex-col items-center justify-center py-1 px-2.5 text-gray-700 hover:text-black transition-colors cursor-pointer group"
+          className="flex flex-col items-center justify-center py-1 px-2 text-gray-700 hover:text-brand transition-colors cursor-pointer"
         >
-          <Share2 size={22} className="group-hover:scale-110 transition-transform text-gray-900 mb-1" />
-          <span className="text-[11px] font-bold tracking-tight">Share</span>
+          <Share2 size={20} />
+          <span className="text-[10px] font-bold mt-0.5">Share</span>
         </button>
 
-        {/* 5. More (Toggles Delete & Status) */}
         <button
           type="button"
           onClick={() => setIsMoreOpen(!isMoreOpen)}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 transition-colors cursor-pointer group ${
-            isMoreOpen ? "text-black" : "text-gray-700 hover:text-black"
-          }`}
+          className="flex flex-col items-center justify-center py-1 px-2 text-gray-700 hover:text-brand transition-colors cursor-pointer"
         >
-          <MoreHorizontal
-            size={22}
-            className={`transition-transform text-gray-900 mb-1 ${isMoreOpen ? "rotate-90" : "group-hover:scale-110"}`}
-          />
-          <span className="text-[11px] font-bold tracking-tight">More</span>
+          <MoreHorizontal size={20} />
+          <span className="text-[10px] font-bold mt-0.5">More</span>
         </button>
       </nav>
 
@@ -799,7 +842,7 @@ export default function QuotationDetailPage({
                   disabled={isUpdatingStatus}
                   className={`w-full p-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all cursor-pointer ${
                     quotation.status === st
-                      ? "bg-black text-white border-black"
+                      ? "bg-brand text-white border-brand"
                       : "bg-gray-50 text-gray-800 border-gray-200 hover:bg-gray-100"
                   }`}
                 >
@@ -818,7 +861,7 @@ export default function QuotationDetailPage({
           <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <div className="flex items-center space-x-2">
-                <FileSpreadsheet size={18} className="text-gray-900" />
+                <FileSpreadsheet size={18} className="text-brand" />
                 <h4 className="text-base font-bold text-gray-900">Commercial Invoice</h4>
               </div>
               <button
@@ -831,7 +874,7 @@ export default function QuotationDetailPage({
             </div>
 
             <p className="text-xs text-gray-600 leading-relaxed">
-              Convert this accepted quotation into an official Tax Invoice or download a Proforma Invoice with your banking credentials.
+              Convert this accepted quotation into an official Tax Invoice or print a Proforma Invoice with your banking credentials.
             </p>
 
             <div className="space-y-2.5 pt-1">
@@ -841,7 +884,7 @@ export default function QuotationDetailPage({
                   setIsInvoiceModalOpen(false);
                   window.print();
                 }}
-                className="w-full py-3 bg-[#18181B] text-white font-bold text-xs rounded-xl hover:bg-black shadow transition-all cursor-pointer flex items-center justify-center space-x-2"
+                className="w-full py-3 bg-brand text-white font-bold text-xs rounded-xl hover:bg-brand-hover shadow transition-all cursor-pointer flex items-center justify-center space-x-2"
               >
                 <Printer size={15} />
                 <span>Print Proforma Invoice</span>
@@ -867,7 +910,7 @@ export default function QuotationDetailPage({
           <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <div className="flex items-center space-x-2">
-                <Share2 size={18} className="text-gray-900" />
+                <Share2 size={18} className="text-brand" />
                 <h4 className="text-base font-bold text-gray-900">Share Quotation</h4>
               </div>
               <button
@@ -901,7 +944,7 @@ export default function QuotationDetailPage({
                   setIsShareModalOpen(false);
                   window.print();
                 }}
-                className="w-full py-3 bg-[#18181B] hover:bg-black text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center space-x-2 cursor-pointer"
+                className="w-full py-3 bg-brand hover:bg-brand-hover text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center space-x-2 cursor-pointer"
               >
                 <Printer size={15} />
                 <span>Print / Save as PDF</span>

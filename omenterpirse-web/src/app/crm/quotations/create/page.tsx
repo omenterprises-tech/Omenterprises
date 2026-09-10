@@ -19,7 +19,10 @@ import {
   FileText,
   DollarSign,
   AlertCircle,
-  SlidersHorizontal,
+  Building2,
+  Percent,
+  PlusCircle,
+  HelpCircle,
 } from "lucide-react";
 import CustomerModal from "@/components/crm/CustomerModal";
 import ProductModal from "@/components/crm/ProductModal";
@@ -33,6 +36,8 @@ interface QuotationItem {
   description: string;
   taxPercent: number;
   total: number;
+  hsn?: string;
+  unit?: string;
 }
 
 interface OtherChargeData {
@@ -76,7 +81,7 @@ function MakeQuotationContent() {
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [productSearch, setProductSearch] = useState("");
 
-  // Add / Edit Quotation Product Sheet (Image 2)
+  // Product Configurator Modal
   const [isConfiguringProduct, setIsConfiguringProduct] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [currentProductObj, setCurrentProductObj] = useState<any | null>(null);
@@ -85,16 +90,18 @@ function MakeQuotationContent() {
   const [cfgPrice, setCfgPrice] = useState("");
   const [cfgDescription, setCfgDescription] = useState("");
   const [cfgTaxPercent, setCfgTaxPercent] = useState("18");
+  const [cfgHsn, setCfgHsn] = useState("");
+  const [cfgUnit, setCfgUnit] = useState("PCS");
 
-  // Other Charge State (Image 3)
+  // Other Charge State
   const [isOtherChargeOpen, setIsOtherChargeOpen] = useState(false);
   const [otherCharge, setOtherCharge] = useState<OtherChargeData | null>(null);
-  const [ocLabel, setOcLabel] = useState("Other Charges");
+  const [ocLabel, setOcLabel] = useState("Transportation / Delivery Charges");
   const [ocAmount, setOcAmount] = useState("");
   const [ocIsTaxable, setOcIsTaxable] = useState(false);
 
-  // Terms & Conditions State (Image 4 & 5)
-  const [isTermsOpen, setIsTermsOpen] = useState(false);
+  // Terms & Conditions State
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [termsList, setTermsList] = useState<TermItem[]>([]);
   const [selectedTermIds, setSelectedTermIds] = useState<string[]>([]);
   const [isEditingTerms, setIsEditingTerms] = useState(false);
@@ -157,10 +164,9 @@ function MakeQuotationContent() {
         }));
 
         setTermsList(mappedTerms);
-        // Default select all terms
         setSelectedTermIds(mappedTerms.map((t) => t.id));
 
-        // If editId is provided, load existing quotation details
+        // Load existing quotation if in edit mode
         if (editId) {
           const qRes = await fetch(`/api/crm/quotations/${editId}`).then((r) => r.json());
           if (qRes.success && qRes.quotation) {
@@ -169,7 +175,6 @@ function MakeQuotationContent() {
             if (q.quotationDate) setQuotationDate(q.quotationDate);
             if (q.notes) setOtherInfo(q.notes);
 
-            // Set customer
             setSelectedCustomer({
               id: q.customerId,
               name: q.customerName,
@@ -179,7 +184,6 @@ function MakeQuotationContent() {
               gstin: q.customerGstin,
             });
 
-            // Parse items
             let parsedItems: any[] = [];
             try {
               parsedItems = typeof q.items === "string" ? JSON.parse(q.items) : q.items;
@@ -197,11 +201,12 @@ function MakeQuotationContent() {
                   unitPrice: Number(it.unitPrice) || 0,
                   taxPercent: Number(it.taxPercent) || 18,
                   total: Number(it.total) || (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0),
+                  hsn: it.hsn || "85446020",
+                  unit: it.unit || "PCS",
                 }))
               );
             }
 
-            // Parse other charges
             if (q.otherCharges) {
               try {
                 const parsedOc =
@@ -216,7 +221,6 @@ function MakeQuotationContent() {
               } catch (e) {}
             }
 
-            // Parse terms
             if (q.termsConditions) {
               const qLines = q.termsConditions
                 .split("\n")
@@ -266,7 +270,7 @@ function MakeQuotationContent() {
     return Math.round((subtotal + otherChargeAmount + taxTotal) * 100) / 100;
   }, [subtotal, otherChargeAmount, taxTotal]);
 
-  // Filtered customers for search
+  // Filtered customers
   const filteredCustomers = useMemo(() => {
     if (!customerSearch.trim()) return customers;
     const q = customerSearch.toLowerCase().trim();
@@ -279,7 +283,7 @@ function MakeQuotationContent() {
     );
   }, [customers, customerSearch]);
 
-  // Filtered products for search
+  // Filtered products
   const filteredProducts = useMemo(() => {
     if (!productSearch.trim()) return allProducts;
     const q = productSearch.toLowerCase().trim();
@@ -302,6 +306,8 @@ function MakeQuotationContent() {
     setCfgQuantity(editIndex !== null && selectedItems[editIndex] ? String(selectedItems[editIndex].quantity) : "1");
     setCfgDescription(prod.description || "");
     setCfgTaxPercent(prod.gst !== undefined && prod.gst !== null ? String(prod.gst) : "18");
+    setCfgHsn(prod.hsn || "85446020");
+    setCfgUnit(prod.unit || "COILS");
 
     setIsProductSelectOpen(false);
     setIsConfiguringProduct(true);
@@ -324,6 +330,8 @@ function MakeQuotationContent() {
       description: cfgDescription.trim(),
       taxPercent: taxRate,
       total,
+      hsn: cfgHsn.trim() || "85446020",
+      unit: cfgUnit.trim() || "COILS",
     };
 
     if (editingItemIndex !== null) {
@@ -346,7 +354,7 @@ function MakeQuotationContent() {
     e.preventDefault();
     const amt = parseFloat(ocAmount);
     if (isNaN(amt) || amt < 0) {
-      alert("Please enter a valid amount.");
+      alert("Please enter a valid positive amount.");
       return;
     }
 
@@ -385,7 +393,7 @@ function MakeQuotationContent() {
     setIsEditingTerms(true);
   };
 
-  // Generate Quotation
+  // Generate / Save Quotation
   const handleGenerateQuotation = async () => {
     setSubmissionError("");
 
@@ -402,19 +410,20 @@ function MakeQuotationContent() {
     setIsGenerating(true);
 
     try {
-      // Format selected terms
       const selectedTermsFormatted = termsList
         .filter((t) => selectedTermIds.includes(t.id) && t.text.trim())
         .map((t, idx) => `${idx + 1}. ${t.text.trim()}`)
         .join("\n");
 
-      // Format items payload
       const itemsPayload = selectedItems.map((it) => ({
+        name: it.name,
         description: it.name + (it.description ? ` - ${it.description}` : ""),
         quantity: it.quantity,
         unitPrice: it.unitPrice,
         taxPercent: it.taxPercent,
         total: it.total,
+        hsn: it.hsn,
+        unit: it.unit,
       }));
 
       const payload = {
@@ -468,515 +477,754 @@ function MakeQuotationContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#1E1E1E]">
-        <Loader2 className="w-10 h-10 text-white animate-spin mb-4" />
-        <p className="text-white/80 font-medium text-sm">Opening Make Quotation...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
+        <Loader2 className="w-10 h-10 text-brand animate-spin mb-4" />
+        <p className="text-gray-600 font-semibold text-sm">Opening Quotation Editor...</p>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-[#1E1E1E] flex flex-col justify-start items-center font-inter">
-      {/* Mobile Frame Container */}
-      <div className="w-full max-w-md min-h-screen bg-[#F8F9FA] flex flex-col shadow-2xl relative pb-28">
-        {/* ================= TOP HEADER (Image 1) ================= */}
-        <div className="bg-[#1E1E1E] text-white px-4 py-4 flex items-center space-x-3 sticky top-0 z-30 shadow-md">
-          <button
-            type="button"
-            onClick={() => router.push(editId ? `/crm/quotations/${editId}` : "/crm/dashboard")}
-            className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title={editId ? "Back to Quotation Detail" : "Back to Dashboard"}
-          >
-            <ArrowLeft size={22} />
-          </button>
-          <h1 className="text-lg font-bold tracking-tight text-white">
-            {editId ? "Edit Quotation" : "Make Quotation"}
-          </h1>
-        </div>
+  const businessName = business?.businessName || "OM ENTERPRISES";
 
-        {/* ================= TOP INFO SECTION (Image 1) ================= */}
-        <div className="bg-white p-4 sm:p-5 border-b border-gray-200/80 shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-xs text-gray-500">
+  return (
+    <div className="min-h-screen bg-[#F8FAFC] text-gray-900 font-inter flex flex-col pb-16">
+      {/* ================= FULL-SCREEN TOP HEADER (Website Brand Styling) ================= */}
+      <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200/80 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-3">
+              <button
+                type="button"
+                onClick={() => router.push(editId ? `/crm/quotations/${editId}` : "/crm/dashboard")}
+                className="p-2 rounded-xl text-gray-500 hover:text-brand hover:bg-brand/5 transition-colors cursor-pointer mr-1"
+                title={editId ? "Back to Quotation Detail" : "Back to Dashboard"}
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h1 className="text-lg font-bold text-gray-900 tracking-tight">
+                    {editId ? "Edit Quotation" : "Create New Quotation"}
+                  </h1>
+                  <span className="text-[10px] bg-brand/10 text-brand font-bold uppercase px-2.5 py-0.5 rounded-full">
+                    {editId ? quotationNo : "Draft"}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 font-medium">
+                  {businessName} • Formal Client Quotation
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <button
+                type="button"
+                onClick={() => router.push("/crm/quotations")}
+                className="hidden sm:inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                View Quotation Ledger
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerateQuotation}
+                disabled={isGenerating}
+                className="px-5 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>{editId ? "Saving..." : "Generating..."}</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={15} />
+                    <span>{editId ? "Update Quotation" : "Generate Quotation"}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ================= FULL-SCREEN MAIN WORKSPACE ================= */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+        {/* Error Notification */}
+        {submissionError && (
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-xs text-rose-800 font-medium animate-in fade-in">
+            <AlertCircle size={18} className="shrink-0 text-rose-600" />
+            <span>{submissionError}</span>
+          </div>
+        )}
+
+        {/* Top Info Card: Date, Quote No, Other Info */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <span className="block text-[11px] font-medium text-gray-400">Quotation Date</span>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                Quotation Date
+              </label>
               <input
                 type="text"
                 value={quotationDate}
                 onChange={(e) => setQuotationDate(e.target.value)}
                 placeholder="DD/MM/YYYY"
-                className="font-bold text-gray-900 text-sm focus:outline-none bg-transparent"
+                className="w-full px-3.5 py-2.5 bg-gray-50 rounded-xl border border-gray-200 text-sm font-semibold text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
               />
             </div>
-            <div className="text-right">
-              <span className="block text-[11px] font-medium text-gray-400">Quotation No</span>
-              <span className="font-bold text-gray-900 text-sm">{quotationNo}</span>
-            </div>
-          </div>
 
-          <div className="pt-1">
-            <input
-              type="text"
-              value={otherInfo}
-              onChange={(e) => setOtherInfo(e.target.value)}
-              placeholder="Other Info:"
-              className="w-full text-xs text-gray-600 placeholder:text-gray-400 bg-transparent focus:outline-none"
-            />
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                Quotation Number
+              </label>
+              <div className="px-3.5 py-2.5 bg-gray-100/70 rounded-xl border border-gray-200 text-sm font-bold text-gray-700">
+                {quotationNo === "-" ? "Auto-generated on save" : quotationNo}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                Other Info / Reference
+              </label>
+              <input
+                type="text"
+                value={otherInfo}
+                onChange={(e) => setOtherInfo(e.target.value)}
+                placeholder="e.g. Inquiry ref, project site, delivery note..."
+                className="w-full px-3.5 py-2.5 bg-gray-50 rounded-xl border border-gray-200 text-sm text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Validation error if any */}
-        {submissionError && (
-          <div className="mx-4 mt-3 p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 font-medium flex items-center gap-2">
-            <AlertCircle size={16} className="shrink-0 text-rose-600" />
-            <span>{submissionError}</span>
-          </div>
-        )}
-
-        {/* ================= MAIN 4 CARDS (Image 1 & 3) ================= */}
-        <div className="p-4 space-y-3.5 flex-1">
-          {/* 1. TO (CUSTOMER) CARD */}
-          {!selectedCustomer ? (
-            <button
-              type="button"
-              onClick={() => setIsCustomerSelectOpen(true)}
-              className="w-full bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs hover:border-brand/40 hover:shadow-sm transition-all flex items-center justify-between cursor-pointer group text-left"
-            >
-              <span className="font-bold text-sm text-gray-900 tracking-wide">
-                TO (CUSTOMER)
-              </span>
-              <div className="w-8 h-8 rounded-full bg-[#1E1E1E] text-white flex items-center justify-center group-hover:scale-105 transition-transform">
-                <Plus size={18} />
-              </div>
-            </button>
-          ) : (
-            <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs space-y-1 relative">
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-gray-400 tracking-wider block">
-                    Customer
-                  </span>
-                  <h4 className="text-sm font-bold text-gray-900">{selectedCustomer.name}</h4>
-                  {selectedCustomer.companyName && (
-                    <p className="text-xs text-gray-500">{selectedCustomer.companyName}</p>
-                  )}
-                  {selectedCustomer.phone && (
-                    <p className="text-xs text-gray-400 mt-0.5">{selectedCustomer.phone}</p>
-                  )}
+        {/* Workspace 2-Column Responsive Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* LEFT COLUMN: Customer & Products (7 Columns on large screens) */}
+          <div className="lg:col-span-8 space-y-6">
+            {/* 1. TO (CUSTOMER) SECTION */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
+                    <User size={16} />
+                  </div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+                    TO (CUSTOMER)
+                  </h3>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCustomer(null)}
-                  className="p-1 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
-                  title="Remove Customer"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
-          )}
 
-          {/* 2. PRODUCTS CARD */}
-          <div className="space-y-2">
-            <button
-              type="button"
-              onClick={() => setIsProductSelectOpen(true)}
-              className="w-full bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs hover:border-brand/40 hover:shadow-sm transition-all flex items-center justify-between cursor-pointer group text-left"
-            >
-              <span className="font-bold text-sm text-gray-900 tracking-wide">
-                PRODUCTS
-              </span>
-              <div className="w-8 h-8 rounded-full bg-[#1E1E1E] text-white flex items-center justify-center group-hover:scale-105 transition-transform">
-                <Plus size={18} />
-              </div>
-            </button>
-
-            {/* List of Added Products (Image 3) */}
-            {selectedItems.length > 0 && (
-              <div className="space-y-2 pt-1">
-                {selectedItems.map((item, idx) => (
-                  <div
-                    key={item.id}
-                    className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between cursor-pointer hover:border-gray-300 transition-all"
+                {!selectedCustomer ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomerSelectOpen(true)}
+                    className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
                   >
-                    <div
-                      onClick={() => openProductConfigurator(item, idx)}
-                      className="flex-1 pr-2"
-                    >
-                      <h4 className="text-sm font-bold text-gray-900">{item.name}</h4>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Amount: {item.quantity} * ₹{item.unitPrice} = ₹{item.total}
-                      </p>
-                      {item.description && (
-                        <p className="text-[11px] text-gray-400 truncate max-w-[240px] mt-0.5">
-                          {item.description}
-                        </p>
+                    <Plus size={14} />
+                    <span>Select Customer</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomerSelectOpen(true)}
+                    className="text-xs font-bold text-brand hover:underline cursor-pointer"
+                  >
+                    Change Customer
+                  </button>
+                )}
+              </div>
+
+              {!selectedCustomer ? (
+                <div
+                  onClick={() => setIsCustomerSelectOpen(true)}
+                  className="p-8 border-2 border-dashed border-gray-200 hover:border-brand rounded-2xl text-center cursor-pointer transition-colors bg-gray-50/50 hover:bg-blue-50/20 group"
+                >
+                  <div className="w-12 h-12 rounded-full bg-brand/10 text-brand flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
+                    <Plus size={22} />
+                  </div>
+                  <h4 className="text-sm font-bold text-gray-800">Add Customer to Quotation</h4>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Click to select from registered customers or register a new one
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-blue-50/40 border border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-gray-900">{selectedCustomer.name}</h4>
+                      {selectedCustomer.companyName && (
+                        <span className="text-xs font-semibold px-2 py-0.5 bg-blue-100 text-brand rounded-md">
+                          {selectedCustomer.companyName}
+                        </span>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSelectedItems((prev) => prev.filter((_, i) => i !== idx))
-                      }
-                      className="p-1 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
-                      title="Remove Product"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 3. OTHER CHARGE CARD */}
-          {!otherCharge ? (
-            <button
-              type="button"
-              onClick={() => {
-                setOcLabel("Other Charges");
-                setOcAmount("");
-                setOcIsTaxable(false);
-                setIsOtherChargeOpen(true);
-              }}
-              className="w-full bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs hover:border-brand/40 hover:shadow-sm transition-all flex items-center justify-between cursor-pointer group text-left"
-            >
-              <span className="font-bold text-sm text-gray-900 tracking-wide">
-                OTHER CHARGE
-              </span>
-              <div className="w-8 h-8 rounded-full bg-[#1E1E1E] text-white flex items-center justify-center group-hover:scale-105 transition-transform">
-                <Plus size={18} />
-              </div>
-            </button>
-          ) : (
-            <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase text-gray-400 tracking-wider block">
-                  Other Charge
-                </span>
-                <h4 className="text-sm font-bold text-gray-900">{otherCharge.label}</h4>
-                <p className="text-xs text-gray-500">
-                  ₹{otherCharge.amount} {otherCharge.isTaxable ? "(+18% GST)" : "(Non-taxable)"}
-                </p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOcLabel(otherCharge.label);
-                    setOcAmount(String(otherCharge.amount));
-                    setOcIsTaxable(otherCharge.isTaxable);
-                    setIsOtherChargeOpen(true);
-                  }}
-                  className="p-1 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
-                  title="Edit Other Charge"
-                >
-                  <Edit3 size={15} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOtherCharge(null)}
-                  className="p-1 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
-                  title="Remove Other Charge"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 4. TERMS & CONDITIONS CARD */}
-          <button
-            type="button"
-            onClick={() => setIsTermsOpen(true)}
-            className="w-full bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs hover:border-brand/40 hover:shadow-sm transition-all flex items-center justify-between cursor-pointer group text-left"
-          >
-            <div>
-              <span className="font-bold text-sm text-gray-900 tracking-wide block">
-                TERMS & CONDITIONS
-              </span>
-              <span className="text-xs text-gray-500 mt-0.5 block">
-                {selectedTermIds.length} Points Selected
-              </span>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-[#1E1E1E] text-white flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Plus size={18} />
-            </div>
-          </button>
-        </div>
-
-        {/* ================= BOTTOM BAR (Image 1) ================= */}
-        <div className="fixed bottom-0 w-full max-w-md bg-[#1E1E1E] text-white p-3.5 sm:p-4 flex items-center justify-between rounded-t-3xl shadow-2xl z-40">
-          <div>
-            <span className="text-[11px] font-medium text-white/70 block">Amount Due</span>
-            <span className="text-xl font-extrabold text-white tracking-tight">
-              ₹{amountDue.toLocaleString("en-IN")}
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleGenerateQuotation}
-            disabled={isGenerating}
-            className="px-8 py-3.5 bg-white hover:bg-gray-100 text-[#1E1E1E] font-bold text-sm rounded-full shadow-lg transition-all cursor-pointer flex items-center justify-center space-x-2 disabled:opacity-50"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 size={16} className="animate-spin text-black" />
-                <span>{editId ? "Updating..." : "Generating..."}</span>
-              </>
-            ) : (
-              <span>{editId ? "Update Quotation" : "Generate"}</span>
-            )}
-          </button>
-        </div>
-
-        {/* ================= MODAL 1: SELECT CUSTOMER ================= */}
-        {isCustomerSelectOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-              {/* Dark Header */}
-              <div className="bg-[#1E1E1E] text-white px-4 py-3.5 flex items-center justify-between shrink-0">
-                <div className="flex items-center space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsCustomerSelectOpen(false)}
-                    className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10"
-                  >
-                    <ArrowLeft size={20} />
-                  </button>
-                  <h2 className="text-base font-bold text-white">Select Customer</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsAddCustomerOpen(true)}
-                  className="px-3 py-1 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1"
-                >
-                  <Plus size={13} />
-                  <span>+ Add</span>
-                </button>
-              </div>
-
-              {/* Search Bar */}
-              <div className="p-3 border-b border-gray-100">
-                <div className="relative">
-                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    value={customerSearch}
-                    onChange={(e) => setCustomerSearch(e.target.value)}
-                    placeholder="Search name, company, phone..."
-                    className="w-full bg-[#F4F5F7] pl-9 pr-3.5 py-2.5 rounded-xl text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 border border-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Customer List */}
-              <div className="p-3 overflow-y-auto space-y-2 flex-1">
-                {filteredCustomers.length === 0 ? (
-                  <div className="py-12 text-center text-xs text-gray-500 space-y-2">
-                    <p>No customers found.</p>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddCustomerOpen(true)}
-                      className="px-4 py-2 bg-[#1E1E1E] text-white rounded-xl font-bold"
-                    >
-                      + Add New Customer
-                    </button>
-                  </div>
-                ) : (
-                  filteredCustomers.map((cust) => (
-                    <div
-                      key={cust.id}
-                      onClick={() => {
-                        setSelectedCustomer(cust);
-                        setIsCustomerSelectOpen(false);
-                      }}
-                      className="p-3.5 rounded-2xl bg-[#F8F9FA] hover:bg-white border border-gray-200/80 hover:border-brand/40 shadow-xs cursor-pointer transition-all flex items-center justify-between group"
-                    >
-                      <div>
-                        <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
-                          {cust.name}
-                        </h4>
-                        {cust.companyName && (
-                          <p className="text-xs text-gray-500">{cust.companyName}</p>
-                        )}
-                        {cust.phone && <p className="text-[11px] text-gray-400">{cust.phone}</p>}
-                      </div>
-                      <span className="text-xs font-bold text-gray-400 group-hover:text-brand transition-colors">
-                        Select →
-                      </span>
+                    {selectedCustomer.addressLine1 && (
+                      <p className="text-xs text-gray-600">{selectedCustomer.addressLine1}</p>
+                    )}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 pt-0.5">
+                      {selectedCustomer.phone && <span>Phone: {selectedCustomer.phone}</span>}
+                      {selectedCustomer.email && <span>Email: {selectedCustomer.email}</span>}
+                      {selectedCustomer.gstin && (
+                        <span className="font-semibold text-brand">GSTIN: {selectedCustomer.gstin}</span>
+                      )}
                     </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Customer Modal: Add Customer */}
-        <CustomerModal
-          isOpen={isAddCustomerOpen}
-          onClose={() => setIsAddCustomerOpen(false)}
-          onCustomerCreated={(newCust) => {
-            setCustomers((prev) => [newCust, ...prev]);
-            setSelectedCustomer(newCust);
-            setIsAddCustomerOpen(false);
-            setIsCustomerSelectOpen(false);
-          }}
-        />
-
-        {/* ================= MODAL 2: SELECT PRODUCT ================= */}
-        {isProductSelectOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-              {/* Dark Header */}
-              <div className="bg-[#1E1E1E] text-white px-4 py-3.5 flex items-center justify-between shrink-0">
-                <div className="flex items-center space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsProductSelectOpen(false)}
-                    className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10"
-                  >
-                    <ArrowLeft size={20} />
-                  </button>
-                  <h2 className="text-base font-bold text-white">Select Product</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsAddProductOpen(true)}
-                  className="px-3 py-1 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1"
-                >
-                  <Plus size={13} />
-                  <span>+ Add</span>
-                </button>
-              </div>
-
-              {/* Search Bar */}
-              <div className="p-3 border-b border-gray-100">
-                <div className="relative">
-                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    value={productSearch}
-                    onChange={(e) => setProductSearch(e.target.value)}
-                    placeholder="Search product..."
-                    className="w-full bg-[#F4F5F7] pl-9 pr-3.5 py-2.5 rounded-xl text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 border border-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Product List */}
-              <div className="p-3 overflow-y-auto space-y-2 flex-1">
-                {filteredProducts.length === 0 ? (
-                  <div className="py-12 text-center text-xs text-gray-500 space-y-2">
-                    <p>No products found.</p>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddProductOpen(true)}
-                      className="px-4 py-2 bg-[#1E1E1E] text-white rounded-xl font-bold"
-                    >
-                      + Add New Product
-                    </button>
                   </div>
-                ) : (
-                  filteredProducts.map((prod) => (
-                    <div
-                      key={prod.id}
-                      onClick={() => openProductConfigurator(prod)}
-                      className="p-3.5 rounded-2xl bg-[#F8F9FA] hover:bg-white border border-gray-200/80 hover:border-brand/40 shadow-xs cursor-pointer transition-all flex items-center justify-between group"
-                    >
-                      <div>
-                        <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
-                          {prod.name}
-                        </h4>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          ₹{Number(prod.basePrice || prod.price || 0).toLocaleString("en-IN")}
-                        </p>
-                        {prod.description && (
-                          <p className="text-[11px] text-gray-400 truncate max-w-[240px]">
-                            {prod.description}
-                          </p>
-                        )}
-                      </div>
-                      <ChevronRight size={18} className="text-gray-400 group-hover:text-brand" />
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Product Modal: Add New Product */}
-        <ProductModal
-          isOpen={isAddProductOpen}
-          onClose={() => setIsAddProductOpen(false)}
-          onProductCreated={(newProd) => {
-            setAllProducts((prev) => [newProd, ...prev]);
-            setIsAddProductOpen(false);
-            openProductConfigurator(newProd);
-          }}
-        />
-
-        {/* ================= MODAL 3: ADD QUOTATION PRODUCT (Image 2) ================= */}
-        {isConfiguringProduct && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
-              {/* Dark Header (Image 2) */}
-              <div className="bg-[#1E1E1E] text-white px-4 py-3.5 flex items-center justify-between shrink-0">
-                <div className="flex items-center space-x-3">
                   <button
                     type="button"
-                    onClick={() => setIsConfiguringProduct(false)}
-                    className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10"
+                    onClick={() => setSelectedCustomer(null)}
+                    className="p-2 text-gray-400 hover:text-rose-600 hover:bg-white rounded-xl transition-colors cursor-pointer self-end sm:self-center"
+                    title="Remove Customer"
                   >
-                    <ArrowLeft size={20} />
+                    <Trash2 size={18} />
                   </button>
-                  <h2 className="text-base font-bold text-white">Add Quotation Product</h2>
                 </div>
+              )}
+            </div>
+
+            {/* 2. PRODUCTS SECTION */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
+                    <Package size={16} />
+                  </div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+                    PRODUCTS ({selectedItems.length})
+                  </h3>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => setIsProductSelectOpen(true)}
-                  className="p-1.5 text-white/80 hover:text-white"
-                  title="Switch Product"
+                  className="flex items-center space-x-1.5 px-3.5 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
                 >
-                  <Search size={18} />
+                  <Plus size={14} />
+                  <span>+ Add Product</span>
                 </button>
               </div>
 
-              {/* Form Content (Image 2) */}
-              <form onSubmit={handleSaveProductToQuotation} className="p-4 sm:p-5 space-y-3.5 overflow-y-auto flex-1">
-                {/* 1. Product Field with '>' arrow to change product (Image 2) */}
+              {selectedItems.length === 0 ? (
                 <div
-                  onClick={() => {
-                    setIsConfiguringProduct(false);
-                    setIsProductSelectOpen(true);
-                  }}
-                  className="bg-[#F4F5F7] p-3.5 rounded-2xl cursor-pointer flex items-center justify-between hover:bg-gray-100 transition-colors"
+                  onClick={() => setIsProductSelectOpen(true)}
+                  className="p-8 border-2 border-dashed border-gray-200 hover:border-brand rounded-2xl text-center cursor-pointer transition-colors bg-gray-50/50 hover:bg-blue-50/20 group"
                 >
-                  <div>
-                    <span className="block text-xs text-gray-400 font-medium">Product</span>
-                    <span className="text-sm font-bold text-gray-900">{cfgName || "Select Product"}</span>
+                  <div className="w-12 h-12 rounded-full bg-brand/10 text-brand flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
+                    <Plus size={22} />
                   </div>
-                  <ChevronRight size={18} className="text-gray-400" />
+                  <h4 className="text-sm font-bold text-gray-800">Add Products / Services</h4>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Select from catalog with custom quantities, rates, and notes
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-gray-200 rounded-2xl">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-gray-50 border-b border-gray-200 font-extrabold text-gray-700 uppercase tracking-wider text-[11px]">
+                      <tr>
+                        <th className="p-3 text-center w-10">#</th>
+                        <th className="p-3">Item Description</th>
+                        <th className="p-3 text-center w-16">HSN</th>
+                        <th className="p-3 text-center w-20">Qty</th>
+                        <th className="p-3 text-right w-24">Rate (₹)</th>
+                        <th className="p-3 text-center w-16">GST %</th>
+                        <th className="p-3 text-right w-28">Amount (₹)</th>
+                        <th className="p-3 text-center w-16">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {selectedItems.map((item, idx) => (
+                        <tr key={item.id} className="hover:bg-blue-50/30 transition-colors">
+                          <td className="p-3 text-center font-medium text-gray-400">{idx + 1}</td>
+                          <td className="p-3">
+                            <span className="font-bold text-gray-900 block">{item.name}</span>
+                            {item.description && (
+                              <span className="text-[11px] text-gray-500 font-normal block mt-0.5">
+                                {item.description}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center text-gray-500">{item.hsn || "85446020"}</td>
+                          <td className="p-3 text-center font-bold text-gray-800">
+                            {item.quantity} <span className="text-[10px] text-gray-500 uppercase">{item.unit || "COILS"}</span>
+                          </td>
+                          <td className="p-3 text-right font-medium text-gray-800">
+                            ₹{item.unitPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-3 text-center font-medium text-gray-600">{item.taxPercent}%</td>
+                          <td className="p-3 text-right font-bold text-gray-900">
+                            ₹{item.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-3 text-center">
+                            <div className="flex items-center justify-center space-x-1">
+                              <button
+                                type="button"
+                                onClick={() => openProductConfigurator(item, idx)}
+                                className="p-1 text-gray-400 hover:text-brand transition-colors cursor-pointer"
+                                title="Edit Item"
+                              >
+                                <Edit3 size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSelectedItems((prev) => prev.filter((_, i) => i !== idx))
+                                }
+                                className="p-1 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                title="Remove Item"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* 3. TERMS & CONDITIONS SECTION */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
+                    <FileText size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+                      TERMS & CONDITIONS
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      {selectedTermIds.length} of {termsList.length} clauses selected for quote
+                    </p>
+                  </div>
                 </div>
 
-                {/* 2. Quantity (Image 2) */}
-                <div className="bg-[#F4F5F7] p-3.5 rounded-2xl">
-                  <label className="block text-xs text-gray-400 font-medium mb-1">Quantity</label>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingTerms((prev) => !prev)}
+                    className="flex items-center space-x-1 px-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors cursor-pointer"
+                  >
+                    <Edit3 size={13} />
+                    <span>{isEditingTerms ? "Finish Editing" : "Edit Points"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addNewTermItem}
+                    className="flex items-center space-x-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <Plus size={13} />
+                    <span>+ Add Clause</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Select All Checkbox */}
+              <div className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold text-gray-700">
+                <span>Select All Clauses</span>
+                <input
+                  type="checkbox"
+                  checked={selectedTermIds.length === termsList.length && termsList.length > 0}
+                  onChange={handleSelectAllTerms}
+                  className="w-4 h-4 rounded-md accent-brand cursor-pointer"
+                />
+              </div>
+
+              {/* Terms Points Checklist */}
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {termsList.map((term) => (
+                  <div
+                    key={term.id}
+                    className="p-3 bg-white rounded-xl border border-gray-200/90 shadow-xs flex items-center justify-between gap-3 hover:border-gray-300 transition-all"
+                  >
+                    {isEditingTerms ? (
+                      <input
+                        type="text"
+                        value={term.text}
+                        onChange={(e) => updateTermText(term.id, e.target.value)}
+                        placeholder="Type terms condition clause..."
+                        className="w-full border-b border-gray-300 focus:border-brand text-xs text-gray-900 py-1 focus:outline-none"
+                      />
+                    ) : (
+                      <span className="text-xs font-medium text-gray-800 leading-snug">
+                        {term.text}
+                      </span>
+                    )}
+
+                    <input
+                      type="checkbox"
+                      checked={selectedTermIds.includes(term.id)}
+                      onChange={() => handleToggleTerm(term.id)}
+                      className="w-4 h-4 rounded-md accent-brand shrink-0 cursor-pointer"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: Financial Summary & Other Charges (4 Columns on large screens) */}
+          <div className="lg:col-span-4 space-y-6">
+            {/* OTHER CHARGE CARD */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-5 border border-gray-200/80 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center font-bold">
+                    <DollarSign size={14} />
+                  </div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">
+                    Other Charges
+                  </h4>
+                </div>
+
+                {!otherCharge && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOcLabel("Transportation / Delivery Charges");
+                      setOcAmount("");
+                      setOcIsTaxable(false);
+                      setIsOtherChargeOpen(true);
+                    }}
+                    className="text-xs font-bold text-brand hover:underline cursor-pointer"
+                  >
+                    + Add Charge
+                  </button>
+                )}
+              </div>
+
+              {!otherCharge ? (
+                <p className="text-xs text-gray-500">
+                  Add optional freight, insurance, packaging, or installation charges.
+                </p>
+              ) : (
+                <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-gray-900 block">{otherCharge.label}</span>
+                    <span className="text-[11px] text-gray-500">
+                      ₹{otherCharge.amount.toLocaleString("en-IN")}{" "}
+                      {otherCharge.isTaxable ? "(+18% GST applicable)" : "(Non-taxable)"}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOcLabel(otherCharge.label);
+                        setOcAmount(String(otherCharge.amount));
+                        setOcIsTaxable(otherCharge.isTaxable);
+                        setIsOtherChargeOpen(true);
+                      }}
+                      className="p-1 text-gray-400 hover:text-brand"
+                    >
+                      <Edit3 size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOtherCharge(null)}
+                      className="p-1 text-gray-400 hover:text-rose-600"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* FINANCIAL TOTALS SUMMARY CARD */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-md space-y-4">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 border-b border-gray-100 pb-2.5">
+                Quotation Financial Breakdown
+              </h4>
+
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between text-gray-600">
+                  <span>Items Subtotal ({selectedItems.length}):</span>
+                  <span className="font-semibold text-gray-900">
+                    ₹{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                {otherCharge && Number(otherCharge.amount) > 0 && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>{otherCharge.label}:</span>
+                    <span className="font-semibold text-gray-900">
+                      ₹{otherCharge.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between text-gray-600">
+                  <span>Tax Amount (GST):</span>
+                  <span className="font-semibold text-gray-900">
+                    ₹{taxTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                <div className="border-t border-gray-200 pt-3 flex justify-between items-center text-sm font-black text-brand">
+                  <span>Total Amount Due:</span>
+                  <span className="text-lg text-brand">
+                    ₹{amountDue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 space-y-2.5">
+                <button
+                  type="button"
+                  onClick={handleGenerateQuotation}
+                  disabled={isGenerating}
+                  className="w-full py-3.5 bg-brand hover:bg-brand-hover text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg hover:shadow-xl transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>{editId ? "Updating Quotation..." : "Generating Quotation..."}</span>
+                    </>
+                  ) : (
+                    <span>{editId ? "Update Quotation" : "Generate Official Quotation"}</span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => router.push(editId ? `/crm/quotations/${editId}` : "/crm/dashboard")}
+                  className="w-full py-2.5 rounded-xl border border-gray-200 hover:bg-gray-100 text-gray-600 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* ================= MODAL 1: SELECT CUSTOMER ================= */}
+      {isCustomerSelectOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+            <div className="bg-brand text-white px-6 py-4 flex items-center justify-between">
+              <h3 className="text-base font-bold">Select Client / Customer</h3>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddCustomerOpen(true)}
+                  className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer"
+                >
+                  <Plus size={14} />
+                  <span>+ New Customer</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomerSelectOpen(false)}
+                  className="p-1 rounded-full text-white/80 hover:text-white"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 border-b border-gray-100">
+              <div className="relative">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  placeholder="Search customer by name, company, phone, email..."
+                  className="w-full bg-gray-50 pl-10 pr-4 py-2.5 rounded-xl text-xs text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:border-brand"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-2 flex-1">
+              {filteredCustomers.length === 0 ? (
+                <div className="py-12 text-center text-xs text-gray-500 space-y-2">
+                  <p>No customers found matching your search.</p>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddCustomerOpen(true)}
+                    className="px-4 py-2 bg-brand text-white rounded-xl font-bold cursor-pointer"
+                  >
+                    + Register New Customer
+                  </button>
+                </div>
+              ) : (
+                filteredCustomers.map((cust) => (
+                  <div
+                    key={cust.id}
+                    onClick={() => {
+                      setSelectedCustomer(cust);
+                      setIsCustomerSelectOpen(false);
+                    }}
+                    className="p-3.5 rounded-2xl bg-gray-50 hover:bg-blue-50/50 border border-gray-200 hover:border-brand/40 shadow-xs cursor-pointer transition-all flex items-center justify-between group"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand">
+                          {cust.name}
+                        </h4>
+                        {cust.companyName && (
+                          <span className="text-[11px] px-2 py-0.5 bg-gray-200 text-gray-700 rounded-md font-medium">
+                            {cust.companyName}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 flex gap-3 mt-0.5">
+                        {cust.phone && <span>{cust.phone}</span>}
+                        {cust.email && <span>{cust.email}</span>}
+                      </div>
+                    </div>
+                    <ChevronRight size={18} className="text-gray-400 group-hover:text-brand" />
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Registration Modal Component */}
+      <CustomerModal
+        isOpen={isAddCustomerOpen}
+        onClose={() => setIsAddCustomerOpen(false)}
+        onCustomerCreated={(newCust: any) => {
+          setCustomers((prev) => [newCust, ...prev]);
+          setSelectedCustomer(newCust);
+          setIsAddCustomerOpen(false);
+          setIsCustomerSelectOpen(false);
+        }}
+      />
+
+      {/* ================= MODAL 2: SELECT PRODUCT ================= */}
+      {isProductSelectOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+            <div className="bg-brand text-white px-6 py-4 flex items-center justify-between">
+              <h3 className="text-base font-bold">Select Product from Catalog</h3>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddProductOpen(true)}
+                  className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer"
+                >
+                  <Plus size={14} />
+                  <span>+ New Product</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsProductSelectOpen(false)}
+                  className="p-1 rounded-full text-white/80 hover:text-white"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 border-b border-gray-100">
+              <div className="relative">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Search products by title, category, description..."
+                  className="w-full bg-gray-50 pl-10 pr-4 py-2.5 rounded-xl text-xs text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:border-brand"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-2 flex-1">
+              {filteredProducts.length === 0 ? (
+                <div className="py-12 text-center text-xs text-gray-500 space-y-2">
+                  <p>No products found matching your catalog search.</p>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddProductOpen(true)}
+                    className="px-4 py-2 bg-brand text-white rounded-xl font-bold cursor-pointer"
+                  >
+                    + Add New Product
+                  </button>
+                </div>
+              ) : (
+                filteredProducts.map((prod) => (
+                  <div
+                    key={prod.id}
+                    onClick={() => openProductConfigurator(prod)}
+                    className="p-3.5 rounded-2xl bg-gray-50 hover:bg-blue-50/50 border border-gray-200 hover:border-brand/40 shadow-xs cursor-pointer transition-all flex items-center justify-between group"
+                  >
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand">
+                        {prod.name}
+                      </h4>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Base Rate: ₹{prod.basePrice || prod.price || 0} | GST: {prod.gst || 18}% | {prod.unit || "COILS"}
+                      </p>
+                    </div>
+                    <ChevronRight size={18} className="text-gray-400 group-hover:text-brand" />
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Product Registration Modal Component */}
+      <ProductModal
+        isOpen={isAddProductOpen}
+        onClose={() => setIsAddProductOpen(false)}
+        onProductCreated={(newProd: any) => {
+          setAllProducts((prev) => [newProd, ...prev]);
+          setIsAddProductOpen(false);
+          openProductConfigurator(newProd);
+        }}
+      />
+
+      {/* ================= MODAL 3: PRODUCT CONFIGURATOR ================= */}
+      {isConfiguringProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 space-y-4">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <h3 className="text-base font-bold text-gray-900">Configure Quotation Item</h3>
+              <button
+                type="button"
+                onClick={() => setIsConfiguringProduct(false)}
+                className="p-1 rounded-full text-gray-400 hover:text-gray-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProductToQuotation} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Product Title</label>
+                <input
+                  type="text"
+                  value={cfgName}
+                  onChange={(e) => setCfgName(e.target.value)}
+                  required
+                  className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-900 focus:outline-none focus:border-brand"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Quantity</label>
                   <input
                     type="number"
                     min="1"
                     value={cfgQuantity}
                     onChange={(e) => setCfgQuantity(e.target.value)}
                     required
-                    className="w-full bg-transparent text-sm font-bold text-gray-900 focus:outline-none"
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-900 focus:outline-none focus:border-brand"
                   />
                 </div>
-
-                {/* 3. Price (Image 2) */}
-                <div className="bg-[#F4F5F7] p-3.5 rounded-2xl">
-                  <label className="block text-xs text-gray-400 font-medium mb-1">Price (per unit)</label>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Price per Unit (₹)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -984,227 +1232,142 @@ function MakeQuotationContent() {
                     value={cfgPrice}
                     onChange={(e) => setCfgPrice(e.target.value)}
                     required
-                    className="w-full bg-transparent text-sm font-bold text-gray-900 focus:outline-none"
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-900 focus:outline-none focus:border-brand"
                   />
                 </div>
+              </div>
 
-                {/* 4. Description with live char counter (Image 2) */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <div className="bg-[#F4F5F7] p-3.5 rounded-2xl">
-                    <label className="block text-xs text-gray-400 font-medium mb-1">Description</label>
-                    <textarea
-                      rows={4}
-                      maxLength={2000}
-                      value={cfgDescription}
-                      onChange={(e) => setCfgDescription(e.target.value)}
-                      placeholder="Description"
-                      className="w-full bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none resize-none"
-                    />
-                  </div>
-                  <div className="text-right text-xs text-gray-400 mt-1 pr-1 font-medium">
-                    {cfgDescription.length}/2000
-                  </div>
-                </div>
-
-                {/* Bottom Button (Image 2) */}
-                <div className="pt-2 pb-1">
-                  <button
-                    type="submit"
-                    className="w-full py-4 bg-[#1E1E1E] hover:bg-black text-white font-bold text-sm rounded-2xl shadow-md transition-all cursor-pointer"
-                  >
-                    Add To Quotation
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ================= MODAL 4: OTHER CHARGE INFO (Image 3) ================= */}
-        {isOtherChargeOpen && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 space-y-4 animate-in slide-in-from-bottom duration-200">
-              {/* Sheet Grabber */}
-              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto sm:hidden" />
-
-              <h3 className="text-base font-bold text-gray-900">
-                Other Charge Info
-              </h3>
-
-              <form onSubmit={handleSaveOtherCharge} className="space-y-3.5">
-                {/* Other Charge Label */}
-                <div className="bg-[#F4F5F7] p-3.5 rounded-2xl">
-                  <label className="block text-xs text-gray-400 font-medium mb-1">
-                    Other Charge Label
-                  </label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">HSN Code</label>
                   <input
                     type="text"
-                    value={ocLabel}
-                    onChange={(e) => setOcLabel(e.target.value)}
-                    placeholder="Other Charges"
-                    required
-                    className="w-full bg-transparent text-sm font-medium text-gray-900 focus:outline-none"
+                    value={cfgHsn}
+                    onChange={(e) => setCfgHsn(e.target.value)}
+                    placeholder="85446020"
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-brand"
                   />
                 </div>
-
-                {/* Other Charge Amount */}
-                <div className="bg-[#F4F5F7] p-3.5 rounded-2xl">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Unit / Measure</label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={ocAmount}
-                    onChange={(e) => setOcAmount(e.target.value)}
-                    placeholder="Other Charge Amount"
-                    required
-                    className="w-full bg-transparent text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:outline-none"
+                    type="text"
+                    value={cfgUnit}
+                    onChange={(e) => setCfgUnit(e.target.value)}
+                    placeholder="COILS / PCS"
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-brand uppercase"
                   />
-                </div>
-
-                {/* Is Taxable Checkbox */}
-                <label className="flex items-center justify-between py-1 cursor-pointer">
-                  <span className="text-sm font-medium text-gray-700">Is Taxable?</span>
-                  <input
-                    type="checkbox"
-                    checked={ocIsTaxable}
-                    onChange={(e) => setOcIsTaxable(e.target.checked)}
-                    className="w-5 h-5 rounded-md accent-black cursor-pointer"
-                  />
-                </label>
-
-                {/* Buttons */}
-                <div className="pt-2 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsOtherChargeOpen(false)}
-                    className="flex-1 py-3.5 border border-gray-300 text-gray-700 font-bold text-sm rounded-2xl"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 py-3.5 bg-[#1E1E1E] hover:bg-black text-white font-bold text-sm rounded-2xl shadow-md"
-                  >
-                    Save
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ================= MODAL 5: SELECT TERMS AND CONDITIONS (Images 4 & 5) ================= */}
-        {isTermsOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
-              {/* Dark Header (Image 4 & 5) */}
-              <div className="bg-[#1E1E1E] text-white px-4 py-3.5 flex items-center justify-between shrink-0">
-                <div className="flex items-center space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsTermsOpen(false)}
-                    className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10"
-                  >
-                    <ArrowLeft size={20} />
-                  </button>
-                  <h2 className="text-base font-bold text-white truncate max-w-[200px]">
-                    Select Terms and C...
-                  </h2>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={addNewTermItem}
-                    className="w-7 h-7 bg-white text-black rounded-lg flex items-center justify-center font-bold text-base cursor-pointer hover:bg-gray-100"
-                    title="Add New Term"
-                  >
-                    <Plus size={16} />
-                  </button>
                 </div>
               </div>
 
-              {/* Subheader with Quotation tab and Edit Items button (Image 4 & 5) */}
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                <div className="border-b-2 border-cyan-600 pb-1 px-1 font-bold text-sm text-cyan-800">
-                  Quotation
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs font-bold text-gray-700">Specifications / Description</label>
+                  <span className="text-[10px] text-gray-400">{cfgDescription.length}/2000</span>
                 </div>
-
-                {/* Edit Items / Finish Editing toggle (Image 4 & 5) */}
-                <button
-                  type="button"
-                  onClick={() => setIsEditingTerms((prev) => !prev)}
-                  className="flex items-center space-x-1 text-xs font-bold text-gray-700 hover:text-black cursor-pointer"
-                >
-                  <Edit3 size={14} />
-                  <span>{isEditingTerms ? "Finish Editing" : "Edit Items"}</span>
-                </button>
-              </div>
-
-              {/* Select All Row (Image 4 & 5) */}
-              <div className="px-4 py-2.5 flex items-center justify-between bg-gray-50/70 border-b border-gray-100">
-                <span className="text-xs font-bold text-gray-800">Select All</span>
-                <input
-                  type="checkbox"
-                  checked={selectedTermIds.length === termsList.length && termsList.length > 0}
-                  onChange={handleSelectAllTerms}
-                  className="w-4 h-4 rounded-md accent-black cursor-pointer"
+                <textarea
+                  value={cfgDescription}
+                  onChange={(e) => setCfgDescription(e.target.value.slice(0, 2000))}
+                  rows={3}
+                  placeholder="Enter specifications, technical details, or notes..."
+                  className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-brand resize-none"
                 />
               </div>
 
-              {/* Terms List (Image 4: Static view, Image 5: Inline editable view) */}
-              <div className="p-4 overflow-y-auto space-y-3 flex-1">
-                {termsList.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-gray-400">
-                    No terms found. Click "+" on top to add a new term.
-                  </div>
-                ) : (
-                  termsList.map((term) => (
-                    <div
-                      key={term.id}
-                      className="p-3.5 bg-white rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between gap-3"
-                    >
-                      {isEditingTerms ? (
-                        /* Image 5: Editable underline input */
-                        <input
-                          type="text"
-                          value={term.text}
-                          onChange={(e) => updateTermText(term.id, e.target.value)}
-                          placeholder="Enter terms point..."
-                          className="w-full border-b border-gray-400 focus:border-black text-sm text-gray-900 py-1 focus:outline-none"
-                        />
-                      ) : (
-                        /* Image 4: Clean text display */
-                        <span className="text-sm font-medium text-gray-900 leading-snug">
-                          {term.text}
-                        </span>
-                      )}
-
-                      <input
-                        type="checkbox"
-                        checked={selectedTermIds.includes(term.id)}
-                        onChange={() => handleToggleTerm(term.id)}
-                        className="w-5 h-5 rounded-md accent-black shrink-0 cursor-pointer"
-                      />
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* DONE Button (Image 4 & 5) */}
-              <div className="p-4 pt-2 border-t border-gray-100 shrink-0">
+              <div className="pt-2 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsTermsOpen(false)}
-                  className="w-full py-3.5 bg-[#1E1E1E] hover:bg-black text-white font-bold text-sm rounded-full shadow-md transition-all cursor-pointer"
+                  onClick={() => setIsConfiguringProduct(false)}
+                  className="flex-1 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs rounded-xl"
                 >
-                  DONE
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-brand hover:bg-brand-hover text-white font-bold text-xs rounded-xl shadow cursor-pointer"
+                >
+                  Add To Quotation
                 </button>
               </div>
-            </div>
+            </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* ================= MODAL 4: OTHER CHARGE INFO ================= */}
+      {isOtherChargeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 space-y-4">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <h3 className="text-base font-bold text-gray-900">Other Charge Details</h3>
+              <button
+                type="button"
+                onClick={() => setIsOtherChargeOpen(false)}
+                className="p-1 rounded-full text-gray-400 hover:text-gray-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveOtherCharge} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Charge Label</label>
+                <input
+                  type="text"
+                  value={ocLabel}
+                  onChange={(e) => setOcLabel(e.target.value)}
+                  placeholder="e.g. Delivery Charge, Packaging, Freight"
+                  required
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-900 focus:outline-none focus:border-brand"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Amount (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={ocAmount}
+                  onChange={(e) => setOcAmount(e.target.value)}
+                  placeholder="0.00"
+                  required
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-900 focus:outline-none focus:border-brand"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="oc-taxable"
+                  checked={ocIsTaxable}
+                  onChange={(e) => setOcIsTaxable(e.target.checked)}
+                  className="w-4 h-4 rounded-md accent-brand cursor-pointer"
+                />
+                <label htmlFor="oc-taxable" className="text-xs font-semibold text-gray-700 cursor-pointer">
+                  Is Taxable (Apply 18% GST)
+                </label>
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsOtherChargeOpen(false)}
+                  className="flex-1 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-brand hover:bg-brand-hover text-white font-bold text-xs rounded-xl shadow cursor-pointer"
+                >
+                  Save Charge
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1213,9 +1376,9 @@ export default function MakeQuotationPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex flex-col items-center justify-center bg-[#1E1E1E] text-white">
-          <Loader2 className="w-10 h-10 text-white animate-spin mb-4" />
-          <p className="text-white/80 font-medium text-sm">Opening Quotation...</p>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
+          <Loader2 className="w-10 h-10 text-brand animate-spin mb-4" />
+          <p className="text-gray-600 font-semibold text-sm">Opening Quotation Editor...</p>
         </div>
       }
     >
