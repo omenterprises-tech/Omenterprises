@@ -440,14 +440,31 @@ export function CreateQuotationModal({
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                Terms & Conditions
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+                  Terms & Conditions (Points)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTerms((prev) => {
+                      const lines = prev.split("\n").filter((l) => l.trim());
+                      const nextNum = lines.length + 1;
+                      const newLine = `${nextNum}. `;
+                      return prev ? `${prev.trim()}\n${newLine}` : newLine;
+                    });
+                  }}
+                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                >
+                  + Add Point
+                </button>
+              </div>
               <textarea
                 value={terms}
                 onChange={(e) => setTerms(e.target.value)}
-                rows={2}
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                rows={3}
+                placeholder="1. Validity: 30 days...&#10;2. Payment: 100% advance..."
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand font-medium leading-relaxed"
               />
             </div>
           </div>

@@ -44,8 +44,22 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { terms } = body;
-    const cleanTerms = typeof terms === "string" ? terms.trim() : "";
+    let cleanTerms = "";
+
+    if (Array.isArray(body.points)) {
+      cleanTerms = body.points
+        .map((p: any, idx: number) => {
+          const raw = typeof p === "string" ? p.trim() : (p?.text || "").trim();
+          if (!raw) return "";
+          // Strip any duplicate leading numbers
+          const clean = raw.replace(/^(\d+[\.\)]\s*|[•\-\*]\s*)/, "").trim();
+          return clean ? `${idx + 1}. ${clean}` : "";
+        })
+        .filter(Boolean)
+        .join("\n");
+    } else if (typeof body.terms === "string") {
+      cleanTerms = body.terms.trim();
+    }
 
     await db
       .update(crmBusinesses)
