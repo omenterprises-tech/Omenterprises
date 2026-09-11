@@ -11,7 +11,6 @@ import {
   Trash2,
   Layers,
   Sparkles,
-  SlidersHorizontal,
   X,
   CheckSquare,
   Square,
@@ -1562,41 +1561,6 @@ export default function ProductModal({
           </div>
         )}
 
-        {/* Global Name Order Selector Bar */}
-        <div className="bg-white px-5 py-3 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center space-x-2">
-            <SlidersHorizontal size={15} className="text-brand" />
-            <span className="text-xs font-bold text-gray-700">Product Name Display Order:</span>
-          </div>
-
-          <div className="flex items-center bg-gray-100 p-1 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setNameOrder("forward")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                nameOrder === "forward"
-                  ? "bg-white text-brand shadow-xs"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-              title="Main Category -> Sub 1 -> Sub 2 -> Sub 3..."
-            >
-              Forward: Finolex Wires 180mts Fr 1.0 sqmm Red
-            </button>
-            <button
-              type="button"
-              onClick={() => setNameOrder("reverse")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                nameOrder === "reverse"
-                  ? "bg-white text-brand shadow-xs"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-              title="...Sub 3 -> Sub 2 -> Sub 1 -> Main Category"
-            >
-              Reverse: Red 1.0 sqmm Fr 180mts Wires Finolex
-            </button>
-          </div>
-        </div>
-
         {/* ========================================================================= */}
         {/* ==================== TAB 1: SINGLE PRODUCT FORM ========================= */}
         {/* ========================================================================= */}
@@ -2261,32 +2225,6 @@ export default function ProductModal({
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  {/* Name Order Toggle */}
-                  <div className="flex items-center bg-gray-100 p-0.5 rounded-lg text-[10px] font-bold text-gray-600">
-                    <button
-                      type="button"
-                      onClick={() => setNameOrder("forward")}
-                      className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                        nameOrder === "forward"
-                          ? "bg-white text-brand shadow-2xs font-black"
-                          : "hover:text-gray-900"
-                      }`}
-                    >
-                      Brand First
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNameOrder("reverse")}
-                      className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                        nameOrder === "reverse"
-                          ? "bg-white text-brand shadow-2xs font-black"
-                          : "hover:text-gray-900"
-                      }`}
-                    >
-                      Spec First
-                    </button>
-                  </div>
-
                   <button
                     type="button"
                     onClick={handleToggleSelectAll}
