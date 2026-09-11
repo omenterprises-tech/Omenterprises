@@ -275,6 +275,12 @@ export default function QuotationDetailPage({
             sheet.style.backgroundColor = "#ffffff";
             sheet.style.color = "#111827";
 
+            // Hide the inline page footer so it is not captured in the canvas image
+            const pageFooter = clonedDoc.getElementById("quotation-page-footer");
+            if (pageFooter) {
+              pageFooter.style.display = "none";
+            }
+
             // Inject explicit fallback stylesheet ensuring all classes have solid hex colors (preventing oklch transparent text bug)
             const fallbackStyle = clonedDoc.createElement("style");
             fallbackStyle.textContent = `
@@ -361,39 +367,60 @@ export default function QuotationDetailPage({
       const imgData = canvas.toDataURL("image/png");
       const pdfWidth = 210;
       const pdfHeight = 297;
+      const footerAreaHeight = 14; // mm reserved for bottom page footer
+      const contentHeightPerPage = pdfHeight - footerAreaHeight; // 283 mm usable content height
       const imgHeight = (canvas.height * pdfWidth) / canvas.width;
 
-      // 1. Single-page document: fits within or near standard A4 height
-      if (imgHeight <= pdfHeight * 1.15) {
-        const pdf = new jsPDF({
-          orientation: "portrait",
-          unit: "mm",
-          format: "a4",
-        });
-
-        const drawHeight = Math.min(imgHeight, pdfHeight);
-        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, drawHeight);
-        return pdf.output("blob");
-      }
-
-      // 2. Multi-page document: for quotations with many line items
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
         format: "a4",
       });
 
-      let heightLeft = imgHeight;
-      let position = 0;
+      // 1. Single-page or near single-page document
+      if (imgHeight <= contentHeightPerPage) {
+        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, imgHeight);
+      } else if (imgHeight <= pdfHeight * 1.05) {
+        // Minor overflow -> slight scale down to fit cleanly on 1 page without spillover
+        const scale = contentHeightPerPage / imgHeight;
+        const scaledWidth = pdfWidth * scale;
+        const offsetX = (pdfWidth - scaledWidth) / 2;
+        pdf.addImage(imgData, "PNG", offsetX, 0, scaledWidth, contentHeightPerPage);
+      } else {
+        // Multi-page document: slice across pages reserving footer height
+        let heightLeft = imgHeight;
+        let position = 0;
 
-      pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
-      heightLeft -= pdfHeight;
-
-      while (heightLeft > 25) {
-        position -= pdfHeight;
-        pdf.addPage();
         pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
-        heightLeft -= pdfHeight;
+        heightLeft -= contentHeightPerPage;
+
+        while (heightLeft > 15) {
+          position -= contentHeightPerPage;
+          pdf.addPage();
+          pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
+          heightLeft -= contentHeightPerPage;
+        }
+      }
+
+      // Add bottom footer (separator line + "Page X of Y") at the exact bottom of every page
+      const totalPages = pdf.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+
+        // White background strip to ensure crisp footer area free of cut-off text
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, pdfHeight - footerAreaHeight, pdfWidth, footerAreaHeight, "F");
+
+        // Subtle divider line
+        pdf.setDrawColor(229, 231, 235); // #E5E7EB
+        pdf.setLineWidth(0.25);
+        pdf.line(12, pdfHeight - 11, pdfWidth - 12, pdfHeight - 11);
+
+        // Right-aligned page number
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(156, 163, 175); // #9CA3AF
+        pdf.text(`Page ${i} of ${totalPages}`, pdfWidth - 12, pdfHeight - 5.5, { align: "right" });
       }
 
       return pdf.output("blob");
@@ -621,6 +648,18 @@ export default function QuotationDetailPage({
           table, tr, td, th {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
+          }
+          #quotation-page-footer {
+            position: fixed !important;
+            bottom: 6mm !important;
+            left: 12mm !important;
+            right: 12mm !important;
+            margin: 0 !important;
+            padding-top: 2mm !important;
+            border-top: 1px solid #e5e7eb !important;
+            background: #ffffff !important;
+            display: flex !important;
+            justify-content: flex-end !important;
           }
         }
       `}</style>
@@ -1037,7 +1076,10 @@ export default function QuotationDetailPage({
           </div>
 
           {/* ================= 8. PAGE FOOTER ================= */}
-          <div className="pt-4 print:pt-2 border-t border-gray-100 flex justify-end items-center text-xs text-gray-400 print:text-[10px]">
+          <div
+            id="quotation-page-footer"
+            className="pt-4 print:pt-2 border-t border-gray-100 flex justify-end items-center text-xs text-gray-400 print:text-[10px]"
+          >
             <span>Page 1 of 1</span>
           </div>
         </div>
