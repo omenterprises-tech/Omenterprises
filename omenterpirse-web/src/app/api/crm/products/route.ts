@@ -37,6 +37,69 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+
+    // Support batch creation
+    if (Array.isArray(body.products) && body.products.length > 0) {
+      const now = new Date().toISOString();
+      const insertRows = [];
+
+      for (let i = 0; i < body.products.length; i++) {
+        const item = body.products[i];
+        const { name, price, basePrice, gst, description, unit, hsn, category, specifications } = item;
+
+        if (!name || !name.trim()) {
+          return NextResponse.json(
+            { success: false, error: `Product #${i + 1} is missing a name.` },
+            { status: 400 }
+          );
+        }
+
+        const rawPrice = price !== undefined && price !== null && String(price).trim() !== "" ? price : basePrice;
+        if (rawPrice === undefined || rawPrice === null || String(rawPrice).trim() === "") {
+          return NextResponse.json(
+            { success: false, error: `Product "${name}" is missing a price.` },
+            { status: 400 }
+          );
+        }
+
+        const parsedPrice = parseFloat(rawPrice);
+        if (isNaN(parsedPrice) || parsedPrice < 0) {
+          return NextResponse.json(
+            { success: false, error: `Product "${name}" has an invalid price.` },
+            { status: 400 }
+          );
+        }
+
+        const parsedGst = gst !== undefined && gst !== null && String(gst).trim() !== "" ? parseFloat(gst) : null;
+
+        insertRows.push({
+          name: name.trim(),
+          description: description ? description.trim() : null,
+          basePrice: parsedPrice,
+          salePrice: parsedPrice,
+          gst: parsedGst !== null && !isNaN(parsedGst) ? parsedGst : null,
+          unit: unit ? unit.trim() : null,
+          hsn: hsn ? hsn.trim() : null,
+          category: category ? category.trim() : "General",
+          specifications: specifications
+            ? typeof specifications === "string"
+              ? specifications
+              : JSON.stringify(specifications)
+            : null,
+          createdAt: now,
+        });
+      }
+
+      const inserted = await db.insert(products).values(insertRows).returning();
+
+      return NextResponse.json({
+        success: true,
+        count: inserted.length,
+        products: inserted,
+      });
+    }
+
+    // Single product creation
     const { name, price, basePrice, gst, description, unit, hsn, category, specifications } = body;
 
     if (!name || !name.trim()) {

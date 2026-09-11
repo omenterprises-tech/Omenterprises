@@ -899,6 +899,13 @@ function MakeQuotationContent() {
             setIsAddProductOpen(false);
             openProductConfigurator(newProd);
           }}
+          onProductsCreated={(newProds: any[]) => {
+            setAllProducts((prev) => [...newProds, ...prev]);
+            setIsAddProductOpen(false);
+            if (newProds && newProds.length > 0) {
+              openProductConfigurator(newProds[0]);
+            }
+          }}
         />
       </div>
     );

@@ -11,6 +11,7 @@ import {
   Search,
   Loader2,
   CheckCircle2,
+  Copy,
 } from "lucide-react";
 import ProductModal from "@/components/crm/ProductModal";
 
@@ -93,6 +94,14 @@ export default function CrmProductsPage() {
 
   const openEditProduct = (prod: any) => {
     setEditingProduct(prod);
+    setIsModalOpen(true);
+  };
+
+  const openDuplicateAsVariant = (prod: any) => {
+    setEditingProduct({
+      ...prod,
+      _isClone: true,
+    });
     setIsModalOpen(true);
   };
 
@@ -302,6 +311,14 @@ export default function CrmProductsPage() {
                         <div className="flex items-center justify-end space-x-1.5">
                           <button
                             type="button"
+                            onClick={() => openDuplicateAsVariant(prod)}
+                            className="p-1.5 text-gray-400 hover:text-brand hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                            title="Duplicate as new variant (keeps common brand & category details)"
+                          >
+                            <Copy size={15} />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => openEditProduct(prod)}
                             className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                             title="Edit product"
@@ -335,6 +352,10 @@ export default function CrmProductsPage() {
         onProductCreated={(newProd) => {
           setProducts((prev) => [newProd, ...prev]);
           showToast("Product added successfully!");
+        }}
+        onProductsCreated={(newProds) => {
+          setProducts((prev) => [...newProds, ...prev]);
+          showToast(`${newProds.length} products created successfully!`);
         }}
         onProductSaved={(updatedProd) => {
           setProducts((prev) =>
