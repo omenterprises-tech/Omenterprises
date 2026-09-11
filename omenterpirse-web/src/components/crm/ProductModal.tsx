@@ -21,7 +21,6 @@ import {
   ChevronDown,
   ChevronRight,
   Filter,
-  RotateCcw,
   Tag,
   GitBranch,
   FolderTree,
@@ -49,118 +48,7 @@ export interface TreeNode {
 const createDefaultCategoryTree = (brand: string = "Finolex"): TreeNode => ({
   id: "root",
   name: brand || "Finolex",
-  children: [
-    {
-      id: "wires",
-      name: "wires",
-      children: [
-        {
-          id: "w-180",
-          name: "180 mts",
-          children: [
-            {
-              id: "w-180-fr",
-              name: "fr",
-              children: [
-                {
-                  id: "w-180-fr-1.0",
-                  name: "1.0 sqmm",
-                  children: [
-                    { id: "w-180-fr-1.0-red", name: "red", price: "1200", children: [] },
-                    { id: "w-180-fr-1.0-blue", name: "blue", price: "1200", children: [] },
-                    { id: "w-180-fr-1.0-green", name: "green", price: "1200", children: [] },
-                    { id: "w-180-fr-1.0-yellow", name: "yellow", price: "1200", children: [] },
-                    { id: "w-180-fr-1.0-black", name: "black", price: "1200", children: [] },
-                  ],
-                },
-                {
-                  id: "w-180-fr-1.5",
-                  name: "1.5 sqmm",
-                  children: [
-                    { id: "w-180-fr-1.5-red", name: "red", price: "1650", children: [] },
-                    { id: "w-180-fr-1.5-blue", name: "blue", price: "1650", children: [] },
-                    { id: "w-180-fr-1.5-green", name: "green", price: "1650", children: [] },
-                    { id: "w-180-fr-1.5-yellow", name: "yellow", price: "1650", children: [] },
-                    { id: "w-180-fr-1.5-black", name: "black", price: "1650", children: [] },
-                  ],
-                },
-              ],
-            },
-            {
-              id: "w-180-frls",
-              name: "frls",
-              children: [
-                {
-                  id: "w-180-frls-1.0",
-                  name: "1.0 sqmm",
-                  children: [
-                    { id: "w-180-frls-1.0-red", name: "red", price: "1350", children: [] },
-                    { id: "w-180-frls-1.0-blue", name: "blue", price: "1350", children: [] },
-                    { id: "w-180-frls-1.0-green", name: "green", price: "1350", children: [] },
-                    { id: "w-180-frls-1.0-yellow", name: "yellow", price: "1350", children: [] },
-                    { id: "w-180-frls-1.0-black", name: "black", price: "1350", children: [] },
-                  ],
-                },
-                {
-                  id: "w-180-frls-1.5",
-                  name: "1.5 sqmm",
-                  children: [
-                    { id: "w-180-frls-1.5-red", name: "red", price: "1850", children: [] },
-                    { id: "w-180-frls-1.5-blue", name: "blue", price: "1850", children: [] },
-                    { id: "w-180-frls-1.5-green", name: "green", price: "1850", children: [] },
-                    { id: "w-180-frls-1.5-yellow", name: "yellow", price: "1850", children: [] },
-                    { id: "w-180-frls-1.5-black", name: "black", price: "1850", children: [] },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-        {
-          id: "w-90",
-          name: "90 mts",
-          children: [
-            {
-              id: "w-90-1.0",
-              name: "1.0 sqmm",
-              children: [
-                { id: "w-90-1.0-red", name: "red", price: "650", children: [] },
-                { id: "w-90-1.0-blue", name: "blue", price: "650", children: [] },
-                { id: "w-90-1.0-green", name: "green", price: "650", children: [] },
-                { id: "w-90-1.0-yellow", name: "yellow", price: "650", children: [] },
-                { id: "w-90-1.0-black", name: "black", price: "650", children: [] },
-              ],
-            },
-            {
-              id: "w-90-1.5",
-              name: "1.5 sqmm",
-              children: [
-                { id: "w-90-1.5-red", name: "red", price: "850", children: [] },
-                { id: "w-90-1.5-blue", name: "blue", price: "850", children: [] },
-                { id: "w-90-1.5-green", name: "green", price: "850", children: [] },
-                { id: "w-90-1.5-yellow", name: "yellow", price: "850", children: [] },
-                { id: "w-90-1.5-black", name: "black", price: "850", children: [] },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: "pipes",
-      name: "pipes",
-      children: [
-        {
-          id: "p-20mm",
-          name: "20mm",
-          children: [
-            { id: "p-20mm-heavy", name: "heavy", price: "180", children: [] },
-            { id: "p-20mm-light", name: "light", price: "140", children: [] },
-          ],
-        },
-      ],
-    },
-  ],
+  children: [],
 });
 
 // Clone a tree node deeply with new unique IDs
@@ -516,11 +404,6 @@ export default function ProductModal({
     showLocalToast("Copied specifications successfully!");
   };
 
-  const handleResetToSampleTree = () => {
-    setTreeRoot(createDefaultCategoryTree(batchMainCategory || "Finolex"));
-    setActiveDrillDownId("root");
-    showLocalToast("Loaded Finolex sample tree with wires & pipes!");
-  };
 
   const handleClearTree = () => {
     setTreeRoot({
@@ -1947,17 +1830,8 @@ export default function ProductModal({
                   />
                 </div>
 
-                {/* Quick Sample / Reset buttons */}
+                {/* Clear button */}
                 <div className="flex items-center space-x-2 pt-2 lg:pt-4">
-                  <button
-                    type="button"
-                    onClick={handleResetToSampleTree}
-                    className="px-3 py-2 text-xs font-bold text-brand bg-brand/5 hover:bg-brand/10 border border-brand/20 rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer"
-                    title="Reload Finolex sample structure"
-                  >
-                    <RotateCcw size={13} />
-                    <span>Load Finolex Sample</span>
-                  </button>
                   <button
                     type="button"
                     onClick={handleClearTree}
@@ -2106,34 +1980,46 @@ export default function ProductModal({
 
                 {/* Active Category Children or Leaf Pricing */}
                 {activeDrillDownNode.children.length === 0 ? (
-                  /* Leaf final product */
-                  <div className="p-4 bg-emerald-50/70 rounded-xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-black text-emerald-900">
-                        🌿 Final Product Tier: &quot;{activeDrillDownNode.name}&quot;
+                  activeDrillDownNode.id === "root" ? (
+                    <div className="p-6 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-center">
+                      <FolderTree size={20} className="mx-auto text-gray-400 mb-1.5" />
+                      <p className="text-xs font-bold text-gray-700">
+                        No sub-categories yet in &quot;{activeDrillDownNode.name}&quot;
                       </p>
-                      <p className="text-[11px] text-emerald-700">
-                        This category has no further sub-categories. Enter its commercial selling price:
+                      <p className="text-[11px] text-gray-400 mt-1 max-w-sm mx-auto">
+                        Type sub-categories above (e.g. wires, pipes) and click &quot;+ Add&quot; or select from Suggestions to begin building your catalog.
                       </p>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-bold text-emerald-900">Rate:</span>
-                      <div className="relative w-32">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={activeDrillDownNode.price || ""}
-                          onChange={(e) => handleSetTreeNodePrice(activeDrillDownNode.id, e.target.value)}
-                          placeholder="0.00"
-                          className="w-full pl-6 pr-2.5 py-1.5 bg-white rounded-xl text-sm font-bold text-gray-900 border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                        />
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-600 text-xs font-bold">
-                          ₹
-                        </span>
+                  ) : (
+                    /* Leaf final product */
+                    <div className="p-4 bg-emerald-50/70 rounded-xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-emerald-900">
+                          🌿 Final Product Tier: &quot;{activeDrillDownNode.name}&quot;
+                        </p>
+                        <p className="text-[11px] text-emerald-700">
+                          This category has no further sub-categories. Enter its commercial selling price:
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs font-bold text-emerald-900">Rate:</span>
+                        <div className="relative w-32">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={activeDrillDownNode.price || ""}
+                            onChange={(e) => handleSetTreeNodePrice(activeDrillDownNode.id, e.target.value)}
+                            placeholder="0.00"
+                            className="w-full pl-6 pr-2.5 py-1.5 bg-white rounded-xl text-sm font-bold text-gray-900 border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                          />
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-600 text-xs font-bold">
+                            ₹
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )
                 ) : (
                   /* List of children */
                   <div className="space-y-2">
