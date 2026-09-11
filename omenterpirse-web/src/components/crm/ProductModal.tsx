@@ -24,6 +24,7 @@ import {
   Filter,
   RotateCcw,
   Tag,
+  GitBranch,
 } from "lucide-react";
 
 interface ProductModalProps {
@@ -40,6 +41,7 @@ interface CategoryLevel {
   label: string;
   values: string[];
   inputValue: string;
+  appliesToParents?: string[];
 }
 
 interface BatchCombinationRow {
@@ -109,6 +111,7 @@ export default function ProductModal({
       label: "Sub-Category 3",
       values: ["fr", "frls"],
       inputValue: "",
+      appliesToParents: ["180 mts"],
     },
     {
       id: "lvl-4",
@@ -345,7 +348,62 @@ export default function ProductModal({
     });
   };
 
-  // ================= UNLIMITED CARTESIAN COMBINATIONS =================
+  // Get all unique values defined in levels preceding levelIndex
+  const getAvailableParentValues = (levelIndex: number): string[] => {
+    const result: string[] = [];
+    for (let i = 0; i < levelIndex; i++) {
+      const lvl = subCategoryLevels[i];
+      if (lvl && lvl.values) {
+        lvl.values.forEach((v) => {
+          if (v && !result.includes(v)) {
+            result.push(v);
+          }
+        });
+      }
+    }
+    return result;
+  };
+
+  const updateSubCategoryAppliesTo = (id: string, parents: string[]) => {
+    setSubCategoryLevels((prev) =>
+      prev.map((lvl) => (lvl.id === id ? { ...lvl, appliesToParents: parents } : lvl))
+    );
+  };
+
+  const toggleSubCategoryParent = (id: string, parentVal: string) => {
+    setSubCategoryLevels((prev) =>
+      prev.map((lvl) => {
+        if (lvl.id !== id) return lvl;
+        const current = lvl.appliesToParents || [];
+        const exists = current.includes(parentVal);
+        const next = exists
+          ? current.filter((p) => p !== parentVal)
+          : [...current, parentVal];
+        return { ...lvl, appliesToParents: next };
+      })
+    );
+  };
+
+  const handleDeleteCombination = (rowId: string) => {
+    setRowOverrides((prev) => ({
+      ...prev,
+      [rowId]: { ...prev[rowId], excluded: true },
+    }));
+    showLocalToast("Removed combination from active list.");
+  };
+
+  const handleDeleteBranch = (branchRows: BatchCombinationRow[]) => {
+    setRowOverrides((prev) => {
+      const next = { ...prev };
+      branchRows.forEach((r) => {
+        next[r.id] = { ...next[r.id], excluded: true };
+      });
+      return next;
+    });
+    showLocalToast(`Excluded all ${branchRows.length} combinations in branch.`);
+  };
+
+  // ================= DYNAMIC CONDITIONAL COMBINATIONS =================
   const combinations = useMemo<BatchCombinationRow[]>(() => {
     const mainCat = batchMainCategory.trim();
     if (!mainCat) return [];
@@ -367,20 +425,43 @@ export default function ProductModal({
       ];
     }
 
-    // Build arrays for Cartesian product: [ [mainCat], level1.values, level2.values, ... ]
-    const dimensionArrays: string[][] = [
-      [mainCat],
-      ...activeLevels.map((lvl) => lvl.values),
-    ];
+    // Build paths dynamically across active levels respecting parent dependencies
+    let currentPaths: string[][] = [[mainCat]];
 
-    const cartesian = (arrays: string[][]): string[][] => {
-      return arrays.reduce<string[][]>(
-        (acc, curr) => acc.flatMap((d) => curr.map((e) => [...d, e])),
-        [[]]
-      );
-    };
+    for (const lvl of activeLevels) {
+      const hasParentFilter =
+        Array.isArray(lvl.appliesToParents) && lvl.appliesToParents.length > 0;
 
-    const allPaths = cartesian(dimensionArrays);
+      const nextPaths: string[][] = [];
+
+      for (const path of currentPaths) {
+        if (!hasParentFilter) {
+          // Applies to all paths
+          for (const val of lvl.values) {
+            nextPaths.push([...path, val]);
+          }
+        } else {
+          // Check if this path contains at least one of the parent values
+          const matchesParent = lvl.appliesToParents!.some((parentVal) =>
+            path.includes(parentVal)
+          );
+
+          if (matchesParent) {
+            // Expand with this level's values
+            for (const val of lvl.values) {
+              nextPaths.push([...path, val]);
+            }
+          } else {
+            // Does NOT match parent filter: bypass / skip this level for this path!
+            nextPaths.push(path);
+          }
+        }
+      }
+
+      currentPaths = nextPaths;
+    }
+
+    const allPaths = currentPaths;
 
     return allPaths.map((path) => {
       const rowId = path.join("__");
@@ -431,19 +512,18 @@ export default function ProductModal({
   // Group combinations by parent sub-category branch (e.g. Length + Grade + Size)
   const branches = useMemo<CombinationBranch[]>(() => {
     if (combinations.length === 0) return [];
-    const activeLevels = subCategoryLevels.filter((lvl) => lvl.values.length > 0);
 
     const map = new Map<string, CombinationBranch>();
 
     combinations.forEach((row) => {
       const parentHierarchy =
-        activeLevels.length >= 2 ? row.hierarchy.slice(0, -1) : [row.hierarchy[0]];
+        row.hierarchy.length > 2 ? row.hierarchy.slice(0, -1) : [row.hierarchy[0]];
       const branchKey = parentHierarchy.join("__");
 
       let branch = map.get(branchKey);
       if (!branch) {
         let branchLabel = "";
-        if (activeLevels.length >= 2) {
+        if (row.hierarchy.length > 2) {
           const subParts = parentHierarchy.slice(1);
           branchLabel =
             nameOrder === "reverse"
@@ -1574,6 +1654,98 @@ export default function ProductModal({
                         </div>
                       )}
                     </div>
+
+                    {/* Branch Dependency (Applies to) */}
+                    {index > 0 &&
+                      (() => {
+                        const parentValues = getAvailableParentValues(index);
+                        if (parentValues.length === 0) return null;
+                        const hasFilter =
+                          Array.isArray(lvl.appliesToParents) && lvl.appliesToParents.length > 0;
+
+                        return (
+                          <div className="pt-2.5 border-t border-gray-200/60 mt-1 space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center space-x-2">
+                                <GitBranch size={13} className="text-brand" />
+                                <span className="text-xs font-bold text-gray-700">Applies to:</span>
+                                <div className="flex items-center bg-white border border-gray-200 rounded-lg p-0.5 shadow-2xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateSubCategoryAppliesTo(lvl.id, [])}
+                                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                      !hasFilter
+                                        ? "bg-brand text-white shadow-xs"
+                                        : "text-gray-600 hover:text-gray-900"
+                                    }`}
+                                  >
+                                    All Products
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!hasFilter && parentValues.length > 0) {
+                                        updateSubCategoryAppliesTo(lvl.id, [parentValues[0]]);
+                                      }
+                                    }}
+                                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                      hasFilter
+                                        ? "bg-brand text-white shadow-xs"
+                                        : "text-gray-600 hover:text-gray-900"
+                                    }`}
+                                  >
+                                    Specific Parent Only
+                                  </button>
+                                </div>
+                              </div>
+
+                              {hasFilter && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                                  Conditional: Only for {lvl.appliesToParents!.join(", ")}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Parent Value Selection Chips */}
+                            {hasFilter && (
+                              <div className="p-2.5 bg-white rounded-xl border border-blue-100/80 shadow-2xs space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-semibold text-gray-600">
+                                    Select parent specification(s) where this level applies:
+                                  </span>
+                                  <span className="text-[10px] text-gray-400 font-medium">
+                                    Other products will bypass this level
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {parentValues.map((pval) => {
+                                    const isSelected = lvl.appliesToParents?.includes(pval);
+                                    return (
+                                      <button
+                                        key={pval}
+                                        type="button"
+                                        onClick={() => toggleSubCategoryParent(lvl.id, pval)}
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center space-x-1.5 ${
+                                          isSelected
+                                            ? "bg-blue-50 border-brand text-brand shadow-xs"
+                                            : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                        }`}
+                                      >
+                                        {isSelected ? (
+                                          <Check size={12} className="text-brand" />
+                                        ) : (
+                                          <Square size={12} className="text-gray-400" />
+                                        )}
+                                        <span>{pval}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                   </div>
                 ))}
 
@@ -1956,6 +2128,15 @@ export default function ProductModal({
                                 ₹
                               </span>
                             </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBranch(b.rows)}
+                              className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                              title="Exclude entire branch"
+                            >
+                              <Trash2 size={15} />
+                            </button>
                           </div>
                         </div>
 
@@ -2005,26 +2186,37 @@ export default function ProductModal({
                                     </div>
                                   </div>
 
-                                  {/* Individual Variant Price Input */}
-                                  <div className="relative w-24 shrink-0">
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      disabled={!row.included}
-                                      value={row.price}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        setRowOverrides((prev) => ({
-                                          ...prev,
-                                          [row.id]: { ...prev[row.id], price: val },
-                                        }));
-                                      }}
-                                      className="w-full pl-4 pr-2 py-1 bg-gray-50 rounded-lg text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand disabled:bg-gray-100"
-                                    />
-                                    <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] font-bold">
-                                      ₹
-                                    </span>
+                                  {/* Individual Variant Price Input & Exclude */}
+                                  <div className="flex items-center space-x-1 shrink-0">
+                                    <div className="relative w-24">
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        disabled={!row.included}
+                                        value={row.price}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setRowOverrides((prev) => ({
+                                            ...prev,
+                                            [row.id]: { ...prev[row.id], price: val },
+                                          }));
+                                        }}
+                                        className="w-full pl-4 pr-2 py-1 bg-gray-50 rounded-lg text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand disabled:bg-gray-100"
+                                      />
+                                      <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] font-bold">
+                                        ₹
+                                      </span>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteCombination(row.id)}
+                                      className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                      title="Exclude combination"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
                                   </div>
                                 </div>
                               );
@@ -2102,27 +2294,38 @@ export default function ProductModal({
                             </div>
                           </div>
 
-                          {/* Editable Price for this combination */}
-                          <div className="w-28 shrink-0 relative">
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              disabled={!row.included}
-                              value={row.price}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setRowOverrides((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], price: val },
-                                }));
-                              }}
-                              placeholder="Rate"
-                              className="w-full pl-5 pr-2.5 py-1.5 bg-gray-50 rounded-xl text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand disabled:bg-gray-100"
-                            />
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
-                              ₹
-                            </span>
+                          {/* Editable Price & Exclude for this combination */}
+                          <div className="flex items-center space-x-1.5 shrink-0">
+                            <div className="w-28 relative">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                disabled={!row.included}
+                                value={row.price}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setRowOverrides((prev) => ({
+                                    ...prev,
+                                    [row.id]: { ...prev[row.id], price: val },
+                                  }));
+                                }}
+                                placeholder="Rate"
+                                className="w-full pl-5 pr-2.5 py-1.5 bg-gray-50 rounded-xl text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand disabled:bg-gray-100"
+                              />
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
+                                ₹
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCombination(row.id)}
+                              className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                              title="Exclude combination"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
                         </div>
                       );
