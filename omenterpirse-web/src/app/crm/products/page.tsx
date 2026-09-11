@@ -218,7 +218,7 @@ export default function CrmProductsPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search name, HSN, description..."
+                  placeholder="Search name, HSN, category..."
                   className="w-full sm:w-64 pl-9 pr-3.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
                 />
               </div>
@@ -268,7 +268,6 @@ export default function CrmProductsPage() {
                   <tr className="border-b border-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                     <th className="pb-3">Product Name</th>
                     <th className="pb-3">HSN / Code</th>
-                    <th className="pb-3">Description</th>
                     <th className="pb-3">Base Price</th>
                     <th className="pb-3 text-right">Actions</th>
                   </tr>
@@ -292,9 +291,6 @@ export default function CrmProductsPage() {
                         ) : (
                           <span className="text-gray-400 font-normal">—</span>
                         )}
-                      </td>
-                      <td className="py-4 text-xs text-gray-500 max-w-xs truncate">
-                        {prod.description || "—"}
                       </td>
                       <td className="py-4 font-bold text-gray-900 text-xs sm:text-sm">
                         <div>

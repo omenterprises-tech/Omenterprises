@@ -42,6 +42,7 @@ export interface TreeNode {
   id: string;
   name: string;
   price?: string;
+  hsn?: string;
   children: TreeNode[];
 }
 
@@ -57,6 +58,7 @@ function deepCloneWithNewIds(node: TreeNode): TreeNode {
     id: `node-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     name: node.name,
     price: node.price,
+    hsn: node.hsn,
     children: (node.children || []).map(deepCloneWithNewIds),
   };
 }
@@ -145,6 +147,17 @@ function setNodePriceInTree(root: TreeNode, nodeId: string, price: string): Tree
   };
 }
 
+// Set HSN on a node
+function setNodeHsnInTree(root: TreeNode, nodeId: string, hsn: string): TreeNode {
+  if (root.id === nodeId) {
+    return { ...root, hsn };
+  }
+  return {
+    ...root,
+    children: (root.children || []).map((c) => setNodeHsnInTree(c, nodeId, hsn)),
+  };
+}
+
 // Apply price to all leaf descendants under nodeId
 function applyPriceToDescendantLeaves(root: TreeNode, nodeId: string, price: string): TreeNode {
   function applyToAllLeaves(node: TreeNode): TreeNode {
@@ -177,7 +190,8 @@ function collectTreeLeafProducts(
   root: TreeNode,
   nameOrder: "forward" | "reverse",
   batchBasePrice: string,
-  rowOverrides: Record<string, { price?: string; excluded?: boolean }>
+  batchHsn: string,
+  rowOverrides: Record<string, { price?: string; hsn?: string; excluded?: boolean }>
 ): BatchCombinationRow[] {
   const results: BatchCombinationRow[] = [];
 
@@ -200,11 +214,19 @@ function collectTreeLeafProducts(
           ? node.price
           : batchBasePrice;
 
+      const assignedHsn =
+        override?.hsn !== undefined
+          ? override.hsn
+          : node.hsn !== undefined && node.hsn !== ""
+          ? node.hsn
+          : batchHsn;
+
       results.push({
         id: rowId,
         name: formattedName,
         hierarchy: currentPath,
         price: assignedPrice || "",
+        hsn: assignedHsn || "",
         included: override?.excluded ? false : true,
       });
       return;
@@ -234,6 +256,7 @@ interface BatchCombinationRow {
   name: string;
   hierarchy: string[];
   price: string;
+  hsn?: string;
   included: boolean;
 }
 
@@ -353,6 +376,10 @@ export default function ProductModal({
     setTreeRoot((prev) => setNodePriceInTree(prev, nodeId, priceVal));
   };
 
+  const handleSetTreeNodeHsn = (nodeId: string, hsnVal: string) => {
+    setTreeRoot((prev) => setNodeHsnInTree(prev, nodeId, hsnVal));
+  };
+
   const handleApplyBulkPriceToBranch = (nodeId: string, priceVal: string) => {
     if (!priceVal || isNaN(Number(priceVal)) || Number(priceVal) < 0) {
       showLocalToast("Please enter a valid rate to apply.");
@@ -410,7 +437,7 @@ export default function ProductModal({
 
   // Per-row price or exclusion overrides in matrix
   const [rowOverrides, setRowOverrides] = useState<
-    Record<string, { price?: string; excluded?: boolean }>
+    Record<string, { price?: string; hsn?: string; excluded?: boolean }>
   >({});
   const [batchErrors, setBatchErrors] = useState<string>("");
 
@@ -743,6 +770,7 @@ export default function ProductModal({
           name: mainCat,
           hierarchy: [mainCat],
           price: override?.price !== undefined ? override.price : batchBasePrice,
+          hsn: override?.hsn !== undefined ? override.hsn : batchHsn,
           included: override?.excluded ? false : true,
         },
       ];
@@ -819,15 +847,16 @@ export default function ProductModal({
         name: formattedName,
         hierarchy: path,
         price: override?.price !== undefined ? override.price : batchBasePrice,
+        hsn: override?.hsn !== undefined ? override.hsn : batchHsn,
         included: override?.excluded ? false : true,
       };
     });
-  }, [batchMainCategory, subCategoryLevels, nameOrder, batchBasePrice, rowOverrides]);
+  }, [batchMainCategory, subCategoryLevels, nameOrder, batchBasePrice, batchHsn, rowOverrides]);
 
   // Tree Mode Leaf Products
   const treeLeafProducts = useMemo<BatchCombinationRow[]>(() => {
-    return collectTreeLeafProducts(treeRoot, nameOrder, batchBasePrice, rowOverrides);
-  }, [treeRoot, nameOrder, batchBasePrice, rowOverrides]);
+    return collectTreeLeafProducts(treeRoot, nameOrder, batchBasePrice, batchHsn, rowOverrides);
+  }, [treeRoot, nameOrder, batchBasePrice, batchHsn, rowOverrides]);
 
   // Active Combinations based on selected generatorMode ("tree" vs "matrix")
   const activeCombinations = useMemo<BatchCombinationRow[]>(() => {
@@ -1104,11 +1133,10 @@ export default function ProductModal({
         specifications: {
           hierarchy: categories.map((c) => c.trim()).filter(Boolean),
           nameOrder,
-          notes: description.trim(),
         },
         price: parseFloat(price),
         gst: gst.trim() !== "" ? parseFloat(gst) : null,
-        description: description.trim() || null,
+        description: null,
         unit: unit.trim() || null,
         hsn: hsn.trim() || null,
       };
@@ -1194,12 +1222,11 @@ export default function ProductModal({
         price: parseFloat(r.price),
         gst: parsedGst,
         unit: batchUnit.trim() || null,
-        hsn: batchHsn.trim() || null,
-        description: batchDescription.trim() || null,
+        hsn: (r.hsn || batchHsn || "").trim() || null,
+        description: null,
         specifications: {
           hierarchy: r.hierarchy,
           nameOrder,
-          notes: batchDescription.trim(),
         },
       }));
 
@@ -1646,21 +1673,6 @@ export default function ProductModal({
                     />
                   </div>
                 </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-gray-700">Specifications / Description</label>
-                    <span className="text-[11px] text-gray-400 font-medium">{description.length}/2000</span>
-                  </div>
-                  <textarea
-                    rows={3}
-                    maxLength={2000}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Technical specifications, grade, manufacturer remarks..."
-                    className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all resize-none"
-                  />
-                </div>
               </div>
 
               {/* Bottom Actions */}
@@ -1904,24 +1916,36 @@ export default function ProductModal({
                           🌿 Final Product Tier: &quot;{activeDrillDownNode.name}&quot;
                         </p>
                         <p className="text-[11px] text-emerald-700">
-                          This category has no further sub-categories. Enter its commercial selling price:
+                          This category has no further sub-categories. Enter price &amp; HSN (if available):
                         </p>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs font-bold text-emerald-900">Rate:</span>
-                        <div className="relative w-32">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-xs font-bold text-emerald-900">HSN:</span>
                           <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={activeDrillDownNode.price || ""}
-                            onChange={(e) => handleSetTreeNodePrice(activeDrillDownNode.id, e.target.value)}
-                            placeholder="0.00"
-                            className="w-full pl-6 pr-2.5 py-1.5 bg-white rounded-xl text-sm font-bold text-gray-900 border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            type="text"
+                            value={activeDrillDownNode.hsn || ""}
+                            onChange={(e) => handleSetTreeNodeHsn(activeDrillDownNode.id, e.target.value)}
+                            placeholder={batchHsn || "e.g. 8544"}
+                            className="w-24 px-2.5 py-1.5 bg-white rounded-xl text-xs font-semibold text-gray-900 border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                           />
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-600 text-xs font-bold">
-                            ₹
-                          </span>
+                        </div>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-xs font-bold text-emerald-900">Rate:</span>
+                          <div className="relative w-28">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={activeDrillDownNode.price || ""}
+                              onChange={(e) => handleSetTreeNodePrice(activeDrillDownNode.id, e.target.value)}
+                              placeholder="0.00"
+                              className="w-full pl-6 pr-2.5 py-1.5 bg-white rounded-xl text-sm font-bold text-gray-900 border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-600 text-xs font-bold">
+                              ₹
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1958,17 +1982,29 @@ export default function ProductModal({
                                 </p>
                               </div>
                               {childIsLeaf ? (
-                                <div className="flex items-center space-x-1 mt-1">
-                                  <span className="text-[10px] font-bold text-gray-500">₹</span>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={child.price || ""}
-                                    onChange={(e) => handleSetTreeNodePrice(child.id, e.target.value)}
-                                    placeholder="Rate"
-                                    className="w-20 px-1.5 py-0.5 bg-white rounded border border-emerald-300 text-xs font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                  />
+                                <div className="flex items-center flex-wrap gap-2 mt-1.5">
+                                  <div className="flex items-center space-x-1">
+                                    <span className="text-[10px] font-bold text-gray-400">HSN:</span>
+                                    <input
+                                      type="text"
+                                      value={child.hsn || ""}
+                                      onChange={(e) => handleSetTreeNodeHsn(child.id, e.target.value)}
+                                      placeholder={batchHsn || "HSN"}
+                                      className="w-16 px-1.5 py-0.5 bg-white rounded border border-emerald-300 text-xs font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                    />
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <span className="text-[10px] font-bold text-gray-500">₹</span>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={child.price || ""}
+                                      onChange={(e) => handleSetTreeNodePrice(child.id, e.target.value)}
+                                      placeholder="Rate"
+                                      className="w-20 px-1.5 py-0.5 bg-white rounded border border-emerald-300 text-xs font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                  </div>
                                 </div>
                               ) : (
                                 <p className="text-[10px] text-gray-500 mt-0.5">
@@ -2082,6 +2118,24 @@ export default function ProductModal({
                       </div>
 
                       <div className="flex items-center space-x-2 shrink-0">
+                        <div className="flex items-center space-x-1">
+                          <span className="text-[10px] font-bold text-gray-400">HSN:</span>
+                          <input
+                            type="text"
+                            disabled={!row.included}
+                            value={row.hsn || ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setRowOverrides((prev) => ({
+                                ...prev,
+                                [row.id]: { ...prev[row.id], hsn: val },
+                              }));
+                            }}
+                            placeholder={batchHsn || "HSN"}
+                            className="w-20 px-2 py-1 bg-gray-50 rounded-lg text-xs font-semibold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand disabled:bg-gray-100"
+                          />
+                        </div>
+
                         <div className="relative w-28">
                           <input
                             type="number"
