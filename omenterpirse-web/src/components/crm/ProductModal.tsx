@@ -18,6 +18,12 @@ import {
   Copy,
   ArrowUp,
   ArrowDown,
+  Search,
+  ChevronDown,
+  ChevronRight,
+  Filter,
+  RotateCcw,
+  Tag,
 } from "lucide-react";
 
 interface ProductModalProps {
@@ -123,6 +129,29 @@ export default function ProductModal({
     Record<string, { price?: string; excluded?: boolean }>
   >({});
   const [batchErrors, setBatchErrors] = useState<string>("");
+
+  // Sub-Category Pricing & Matrix View State
+  const [pricingViewMode, setPricingViewMode] = useState<"grouped" | "flat">("grouped");
+  const [matrixSearch, setMatrixSearch] = useState("");
+  const [bulkFilteredPrice, setBulkFilteredPrice] = useState("");
+  const [expandedBranches, setExpandedBranches] = useState<Record<string, boolean>>({});
+  const [selectedPricingLevelId, setSelectedPricingLevelId] = useState<string>("");
+  const [levelPricesInput, setLevelPricesInput] = useState<Record<string, string>>({});
+  const [showLevelPricingDrawer, setShowLevelPricingDrawer] = useState<boolean>(false);
+
+  // Automatically select a sensible default level for Level-Based pricing (e.g. Size or Length)
+  useEffect(() => {
+    const activeLevels = subCategoryLevels.filter((lvl) => lvl.values.length > 0);
+    if (activeLevels.length > 0) {
+      if (!selectedPricingLevelId || !activeLevels.some((l) => l.id === selectedPricingLevelId)) {
+        const preferred =
+          activeLevels.length >= 2
+            ? activeLevels[activeLevels.length - 2]
+            : activeLevels[0];
+        setSelectedPricingLevelId(preferred.id);
+      }
+    }
+  }, [subCategoryLevels, selectedPricingLevelId]);
 
   const showLocalToast = (msg: string) => {
     setToastMessage(msg);
@@ -385,6 +414,226 @@ export default function ProductModal({
       next[r.id] = { ...next[r.id], excluded: allSelected };
     });
     setRowOverrides(next);
+  };
+
+  // Interface for branch-level grouping
+  interface CombinationBranch {
+    branchKey: string;
+    parentHierarchy: string[];
+    branchLabel: string;
+    rows: BatchCombinationRow[];
+    hasMixedPrices: boolean;
+    commonPrice: string;
+    allIncluded: boolean;
+    someIncluded: boolean;
+  }
+
+  // Group combinations by parent sub-category branch (e.g. Length + Grade + Size)
+  const branches = useMemo<CombinationBranch[]>(() => {
+    if (combinations.length === 0) return [];
+    const activeLevels = subCategoryLevels.filter((lvl) => lvl.values.length > 0);
+
+    const map = new Map<string, CombinationBranch>();
+
+    combinations.forEach((row) => {
+      const parentHierarchy =
+        activeLevels.length >= 2 ? row.hierarchy.slice(0, -1) : [row.hierarchy[0]];
+      const branchKey = parentHierarchy.join("__");
+
+      let branch = map.get(branchKey);
+      if (!branch) {
+        let branchLabel = "";
+        if (activeLevels.length >= 2) {
+          const subParts = parentHierarchy.slice(1);
+          branchLabel =
+            nameOrder === "reverse"
+              ? [...subParts].reverse().join(" • ")
+              : subParts.join(" • ");
+        } else {
+          branchLabel = parentHierarchy[0];
+        }
+
+        branch = {
+          branchKey,
+          parentHierarchy,
+          branchLabel,
+          rows: [],
+          hasMixedPrices: false,
+          commonPrice: "",
+          allIncluded: true,
+          someIncluded: false,
+        };
+        map.set(branchKey, branch);
+      }
+      branch.rows.push(row);
+    });
+
+    return Array.from(map.values()).map((b) => {
+      const includedRows = b.rows.filter((r) => r.included);
+      const allIncluded = b.rows.length > 0 && includedRows.length === b.rows.length;
+      const someIncluded = includedRows.length > 0 && !allIncluded;
+
+      const distinctPrices = Array.from(
+        new Set(b.rows.map((r) => String(r.price ?? "").trim()).filter(Boolean))
+      );
+      const hasMixedPrices = distinctPrices.length > 1;
+      const commonPrice =
+        distinctPrices.length === 1
+          ? distinctPrices[0]
+          : distinctPrices.length === 0
+          ? batchBasePrice
+          : "";
+
+      return {
+        ...b,
+        hasMixedPrices,
+        commonPrice,
+        allIncluded,
+        someIncluded,
+      };
+    });
+  }, [combinations, subCategoryLevels, nameOrder, batchBasePrice]);
+
+  // Filter combinations based on search query
+  const filteredCombinations = useMemo(() => {
+    if (!matrixSearch.trim()) return combinations;
+    const q = matrixSearch.toLowerCase().trim();
+    return combinations.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.hierarchy.some((h) => h.toLowerCase().includes(q))
+    );
+  }, [combinations, matrixSearch]);
+
+  // Filter branches based on search query
+  const filteredBranches = useMemo(() => {
+    if (!matrixSearch.trim()) return branches;
+    const q = matrixSearch.toLowerCase().trim();
+    return branches
+      .map((b) => {
+        const matchingRows = b.rows.filter(
+          (r) =>
+            r.name.toLowerCase().includes(q) ||
+            r.hierarchy.some((h) => h.toLowerCase().includes(q))
+        );
+        if (matchingRows.length === 0) return null;
+        return {
+          ...b,
+          rows: matchingRows,
+        };
+      })
+      .filter(Boolean) as CombinationBranch[];
+  }, [branches, matrixSearch]);
+
+  // Set price for an entire branch of variants
+  const handleSetBranchPrice = (branchRows: BatchCombinationRow[], newPrice: string) => {
+    setRowOverrides((prev) => {
+      const next = { ...prev };
+      branchRows.forEach((r) => {
+        next[r.id] = { ...next[r.id], price: newPrice };
+      });
+      return next;
+    });
+  };
+
+  // Toggle inclusion for an entire branch
+  const handleToggleBranchIncluded = (
+    branchRows: BatchCombinationRow[],
+    targetState: boolean
+  ) => {
+    setRowOverrides((prev) => {
+      const next = { ...prev };
+      branchRows.forEach((r) => {
+        next[r.id] = { ...next[r.id], excluded: !targetState };
+      });
+      return next;
+    });
+  };
+
+  // Toggle individual branch expansion
+  const toggleBranchExpanded = (branchKey: string) => {
+    setExpandedBranches((prev) => ({
+      ...prev,
+      [branchKey]: !prev[branchKey],
+    }));
+  };
+
+  // Expand or collapse all branches
+  const handleExpandAllBranches = (expand: boolean) => {
+    const next: Record<string, boolean> = {};
+    branches.forEach((b) => {
+      next[b.branchKey] = expand;
+    });
+    setExpandedBranches(next);
+  };
+
+  // Apply bulk price to filtered combinations
+  const handleApplyBulkFilteredPrice = () => {
+    if (!bulkFilteredPrice || isNaN(Number(bulkFilteredPrice)) || Number(bulkFilteredPrice) < 0) {
+      showLocalToast("Please enter a valid rate to apply.");
+      return;
+    }
+    setRowOverrides((prev) => {
+      const next = { ...prev };
+      filteredCombinations.forEach((r) => {
+        next[r.id] = { ...next[r.id], price: bulkFilteredPrice };
+      });
+      return next;
+    });
+    showLocalToast(`Updated ${filteredCombinations.length} combinations to ₹${bulkFilteredPrice}`);
+  };
+
+  // Include/exclude all filtered items
+  const handleIncludeAllFiltered = (include: boolean) => {
+    setRowOverrides((prev) => {
+      const next = { ...prev };
+      filteredCombinations.forEach((r) => {
+        next[r.id] = { ...next[r.id], excluded: !include };
+      });
+      return next;
+    });
+  };
+
+  // Reset all overrides to default base price
+  const handleResetAllToBasePrice = () => {
+    setRowOverrides((prev) => {
+      const next: Record<string, { price?: string; excluded?: boolean }> = {};
+      Object.keys(prev).forEach((key) => {
+        if (prev[key]?.excluded !== undefined) {
+          next[key] = { excluded: prev[key].excluded };
+        }
+      });
+      return next;
+    });
+    showLocalToast(`All prices reset to Default Base Rate (₹${batchBasePrice || "0"})`);
+  };
+
+  // Quick price by subcategory level
+  const handleApplyLevelPrices = () => {
+    const activeLevels = subCategoryLevels.filter((lvl) => lvl.values.length > 0);
+    const activeLevelIdx = activeLevels.findIndex((lvl) => lvl.id === selectedPricingLevelId);
+    if (activeLevelIdx === -1) {
+      showLocalToast("Please select a sub-category level first.");
+      return;
+    }
+
+    const hierIdx = activeLevelIdx + 1; // 0 is main category
+    let countUpdated = 0;
+
+    setRowOverrides((prev) => {
+      const next = { ...prev };
+      combinations.forEach((r) => {
+        const val = r.hierarchy[hierIdx];
+        if (val && levelPricesInput[val] !== undefined && levelPricesInput[val].trim() !== "") {
+          next[r.id] = { ...next[r.id], price: levelPricesInput[val].trim() };
+          countUpdated++;
+        }
+      });
+      return next;
+    });
+
+    const targetLevel = activeLevels[activeLevelIdx];
+    showLocalToast(`Applied rates across ${countUpdated} combinations based on ${targetLevel.label}!`);
   };
 
   if (!isOpen) return null;
@@ -1340,18 +1589,20 @@ export default function ProductModal({
               </div>
             </div>
 
-            {/* Step 3: Generated Combinations Matrix Table */}
-            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-200/80 shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+            {/* Step 3: Generated Combinations Matrix Table & Sub-Category Pricing */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-200/80 shadow-xs space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800 flex items-center gap-1.5">
                     <Sparkles size={14} className="text-brand" />
-                    <span>3. Generated Combinations Matrix ({includedCount} Active)</span>
+                    <span>3. Generated Combinations & Sub-Category Pricing ({includedCount} Active)</span>
                   </h3>
                   <p className="text-[11px] text-gray-500 mt-0.5">
-                    All permutations from the tree above. Order:{" "}
+                    All permutations from the tree above. Set rates by branch, by sub-category level, or per combination. Order:{" "}
                     <strong className="text-brand font-black">
-                      {nameOrder === "forward" ? "Forward (Main Category → Sub-Categories)" : "Reverse (Sub-Categories → Main Category)"}
+                      {nameOrder === "forward"
+                        ? "Forward (Main Category → Sub-Categories)"
+                        : "Reverse (Sub-Categories → Main Category)"}
                     </strong>
                   </p>
                 </div>
@@ -1374,89 +1625,509 @@ export default function ProductModal({
                       </>
                     )}
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={handleResetAllToBasePrice}
+                    className="text-xs font-bold text-gray-500 hover:text-rose-600 flex items-center space-x-1 py-1 px-2.5 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                    title={`Reset all custom rates back to Default Base Rate (₹${batchBasePrice || "0"})`}
+                  >
+                    <RotateCcw size={13} />
+                    <span>Reset to Base Rate</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Combinations List */}
+              {/* Collapsible: Quick Level-Based Pricing Drawer */}
+              {combinations.length > 0 && subCategoryLevels.some((l) => l.values.length > 0) && (
+                <div className="rounded-2xl border border-blue-200/70 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 overflow-hidden shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() => setShowLevelPricingDrawer(!showLevelPricingDrawer)}
+                    className="w-full px-4 py-3 flex items-center justify-between text-left cursor-pointer hover:bg-blue-100/40 transition-colors"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Tag size={15} className="text-brand" />
+                      <span className="text-xs font-bold text-gray-800">
+                        ⚡ Quick Price by Sub-Category Level (e.g. Size, Length, or Grade)
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand text-white">
+                        Fast Rate Setup
+                      </span>
+                    </div>
+                    {showLevelPricingDrawer ? (
+                      <ChevronDown size={16} className="text-gray-500" />
+                    ) : (
+                      <ChevronRight size={16} className="text-gray-500" />
+                    )}
+                  </button>
+
+                  {showLevelPricingDrawer && (
+                    <div className="p-4 pt-1 border-t border-blue-100/80 space-y-3 bg-white/70">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center space-x-2">
+                          <label className="text-xs font-bold text-gray-700">
+                            Apply prices based on:
+                          </label>
+                          <select
+                            value={selectedPricingLevelId}
+                            onChange={(e) => setSelectedPricingLevelId(e.target.value)}
+                            className="px-3 py-1.5 bg-white rounded-xl text-xs font-bold text-brand border border-blue-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
+                          >
+                            {subCategoryLevels
+                              .filter((lvl) => lvl.values.length > 0)
+                              .map((lvl) => (
+                                <option key={lvl.id} value={lvl.id}>
+                                  {lvl.label} ({lvl.values.length} values)
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleApplyLevelPrices}
+                          className="px-4 py-1.5 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto cursor-pointer"
+                        >
+                          <Check size={14} />
+                          <span>Apply Level Rates to Matching Combinations</span>
+                        </button>
+                      </div>
+
+                      {/* Inputs for each value of selected level */}
+                      {(() => {
+                        const targetLevel =
+                          subCategoryLevels.find((lvl) => lvl.id === selectedPricingLevelId) ||
+                          subCategoryLevels.find((lvl) => lvl.values.length > 0);
+                        if (!targetLevel || targetLevel.values.length === 0) return null;
+
+                        return (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
+                            {targetLevel.values.map((val) => (
+                              <div
+                                key={val}
+                                className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-200/80 shadow-xs"
+                              >
+                                <span className="text-xs font-bold text-gray-800 truncate pr-2">
+                                  {val}
+                                </span>
+                                <div className="relative w-28 shrink-0">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={levelPricesInput[val] ?? ""}
+                                    onChange={(e) =>
+                                      setLevelPricesInput((prev) => ({
+                                        ...prev,
+                                        [val]: e.target.value,
+                                      }))
+                                    }
+                                    placeholder="Rate"
+                                    className="w-full pl-5 pr-2 py-1 bg-gray-50 rounded-lg text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                                  />
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
+                                    ₹
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Search Filter & Bulk Action Bar */}
+              {combinations.length > 0 && (
+                <div className="bg-gray-50/80 p-3.5 rounded-2xl border border-gray-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex-1 relative">
+                    <Search
+                      size={15}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    />
+                    <input
+                      type="text"
+                      value={matrixSearch}
+                      onChange={(e) => setMatrixSearch(e.target.value)}
+                      placeholder="Filter combinations (e.g. 180 mts, frls, 1.0 sqmm, red)..."
+                      className="w-full pl-9 pr-8 py-2 bg-white rounded-xl text-xs font-medium text-gray-900 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    />
+                    {matrixSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setMatrixSearch("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Bulk Rate for Filtered Items */}
+                  <div className="flex items-center space-x-2 flex-wrap sm:flex-nowrap gap-y-2">
+                    <div className="relative w-28">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={bulkFilteredPrice}
+                        onChange={(e) => setBulkFilteredPrice(e.target.value)}
+                        placeholder="Bulk Rate"
+                        className="w-full pl-5 pr-2 py-1.5 bg-white rounded-xl text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand shadow-xs"
+                      />
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
+                        ₹
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleApplyBulkFilteredPrice}
+                      disabled={filteredCombinations.length === 0}
+                      className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                      title="Apply this rate to all filtered/visible combinations"
+                    >
+                      Set for Filtered ({filteredCombinations.length})
+                    </button>
+
+                    {matrixSearch && (
+                      <div className="flex items-center space-x-1 pl-1 border-l border-gray-300">
+                        <button
+                          type="button"
+                          onClick={() => handleIncludeAllFiltered(true)}
+                          className="px-2 py-1 bg-white hover:bg-gray-100 text-brand border border-gray-200 rounded-lg text-[10px] font-bold cursor-pointer"
+                        >
+                          Include Visible
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleIncludeAllFiltered(false)}
+                          className="px-2 py-1 bg-white hover:bg-gray-100 text-gray-600 border border-gray-200 rounded-lg text-[10px] font-bold cursor-pointer"
+                        >
+                          Exclude Visible
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* View Mode Controls: Grouped by Branch vs Flat List */}
+              {combinations.length > 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center bg-gray-100 p-0.5 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setPricingViewMode("grouped")}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+                          pricingViewMode === "grouped"
+                            ? "bg-white text-brand shadow-xs"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        <Layers size={13} />
+                        <span>Grouped by Branch ({filteredBranches.length})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPricingViewMode("flat")}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+                          pricingViewMode === "flat"
+                            ? "bg-white text-brand shadow-xs"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        <Package size={13} />
+                        <span>Flat List ({filteredCombinations.length})</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {pricingViewMode === "grouped" && (
+                    <div className="flex items-center space-x-2 text-xs font-bold text-gray-500">
+                      <button
+                        type="button"
+                        onClick={() => handleExpandAllBranches(true)}
+                        className="hover:text-brand cursor-pointer"
+                      >
+                        Expand All
+                      </button>
+                      <span>•</span>
+                      <button
+                        type="button"
+                        onClick={() => handleExpandAllBranches(false)}
+                        className="hover:text-brand cursor-pointer"
+                      >
+                        Collapse All
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Combinations Render Area */}
               {combinations.length === 0 ? (
                 <div className="py-12 text-center text-gray-400 text-xs">
                   Enter a Main Category and values in your sub-category levels above to view generated combinations.
                 </div>
-              ) : (
-                <div className="space-y-2 max-h-[28rem] overflow-y-auto pr-1">
-                  {combinations.map((row, idx) => (
-                    <div
-                      key={row.id}
-                      className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
-                        row.included
-                          ? "bg-white border-gray-200 hover:border-brand/40 shadow-xs"
-                          : "bg-gray-50/70 border-gray-150 opacity-50"
-                      }`}
-                    >
-                      {/* Checkbox & Product Name */}
-                      <div className="flex items-center space-x-3 flex-1 min-w-0 pr-3">
-                        <input
-                          type="checkbox"
-                          checked={row.included}
-                          onChange={(e) => {
-                            const val = !e.target.checked;
-                            setRowOverrides((prev) => ({
-                              ...prev,
-                              [row.id]: { ...prev[row.id], excluded: val },
-                            }));
-                          }}
-                          className="w-4 h-4 rounded-md accent-brand cursor-pointer shrink-0"
-                        />
+              ) : pricingViewMode === "grouped" ? (
+                /* =================== VIEW 1: GROUPED BY BRANCH =================== */
+                <div className="space-y-3 max-h-[32rem] overflow-y-auto pr-1">
+                  {filteredBranches.length === 0 ? (
+                    <div className="py-8 text-center text-gray-400 text-xs">
+                      No branches match &quot;{matrixSearch}&quot;.
+                    </div>
+                  ) : (
+                    filteredBranches.map((b) => (
+                      <div
+                        key={b.branchKey}
+                        className="border border-gray-200/90 rounded-2xl bg-white shadow-xs overflow-hidden transition-all hover:border-brand/40"
+                      >
+                        {/* Branch Header */}
+                        <div className="p-3.5 bg-gray-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-150">
+                          <div className="flex items-center space-x-3 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={b.allIncluded}
+                              ref={(el) => {
+                                if (el) el.indeterminate = b.someIncluded;
+                              }}
+                              onChange={(e) =>
+                                handleToggleBranchIncluded(b.rows, e.target.checked)
+                              }
+                              className="w-4 h-4 rounded accent-brand cursor-pointer shrink-0"
+                              title="Toggle all items in this branch"
+                            />
 
-                        <div className="min-w-0">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-[10px] font-mono font-bold text-gray-400">
-                              #{idx + 1}
-                            </span>
-                            <p className="text-xs font-black text-gray-900 tracking-tight truncate">
-                              {row.name}
-                            </p>
+                            <div
+                              className="cursor-pointer select-none min-w-0 flex items-center space-x-2"
+                              onClick={() => toggleBranchExpanded(b.branchKey)}
+                            >
+                              {expandedBranches[b.branchKey] ? (
+                                <ChevronDown size={16} className="text-gray-500 shrink-0" />
+                              ) : (
+                                <ChevronRight size={16} className="text-gray-500 shrink-0" />
+                              )}
+                              <div>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs font-black text-gray-900 tracking-tight">
+                                    {b.branchLabel}
+                                  </span>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-brand border border-blue-100">
+                                    {b.rows.length} variants
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                                  {b.rows
+                                    .map((r) => r.hierarchy[r.hierarchy.length - 1])
+                                    .join(", ")}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-2 text-[10px] text-gray-500 font-medium mt-0.5">
-                            <span className="px-1.5 py-0.2 rounded bg-gray-100 font-mono">
-                              Unit: {batchUnit || "COILS"}
-                            </span>
-                            {batchHsn && (
-                              <span className="px-1.5 py-0.2 rounded bg-gray-100 font-mono">
-                                HSN: {batchHsn}
+
+                          {/* Branch Price Control */}
+                          <div className="flex items-center space-x-2 self-end sm:self-center shrink-0">
+                            <div className="text-right">
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                                Branch Rate
+                              </label>
+                              {b.hasMixedPrices && (
+                                <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                                  Mixed rates
+                                </span>
+                              )}
+                            </div>
+                            <div className="relative w-28">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={b.commonPrice}
+                                placeholder={b.hasMixedPrices ? "Mixed" : "Rate"}
+                                onChange={(e) => handleSetBranchPrice(b.rows, e.target.value)}
+                                className="w-full pl-5 pr-2 py-1.5 bg-white rounded-xl text-xs font-black text-brand border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand shadow-xs"
+                              />
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
+                                ₹
                               </span>
-                            )}
-                            <span className="px-1.5 py-0.2 rounded bg-blue-50 text-brand font-bold">
-                              GST: {batchGst || 18}%
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Expanded Variant Rows */}
+                        {expandedBranches[b.branchKey] && (
+                          <div className="divide-y divide-gray-100 bg-white">
+                            {b.rows.map((row) => {
+                              const leafValue = row.hierarchy[row.hierarchy.length - 1];
+                              const isCustom =
+                                row.price !== undefined &&
+                                row.price !== "" &&
+                                row.price !== batchBasePrice;
+                              return (
+                                <div
+                                  key={row.id}
+                                  className={`px-4 py-2.5 flex items-center justify-between transition-colors ${
+                                    row.included ? "hover:bg-gray-50/70" : "bg-gray-50/40 opacity-50"
+                                  }`}
+                                >
+                                  <div className="flex items-center space-x-3 min-w-0 pr-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={row.included}
+                                      onChange={(e) => {
+                                        const val = !e.target.checked;
+                                        setRowOverrides((prev) => ({
+                                          ...prev,
+                                          [row.id]: { ...prev[row.id], excluded: val },
+                                        }));
+                                      }}
+                                      className="w-3.5 h-3.5 rounded accent-brand cursor-pointer shrink-0"
+                                    />
+                                    <div className="min-w-0">
+                                      <div className="flex items-center space-x-2">
+                                        <span className="text-xs font-bold text-gray-900">
+                                          {leafValue}
+                                        </span>
+                                        <span className="text-[10px] text-gray-400 font-mono truncate">
+                                          ({row.name})
+                                        </span>
+                                        {isCustom && (
+                                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                            Custom
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Individual Variant Price Input */}
+                                  <div className="relative w-24 shrink-0">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      disabled={!row.included}
+                                      value={row.price}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setRowOverrides((prev) => ({
+                                          ...prev,
+                                          [row.id]: { ...prev[row.id], price: val },
+                                        }));
+                                      }}
+                                      className="w-full pl-4 pr-2 py-1 bg-gray-50 rounded-lg text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand disabled:bg-gray-100"
+                                    />
+                                    <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] font-bold">
+                                      ₹
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                /* =================== VIEW 2: FLAT LIST =================== */
+                <div className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
+                  {filteredCombinations.length === 0 ? (
+                    <div className="py-8 text-center text-gray-400 text-xs">
+                      No combinations match &quot;{matrixSearch}&quot;.
+                    </div>
+                  ) : (
+                    filteredCombinations.map((row, idx) => {
+                      const isCustom =
+                        row.price !== undefined &&
+                        row.price !== "" &&
+                        row.price !== batchBasePrice;
+                      return (
+                        <div
+                          key={row.id}
+                          className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
+                            row.included
+                              ? "bg-white border-gray-200 hover:border-brand/40 shadow-xs"
+                              : "bg-gray-50/70 border-gray-150 opacity-50"
+                          }`}
+                        >
+                          {/* Checkbox & Product Name */}
+                          <div className="flex items-center space-x-3 flex-1 min-w-0 pr-3">
+                            <input
+                              type="checkbox"
+                              checked={row.included}
+                              onChange={(e) => {
+                                const val = !e.target.checked;
+                                setRowOverrides((prev) => ({
+                                  ...prev,
+                                  [row.id]: { ...prev[row.id], excluded: val },
+                                }));
+                              }}
+                              className="w-4 h-4 rounded-md accent-brand cursor-pointer shrink-0"
+                            />
+
+                            <div className="min-w-0">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-[10px] font-mono font-bold text-gray-400">
+                                  #{idx + 1}
+                                </span>
+                                <p className="text-xs font-black text-gray-900 tracking-tight truncate">
+                                  {row.name}
+                                </p>
+                                {isCustom && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                    Custom Rate
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center space-x-2 text-[10px] text-gray-500 font-medium mt-0.5">
+                                <span className="px-1.5 py-0.2 rounded bg-gray-100 font-mono">
+                                  Unit: {batchUnit || "COILS"}
+                                </span>
+                                {batchHsn && (
+                                  <span className="px-1.5 py-0.2 rounded bg-gray-100 font-mono">
+                                    HSN: {batchHsn}
+                                  </span>
+                                )}
+                                <span className="px-1.5 py-0.2 rounded bg-blue-50 text-brand font-bold">
+                                  GST: {batchGst || 18}%
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Editable Price for this combination */}
+                          <div className="w-28 shrink-0 relative">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              disabled={!row.included}
+                              value={row.price}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setRowOverrides((prev) => ({
+                                  ...prev,
+                                  [row.id]: { ...prev[row.id], price: val },
+                                }));
+                              }}
+                              placeholder="Rate"
+                              className="w-full pl-5 pr-2.5 py-1.5 bg-gray-50 rounded-xl text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand disabled:bg-gray-100"
+                            />
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
+                              ₹
                             </span>
                           </div>
                         </div>
-                      </div>
-
-                      {/* Editable Price for this combination */}
-                      <div className="w-28 shrink-0 relative">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          disabled={!row.included}
-                          value={row.price}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setRowOverrides((prev) => ({
-                              ...prev,
-                              [row.id]: { ...prev[row.id], price: val },
-                            }));
-                          }}
-                          placeholder="Rate"
-                          className="w-full pl-5 pr-2.5 py-1.5 bg-gray-50 rounded-xl text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand disabled:bg-gray-100"
-                        />
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
-                          ₹
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    })
+                  )}
                 </div>
               )}
 
