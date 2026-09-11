@@ -382,157 +382,6 @@ interface BatchCombinationRow {
   included: boolean;
 }
 
-// Visual Indented Tree Node Component for Full Hierarchy Explorer
-function VisualTreeNode({
-  node,
-  depth = 0,
-  path = [],
-  activeDrillDownId,
-  treeExpandedNodes,
-  toggleExpand,
-  setActiveDrillDownId,
-  handleDeleteTreeNode,
-  handleSetTreeNodePrice,
-  searchQuery,
-}: {
-  node: TreeNode;
-  depth: number;
-  path: string[];
-  activeDrillDownId: string;
-  treeExpandedNodes: Record<string, boolean>;
-  toggleExpand: (id: string) => void;
-  setActiveDrillDownId: (id: string) => void;
-  handleDeleteTreeNode: (id: string, name: string) => void;
-  handleSetTreeNodePrice: (id: string, price: string) => void;
-  searchQuery: string;
-}) {
-  const isLeaf = !node.children || node.children.length === 0;
-  const isExpanded = treeExpandedNodes[node.id] ?? true;
-  const isActive = activeDrillDownId === node.id;
-  const leafCount = countLeafNodes(node);
-
-  // If search query is present, check if node or any descendant matches
-  const hasMatchingDescendant = (n: TreeNode): boolean => {
-    if (!searchQuery.trim()) return true;
-    if (n.name.toLowerCase().includes(searchQuery.toLowerCase().trim())) return true;
-    return (n.children || []).some(hasMatchingDescendant);
-  };
-
-  if (searchQuery.trim() && !hasMatchingDescendant(node)) {
-    return null;
-  }
-
-  return (
-    <div className="text-xs select-none">
-      <div
-        className={`group flex items-center justify-between py-1.5 px-2.5 rounded-xl border transition-all my-0.5 ${
-          isActive
-            ? "bg-brand/10 border-brand text-brand font-bold shadow-2xs"
-            : "bg-white/90 hover:bg-gray-50 border-gray-200/70 text-gray-800"
-        }`}
-        style={{ marginLeft: `${depth * 18}px` }}
-      >
-        <div className="flex items-center space-x-2 min-w-0">
-          {!isLeaf ? (
-            <button
-              type="button"
-              onClick={() => toggleExpand(node.id)}
-              className="p-0.5 text-gray-400 hover:text-gray-700 cursor-pointer"
-            >
-              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            </button>
-          ) : (
-            <span className="w-3.5 h-3.5 flex items-center justify-center text-emerald-500 font-black">
-              •
-            </span>
-          )}
-
-          <span
-            className={`cursor-pointer hover:underline truncate ${
-              isLeaf ? "font-semibold text-gray-800" : "font-bold text-gray-900"
-            }`}
-            onClick={() => setActiveDrillDownId(node.id)}
-            title={`Click to edit or drill down into ${node.name}`}
-          >
-            {node.name}
-          </span>
-
-          {!isLeaf ? (
-            <span className="px-1.5 py-0.2 rounded-full bg-gray-100 text-[10px] font-bold text-gray-500">
-              {node.children.length} {node.children.length === 1 ? "sub" : "subs"} ({leafCount} products)
-            </span>
-          ) : (
-            <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 text-[10px] font-bold text-emerald-700 border border-emerald-100">
-              Leaf
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center space-x-2 shrink-0">
-          {isLeaf ? (
-            <div className="flex items-center space-x-1">
-              <span className="text-[10px] font-bold text-gray-400">Rate:</span>
-              <div className="relative w-24">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={node.price || ""}
-                  onChange={(e) => handleSetTreeNodePrice(node.id, e.target.value)}
-                  placeholder="Rate"
-                  className="w-full pl-4 pr-1.5 py-0.5 text-xs font-bold bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
-                />
-                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-bold">
-                  ₹
-                </span>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setActiveDrillDownId(node.id)}
-              className="text-[10px] font-bold text-brand hover:underline px-2 py-0.5 rounded hover:bg-brand/5 cursor-pointer"
-            >
-              Drill Down &gt;
-            </button>
-          )}
-
-          {node.id !== "root" && (
-            <button
-              type="button"
-              onClick={() => handleDeleteTreeNode(node.id, node.name)}
-              className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-rose-600 rounded transition-opacity cursor-pointer"
-              title={`Delete ${node.name}`}
-            >
-              <Trash2 size={13} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {!isLeaf && isExpanded && (
-        <div className="space-y-0.5 pl-1 border-l-2 border-dashed border-gray-200 ml-3">
-          {node.children.map((child) => (
-            <VisualTreeNode
-              key={child.id}
-              node={child}
-              depth={depth + 1}
-              path={[...path, node.name]}
-              activeDrillDownId={activeDrillDownId}
-              treeExpandedNodes={treeExpandedNodes}
-              toggleExpand={toggleExpand}
-              setActiveDrillDownId={setActiveDrillDownId}
-              handleDeleteTreeNode={handleDeleteTreeNode}
-              handleSetTreeNodePrice={handleSetTreeNodePrice}
-              searchQuery={searchQuery}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function ProductModal({
   isOpen,
   onClose,
@@ -2093,1595 +1942,462 @@ export default function ProductModal({
               </div>
             )}
 
-            {/* Step 1: Shared Common Details */}
-            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-200/80 shadow-xs space-y-5">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800 flex items-center gap-1.5">
-                    <SlidersHorizontal size={14} className="text-brand" />
-                    <span>1. Common Details (Shared by All Generated Products)</span>
-                  </h3>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    Entered once. All combinations generated from the hierarchy will inherit these values.
-                  </p>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-wider">
-                  Inherited
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Main Category (Brand) */}
-                <div className="sm:col-span-2">
+            {/* Card 1: Brand & Shared Defaults */}
+            <div className="bg-white rounded-2xl p-5 border border-gray-200/80 shadow-xs">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                {/* Brand / Main Category */}
+                <div className="flex-1 max-w-sm">
                   <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Main Category (Brand / Group) <span className="text-rose-500">*</span>
+                    Main Category / Brand <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={batchMainCategory}
                     onChange={(e) => setBatchMainCategory(e.target.value)}
-                    placeholder="e.g. Finolex, Polycab, Havells"
-                    className="w-full px-4 py-2.5 bg-gray-50 rounded-xl text-sm font-semibold text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
+                    placeholder="e.g. Finolex, Polycab"
+                    className="w-full px-3.5 py-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand"
                   />
                 </div>
 
-                {/* Default Base Price */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Default Base Rate (₹)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={batchBasePrice}
-                      onChange={(e) => setBatchBasePrice(e.target.value)}
-                      placeholder="e.g. 1200"
-                      className="w-full pl-6 pr-3 py-2.5 bg-gray-50 rounded-xl text-sm font-semibold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
-                    />
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
-                      ₹
-                    </span>
-                  </div>
-                </div>
-
-                {/* Common Unit */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Common Unit of Measure
-                  </label>
+                {/* Measurement Unit */}
+                <div className="w-32">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Unit</label>
                   <input
                     type="text"
                     value={batchUnit}
                     onChange={(e) => setBatchUnit(e.target.value)}
-                    placeholder="e.g. COILS, METERS, PCS"
-                    className="w-full px-4 py-2.5 bg-gray-50 rounded-xl text-sm uppercase text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
+                    placeholder="COILS"
+                    className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold uppercase text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand"
                   />
                 </div>
 
-                {/* Common HSN */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Common HSN / SAC Code
-                  </label>
+                {/* GST */}
+                <div className="w-24">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">GST %</label>
                   <input
-                    type="text"
-                    value={batchHsn}
-                    onChange={(e) => setBatchHsn(e.target.value)}
-                    placeholder="e.g. 8544"
-                    className="w-full px-4 py-2.5 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
+                    type="number"
+                    value={batchGst}
+                    onChange={(e) => setBatchGst(e.target.value)}
+                    placeholder="18"
+                    className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand"
                   />
                 </div>
 
-                {/* Common GST */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Common GST Rate (%)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={batchGst}
-                      onChange={(e) => setBatchGst(e.target.value)}
-                      placeholder="18"
-                      className="w-full px-4 py-2.5 pr-10 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm pointer-events-none">
-                      %
-                    </span>
-                  </div>
-                </div>
-
-                {/* Common Description */}
-                <div className="sm:col-span-3">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Common Specifications / Remarks (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={batchDescription}
-                    onChange={(e) => setBatchDescription(e.target.value)}
-                    placeholder="e.g. FR PVC Insulated Copper Flexible 1100V"
-                    className="w-full px-4 py-2.5 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Step 2: Category Architecture & Sub-Categories */}
-            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-200/80 shadow-xs space-y-6">
-              {/* Structure Mode Switcher Banner */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-purple-50/70 p-4 rounded-2xl border border-blue-200/80">
-                <div className="space-y-0.5">
-                  <div className="flex items-center space-x-2">
-                    <span className="px-2 py-0.5 rounded-md bg-brand text-white text-[10px] font-black uppercase tracking-wider">
-                      Structure Mode
-                    </span>
-                    <h3 className="text-xs font-black text-gray-900">
-                      2. Category Architecture & Sub-Categories
-                    </h3>
-                  </div>
-                  <p className="text-[11px] text-gray-600">
-                    {generatorMode === "tree"
-                      ? "🌿 Interactive Nested Tree: Build branch-by-branch. Each category has its own sub-categories and leaf pricing (e.g. Wires with FR/FRLS vs Pipes with Heavy/Light)."
-                      : "📊 Flat Level Matrix: Cartesian cross-product across all levels with optional skip filters."}
-                  </p>
-                </div>
-
-                {/* Mode Toggle Buttons */}
-                <div className="flex items-center space-x-1.5 bg-white/90 p-1 rounded-xl border border-gray-200/80 shadow-2xs shrink-0 self-start md:self-auto">
+                {/* Quick Sample / Reset buttons */}
+                <div className="flex items-center space-x-2 pt-2 lg:pt-4">
                   <button
                     type="button"
-                    onClick={() => setGeneratorMode("tree")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
-                      generatorMode === "tree"
-                        ? "bg-brand text-white shadow-xs"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    <FolderTree size={14} />
-                    <span>🌿 Category Tree (Recommended)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGeneratorMode("matrix")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
-                      generatorMode === "matrix"
-                        ? "bg-brand text-white shadow-xs"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    <Layers size={14} />
-                    <span>📊 Flat Level Matrix</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* MODE A: INTERACTIVE NESTED CATEGORY TREE */}
-              {generatorMode === "tree" ? (
-                <div className="space-y-6">
-                  {/* Quick Tree Actions & Info */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
-                    <div>
-                      <h4 className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
-                        <GitBranch size={14} className="text-brand" />
-                        <span>Interactive Drill-Down Tree Builder</span>
-                      </h4>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        Select a category, add sub-categories into it, or set prices directly on the final product tier.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <button
-                        type="button"
-                        onClick={handleResetToSampleTree}
-                        className="px-2.5 py-1 text-xs font-bold text-brand bg-brand/5 hover:bg-brand/10 border border-brand/20 rounded-xl transition-all flex items-center space-x-1 cursor-pointer"
-                        title="Reload Finolex wires & pipes sample hierarchy"
-                      >
-                        <RotateCcw size={12} />
-                        <span>Load Finolex Sample</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleClearTree}
-                        className="px-2.5 py-1 text-xs font-bold text-gray-500 hover:text-rose-600 hover:bg-rose-50 border border-gray-200 rounded-xl transition-all flex items-center space-x-1 cursor-pointer"
-                        title="Start with a blank tree"
-                      >
-                        <Trash2 size={12} />
-                        <span>Clear Tree</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Interactive Breadcrumb Bar */}
-                  <div className="p-3 bg-gradient-to-r from-gray-50 via-slate-50 to-gray-50 rounded-2xl border border-gray-200/80 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
-                        <FolderTree size={12} className="text-brand" />
-                        Navigation Path (Click to jump):
-                      </span>
-                      {activeDrillDownPath.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const parentNode = activeDrillDownPath[activeDrillDownPath.length - 2];
-                            if (parentNode) setActiveDrillDownId(parentNode.id);
-                          }}
-                          className="text-[10px] font-bold text-brand hover:underline flex items-center space-x-1 cursor-pointer"
-                        >
-                          <ArrowUp size={11} />
-                          <span>Up to Parent ({activeDrillDownPath[activeDrillDownPath.length - 2].name})</span>
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="flex items-center flex-wrap gap-1.5">
-                      {activeDrillDownPath.map((node, idx) => {
-                        const isLast = idx === activeDrillDownPath.length - 1;
-                        return (
-                          <React.Fragment key={node.id}>
-                            <button
-                              type="button"
-                              onClick={() => setActiveDrillDownId(node.id)}
-                              className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center space-x-1.5 ${
-                                isLast
-                                  ? "bg-brand text-white shadow-xs ring-2 ring-brand/20"
-                                  : "bg-white hover:bg-gray-100 text-gray-700 border border-gray-200/80 shadow-2xs"
-                              }`}
-                            >
-                              {idx === 0 ? <Folder size={13} /> : <CornerDownRight size={13} />}
-                              <span>{node.name}</span>
-                            </button>
-                            {!isLast && <ChevronRight size={13} className="text-gray-400 shrink-0" />}
-                          </React.Fragment>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Active Node Workspace Card */}
-                  <div className="p-5 bg-white rounded-2xl border-2 border-brand/20 shadow-xs space-y-5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
-                      <div className="flex items-center space-x-2">
-                        <span className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-black text-sm">
-                          {activeDrillDownPath.length}
-                        </span>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <h4 className="text-sm font-black text-gray-900 tracking-tight">
-                              {activeDrillDownNode.name}
-                            </h4>
-                            <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[10px] font-bold">
-                              {activeDrillDownId === "root" ? "Main Category (Brand)" : `Level ${activeDrillDownPath.length}`}
-                            </span>
-                            {activeDrillDownNode.children.length === 0 && (
-                              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                                🌿 Final Product Tier
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-gray-500">
-                            {activeDrillDownNode.children.length > 0
-                              ? `Contains ${activeDrillDownNode.children.length} direct sub-categories (${countLeafNodes(activeDrillDownNode)} leaf products).`
-                              : "Final specification tier. Set its commercial selling rate below, or add further sub-categories if needed."}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Sibling copy & branch bulk pricing quick actions */}
-                      <div className="flex items-center space-x-1.5 flex-wrap sm:flex-nowrap gap-y-1">
-                        {nodesWithChildren.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setShowCopyBranchModal(!showCopyBranchModal)}
-                            className="px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl text-xs font-bold border border-gray-200 flex items-center space-x-1 cursor-pointer"
-                            title="Copy sub-categories from another branch"
-                          >
-                            <Copy size={13} />
-                            <span>Copy Sub-Categories</span>
-                          </button>
-                        )}
-
-                        {countLeafNodes(activeDrillDownNode) > 1 && (
-                          <div className="flex items-center space-x-1 pl-1">
-                            <div className="relative w-24">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={bulkBranchPriceInput}
-                                onChange={(e) => setBulkBranchPriceInput(e.target.value)}
-                                placeholder="Rate"
-                                className="w-full pl-5 pr-1.5 py-1 bg-gray-50 rounded-xl text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand focus:border-brand"
-                              />
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
-                                ₹
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleApplyBulkPriceToBranch(activeDrillDownNode.id, bulkBranchPriceInput)}
-                              className="px-2 py-1 bg-brand text-white rounded-xl text-xs font-bold hover:bg-brand-hover cursor-pointer"
-                              title="Apply this rate to all leaf products under this category"
-                            >
-                              Set All Leaves
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Copy Modal / Inline Drawer */}
-                    {showCopyBranchModal && (
-                      <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-200/80 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
-                            <Copy size={13} className="text-brand" />
-                            <span>Replicate Sub-Categories into &quot;{activeDrillDownNode.name}&quot;:</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setShowCopyBranchModal(false)}
-                            className="text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
-                          >
-                            <X size={13} />
-                          </button>
-                        </div>
-                        <p className="text-[10px] text-gray-500">
-                          Select another branch to copy all of its sub-categories (e.g. colors, sizes) into this branch without re-typing.
-                        </p>
-                        <div className="flex items-center space-x-2">
-                          <select
-                            value={copySourceNodeId}
-                            onChange={(e) => setCopySourceNodeId(e.target.value)}
-                            className="flex-1 px-3 py-1.5 bg-white rounded-xl text-xs font-bold text-gray-800 border border-blue-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
-                          >
-                            <option value="">-- Choose source branch to copy from --</option>
-                            {nodesWithChildren.map((src) => (
-                              <option key={src.id} value={src.id}>
-                                {src.pathStr} ({src.count} sub-categories)
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            disabled={!copySourceNodeId}
-                            onClick={() => handleCopyChildren(copySourceNodeId, activeDrillDownNode.id)}
-                            className="px-4 py-1.5 bg-brand text-white text-xs font-bold rounded-xl hover:bg-brand-hover disabled:opacity-50 cursor-pointer shadow-xs"
-                          >
-                            Copy Now
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Add Sub-Categories Input Bar */}
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-gray-700">
-                        Add Sub-Categories inside &quot;{activeDrillDownNode.name}&quot;:
-                      </label>
-                      <div className="flex items-center space-x-2">
-                        <div className="relative flex-1">
-                          <input
-                            type="text"
-                            value={drillDownInput}
-                            onChange={(e) => setDrillDownInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                handleAddChildrenToActiveNode();
-                              }
-                            }}
-                            placeholder="e.g. 180 mts, 90 mts OR fr, frls OR red, blue, green (comma separated)"
-                            className="w-full px-4 py-2 bg-gray-50 rounded-xl text-xs font-semibold text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleAddChildrenToActiveNode()}
-                          className="px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-sm transition-all flex items-center space-x-1.5 cursor-pointer shrink-0"
-                        >
-                          <Plus size={14} />
-                          <span>+ Add Sub-Categories</span>
-                        </button>
-                      </div>
-
-                      {/* Quick Presets Pills */}
-                      <div className="flex items-center flex-wrap gap-1.5 pt-1">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">
-                          Quick Suggestions:
-                        </span>
-                        {[
-                          { label: "Wires & Pipes", items: "wires, pipes" },
-                          { label: "Lengths", items: "180 mts, 90 mts" },
-                          { label: "Grades", items: "fr, frls" },
-                          { label: "Wire Sizes", items: "1.0 sqmm, 1.5 sqmm, 2.5 sqmm, 4.0 sqmm" },
-                          { label: "Colors", items: "red, blue, green, yellow, black" },
-                          { label: "Pipe Diameters", items: "20mm, 25mm, 32mm" },
-                          { label: "Pipe Thickness", items: "heavy, light" },
-                        ].map((preset) => (
-                          <button
-                            key={preset.label}
-                            type="button"
-                            onClick={() => handleAddChildrenToActiveNode(preset.items)}
-                            className="px-2 py-0.5 rounded-lg bg-gray-100 hover:bg-brand/10 hover:text-brand text-gray-600 text-[10px] font-bold border border-gray-200/80 transition-colors cursor-pointer"
-                          >
-                            + {preset.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Existing Children Grid OR Leaf Pricing */}
-                    {activeDrillDownNode.children.length === 0 ? (
-                      /* LEAF PRODUCT: Show Direct Rate Setting */
-                      <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center space-x-2">
-                            <Sparkles size={16} className="text-emerald-600" />
-                            <h5 className="text-xs font-black text-emerald-900 uppercase tracking-wider">
-                              Final Product Tier Rate
-                            </h5>
-                          </div>
-                          <p className="text-xs text-emerald-800">
-                            &quot;{activeDrillDownNode.name}&quot; is a leaf product in this branch. Enter its selling price:
-                          </p>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <div className="relative w-36">
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={activeDrillDownNode.price || ""}
-                              onChange={(e) => handleSetTreeNodePrice(activeDrillDownNode.id, e.target.value)}
-                              placeholder="Rate (₹)"
-                              className="w-full pl-6 pr-3 py-2 bg-white rounded-xl text-sm font-bold text-gray-900 border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 shadow-2xs"
-                            />
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-600 text-xs font-bold">
-                              ₹
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      /* CHILDREN LIST */
-                      <div className="space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-gray-700">
-                            Sub-Categories inside &quot;{activeDrillDownNode.name}&quot; ({activeDrillDownNode.children.length}):
-                          </span>
-                          <span className="text-[10px] text-gray-400 font-medium">
-                            Click any child to drill-down and add further sub-categories
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                          {activeDrillDownNode.children.map((child) => {
-                            const childIsLeaf = !child.children || child.children.length === 0;
-                            const childLeafCount = countLeafNodes(child);
-
-                            return (
-                              <div
-                                key={child.id}
-                                className={`p-3 rounded-2xl border transition-all flex flex-col justify-between space-y-2.5 ${
-                                  childIsLeaf
-                                    ? "bg-emerald-50/40 border-emerald-200/80 hover:border-emerald-300"
-                                    : "bg-gray-50/70 border-gray-200/80 hover:border-brand/40"
-                                }`}
-                              >
-                                <div className="flex items-start justify-between gap-1">
-                                  <div className="flex items-center space-x-2 min-w-0">
-                                    <span
-                                      className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs shrink-0 ${
-                                        childIsLeaf
-                                          ? "bg-emerald-100 text-emerald-700 font-bold"
-                                          : "bg-blue-100 text-brand font-bold"
-                                      }`}
-                                    >
-                                      {childIsLeaf ? "🌿" : "📁"}
-                                    </span>
-                                    <div className="min-w-0">
-                                      <p className="text-xs font-black text-gray-900 truncate">
-                                        {child.name}
-                                      </p>
-                                      <p className="text-[10px] text-gray-500 font-medium">
-                                        {childIsLeaf
-                                          ? "Final Product (Leaf)"
-                                          : `${child.children.length} sub-categories (${childLeafCount} products)`}
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteTreeNode(child.id, child.name)}
-                                    className="p-1 text-gray-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer shrink-0"
-                                    title={`Delete ${child.name}`}
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </div>
-
-                                {/* Leaf Price Box or Drill Down Action */}
-                                <div className="pt-2 border-t border-gray-200/60 flex items-center justify-between gap-2">
-                                  {childIsLeaf ? (
-                                    <div className="flex items-center space-x-1.5 flex-1">
-                                      <span className="text-[10px] font-bold text-gray-500 shrink-0">Rate:</span>
-                                      <div className="relative flex-1">
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          min="0"
-                                          value={child.price || ""}
-                                          onChange={(e) => handleSetTreeNodePrice(child.id, e.target.value)}
-                                          placeholder="Rate"
-                                          className="w-full pl-5 pr-2 py-1 bg-white rounded-lg text-xs font-bold text-gray-900 border border-emerald-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                                        />
-                                        <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] font-bold">
-                                          ₹
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="text-[10px] font-bold text-brand flex items-center space-x-1">
-                                      <GitBranch size={11} />
-                                      <span>{childLeafCount} products</span>
-                                    </div>
-                                  )}
-
-                                  <button
-                                    type="button"
-                                    onClick={() => setActiveDrillDownId(child.id)}
-                                    className="px-2.5 py-1 bg-white hover:bg-brand hover:text-white text-gray-700 border border-gray-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer shrink-0 flex items-center space-x-1"
-                                  >
-                                    <span>{childIsLeaf ? "+ Add Sub" : "Open"}</span>
-                                    <ChevronRight size={12} />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Visual Tree Explorer (Whole Tree Hierarchy View) */}
-                  <div className="p-5 bg-gray-50/60 rounded-2xl border border-gray-200/80 space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="flex items-center space-x-2">
-                        <FolderTree size={16} className="text-brand" />
-                        <h4 className="text-xs font-black uppercase tracking-wider text-gray-800">
-                          Full Category Tree Explorer ({countLeafNodes(treeRoot)} Total Products)
-                        </h4>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const expandAll = (n: TreeNode, acc: Record<string, boolean>) => {
-                              acc[n.id] = true;
-                              (n.children || []).forEach((c) => expandAll(c, acc));
-                            };
-                            const next: Record<string, boolean> = {};
-                            expandAll(treeRoot, next);
-                            setTreeExpandedNodes(next);
-                          }}
-                          className="text-[10px] font-bold text-gray-500 hover:text-brand cursor-pointer"
-                        >
-                          Expand All
-                        </button>
-                        <span className="text-gray-300">•</span>
-                        <button
-                          type="button"
-                          onClick={() => setTreeExpandedNodes({ root: true })}
-                          className="text-[10px] font-bold text-gray-500 hover:text-brand cursor-pointer"
-                        >
-                          Collapse All
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Tree Search */}
-                    <div className="relative">
-                      <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        value={treeSearchQuery}
-                        onChange={(e) => setTreeSearchQuery(e.target.value)}
-                        placeholder="Search within tree (e.g. 180, pipes, red)..."
-                        className="w-full pl-8 pr-3 py-1.5 bg-white rounded-xl text-xs font-medium text-gray-900 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
-                      />
-                    </div>
-
-                    {/* Tree Visual Nodes Container */}
-                    <div className="p-3 bg-white rounded-xl border border-gray-200/80 max-h-96 overflow-y-auto space-y-1">
-                      <VisualTreeNode
-                        node={treeRoot}
-                        depth={0}
-                        path={[]}
-                        activeDrillDownId={activeDrillDownId}
-                        treeExpandedNodes={treeExpandedNodes}
-                        toggleExpand={(id) =>
-                          setTreeExpandedNodes((prev) => ({ ...prev, [id]: !prev[id] }))
-                        }
-                        setActiveDrillDownId={setActiveDrillDownId}
-                        handleDeleteTreeNode={handleDeleteTreeNode}
-                        handleSetTreeNodePrice={handleSetTreeNodePrice}
-                        searchQuery={treeSearchQuery}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* MODE B: FLAT LEVEL MATRIX */
-                <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2.5">
-                    <div>
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800 flex items-center gap-1.5">
-                        <Layers size={14} className="text-brand" />
-                        <span>Flat Sub-Category Levels (Matrix Cartesian Mode)</span>
-                      </h3>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        Combinations are generated across all levels. Use parent specification filters below to skip irrelevant levels.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={addSubCategoryLevel}
-                      className="self-start sm:self-auto inline-flex items-center space-x-1.5 px-3 py-1.5 bg-brand/5 hover:bg-brand/10 text-brand text-xs font-bold rounded-xl transition-colors cursor-pointer"
-                    >
-                      <Plus size={14} />
-                      <span>+ Add Sub-Category Level</span>
-                    </button>
-                  </div>
-
-                  {/* Levels Container */}
-                  <div className="space-y-4">
-                    {subCategoryLevels.map((lvl, index) => (
-                      <div
-                        key={lvl.id}
-                        className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200/80 space-y-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <span className="w-6 h-6 rounded-full bg-brand/10 text-brand text-xs font-bold flex items-center justify-center">
-                              {index + 1}
-                            </span>
-                            <input
-                              type="text"
-                              value={lvl.label}
-                              onChange={(e) => updateSubCategoryLabel(lvl.id, e.target.value)}
-                              className="text-xs font-bold text-gray-800 bg-transparent border-b border-dashed border-gray-300 focus:border-brand focus:outline-none px-1 py-0.5"
-                              placeholder={`Sub-Category ${index + 1} Name`}
-                            />
-                            <span className="text-[10px] text-gray-400 font-medium">
-                              ({lvl.values.length} values)
-                            </span>
-                          </div>
-
-                          {/* Reorder and Delete Controls */}
-                          <div className="flex items-center space-x-1">
-                            <button
-                              type="button"
-                              onClick={() => moveLevel(index, "up")}
-                              disabled={index === 0}
-                              className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-20 cursor-pointer"
-                              title="Move Level Up"
-                            >
-                              <ArrowUp size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => moveLevel(index, "down")}
-                              disabled={index === subCategoryLevels.length - 1}
-                              className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-20 cursor-pointer"
-                              title="Move Level Down"
-                            >
-                              <ArrowDown size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => removeSubCategoryLevel(lvl.id)}
-                              className="p-1 text-gray-400 hover:text-rose-600 cursor-pointer ml-1"
-                              title="Delete Level"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Tag / Chip Input for this level */}
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="text"
-                              value={lvl.inputValue}
-                              onChange={(e) => updateSubCategoryInputValue(lvl.id, e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  addValuesToSubCategory(lvl.id, lvl.inputValue);
-                                }
-                              }}
-                              placeholder="Type values (e.g. 180 mts, 90 mts or red, blue, green) and press Enter"
-                              className="flex-1 px-3 py-1.5 bg-white rounded-xl text-xs text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => addValuesToSubCategory(lvl.id, lvl.inputValue)}
-                              className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0"
-                            >
-                              + Add
-                            </button>
-                          </div>
-
-                          {/* Render chips */}
-                          {lvl.values.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 pt-1">
-                              {lvl.values.map((v) => (
-                                <span
-                                  key={v}
-                                  className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-xs font-bold text-gray-800 shadow-2xs"
-                                >
-                                  <span>{v}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeValueFromSubCategory(lvl.id, v)}
-                                    className="text-gray-400 hover:text-rose-500 cursor-pointer ml-1"
-                                  >
-                                    <X size={12} />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Conditional Parent Filters */}
-                        {index > 0 &&
-                          (() => {
-                            const parentValues = getAvailableParentValues(index);
-                            if (parentValues.length === 0) return null;
-
-                            const isSpecificParentActive =
-                              (Array.isArray(lvl.appliesToParents) &&
-                                lvl.appliesToParents.length > 0) ||
-                              Boolean(
-                                lvl.valueParentMap &&
-                                  Object.keys(lvl.valueParentMap).length > 0
-                              );
-                            const isPerValueMode = lvl.mappingMode === "per_value";
-
-                            return (
-                              <div className="pt-2 border-t border-gray-200/60 space-y-2">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                                  <div className="flex items-center space-x-1.5">
-                                    <span className="text-[11px] font-bold text-gray-600">
-                                      Parent Dependency:
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (isSpecificParentActive) {
-                                          updateSubCategoryAppliesTo(lvl.id, []);
-                                          setSubCategoryLevels((prev) =>
-                                            prev.map((l) =>
-                                              l.id === lvl.id
-                                                ? {
-                                                    ...l,
-                                                    appliesToParents: [],
-                                                    valueParentMap: {},
-                                                    mappingMode: "level",
-                                                  }
-                                                : l
-                                            )
-                                          );
-                                        } else {
-                                          updateSubCategoryAppliesTo(lvl.id, [...parentValues]);
-                                        }
-                                      }}
-                                      className={`text-[11px] font-bold px-2 py-0.5 rounded-md transition-all cursor-pointer ${
-                                        !isSpecificParentActive
-                                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                          : "bg-blue-50 text-brand border border-blue-200"
-                                      }`}
-                                    >
-                                      {!isSpecificParentActive
-                                        ? "Applies to ALL products"
-                                        : "Applies only to SPECIFIC parents"}
-                                    </button>
-                                  </div>
-
-                                  {isSpecificParentActive && (
-                                    <div className="flex items-center space-x-1 text-[10px] font-bold">
-                                      <span className="text-gray-400">Mode:</span>
-                                      <div className="flex items-center bg-gray-100 p-0.5 rounded-lg">
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            setSubCategoryLevels((prev) =>
-                                              prev.map((l) =>
-                                                l.id === lvl.id
-                                                  ? { ...l, mappingMode: "level" }
-                                                  : l
-                                              )
-                                            )
-                                          }
-                                          className={`px-2 py-0.5 rounded-md cursor-pointer transition-all ${
-                                            !isPerValueMode
-                                              ? "bg-white text-brand shadow-2xs"
-                                              : "text-gray-500 hover:text-gray-800"
-                                          }`}
-                                        >
-                                          Whole Level
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setSubCategoryLevels((prev) =>
-                                              prev.map((l) => {
-                                                if (l.id !== lvl.id) return l;
-                                                const map = { ...(l.valueParentMap || {}) };
-                                                l.values.forEach((v) => {
-                                                  if (!map[v]) {
-                                                    map[v] =
-                                                      l.appliesToParents && l.appliesToParents.length > 0
-                                                        ? [...l.appliesToParents]
-                                                        : [...parentValues];
-                                                  }
-                                                });
-                                                return {
-                                                  ...l,
-                                                  mappingMode: "per_value",
-                                                  valueParentMap: map,
-                                                };
-                                              })
-                                            );
-                                          }}
-                                          className={`px-2 py-0.5 rounded-md cursor-pointer transition-all ${
-                                            isPerValueMode
-                                              ? "bg-white text-brand shadow-2xs"
-                                              : "text-gray-500 hover:text-gray-800"
-                                          }`}
-                                          title="Set different parents for different values"
-                                        >
-                                          Assign Per Value
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Option A: Whole Level Parent Chips */}
-                                {isSpecificParentActive && !isPerValueMode && (
-                                  <div className="p-3 bg-white rounded-xl border border-blue-100/80 shadow-2xs space-y-1.5">
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-[11px] font-semibold text-gray-700">
-                                        Select parent specification(s) where this level applies:
-                                      </span>
-                                      <span className="text-[10px] text-gray-400 font-medium">
-                                        Other products will bypass this level
-                                      </span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {parentValues.map((pval) => {
-                                        const isSelected = lvl.appliesToParents?.includes(pval);
-                                        return (
-                                          <button
-                                            key={pval}
-                                            type="button"
-                                            onClick={() => toggleSubCategoryParent(lvl.id, pval)}
-                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center space-x-1.5 ${
-                                              isSelected
-                                                ? "bg-blue-50 border-brand text-brand shadow-xs"
-                                                : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                                            }`}
-                                          >
-                                            {isSelected ? (
-                                              <Check size={12} className="text-brand" />
-                                            ) : (
-                                              <Square size={12} className="text-gray-400" />
-                                            )}
-                                            <span>{pval}</span>
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Option B: Per-Value Parent Assignment */}
-                                {isSpecificParentActive && isPerValueMode && (
-                                  <div className="p-3 bg-white rounded-xl border border-blue-100/80 shadow-2xs space-y-2.5">
-                                    <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
-                                      <div>
-                                        <p className="text-[11px] font-bold text-gray-800">
-                                          Per-Value Parent Assignment
-                                        </p>
-                                        <p className="text-[10px] text-gray-500">
-                                          Check which parents each value belongs to.
-                                        </p>
-                                      </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                      {lvl.values.map((val) => {
-                                        const assigned =
-                                          lvl.valueParentMap?.[val] ||
-                                          lvl.appliesToParents ||
-                                          parentValues;
-
-                                        return (
-                                          <div
-                                            key={val}
-                                            className="p-2 bg-gray-50/70 rounded-xl border border-gray-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-                                          >
-                                            <div className="flex items-center space-x-2">
-                                              <span className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs font-black text-gray-900 shadow-2xs">
-                                                {val}
-                                              </span>
-                                              <span className="text-[10px] text-gray-400 font-medium">
-                                                applies to:
-                                              </span>
-                                            </div>
-
-                                            <div className="flex flex-wrap items-center gap-1.5">
-                                              {parentValues.map((pval) => {
-                                                const isChecked = assigned.includes(pval);
-                                                return (
-                                                  <button
-                                                    key={pval}
-                                                    type="button"
-                                                    onClick={() =>
-                                                      toggleValueParent(lvl.id, val, pval)
-                                                    }
-                                                    className={`px-2 py-0.5 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center space-x-1 ${
-                                                      isChecked
-                                                        ? "bg-blue-50 border-brand text-brand font-black"
-                                                        : "bg-white border-gray-200 text-gray-500 hover:bg-gray-100"
-                                                    }`}
-                                                  >
-                                                    {isChecked ? (
-                                                      <Check size={11} className="text-brand" />
-                                                    ) : (
-                                                      <Square size={11} className="text-gray-400" />
-                                                    )}
-                                                    <span>{pval}</span>
-                                                  </button>
-                                                );
-                                              })}
-                                              <button
-                                                type="button"
-                                                onClick={() =>
-                                                  setValueAllParents(lvl.id, val, parentValues)
-                                                }
-                                                className="px-1.5 py-0.5 text-[10px] font-bold text-gray-400 hover:text-brand underline cursor-pointer ml-1"
-                                              >
-                                                {assigned.length === parentValues.length
-                                                  ? "Clear"
-                                                  : "All"}
-                                              </button>
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                      </div>
-                    ))}
-
-                    {/* Add Another Level Button */}
-                    <button
-                      type="button"
-                      onClick={addSubCategoryLevel}
-                      className="w-full py-3 border-2 border-dashed border-gray-200 hover:border-brand hover:bg-brand/5 text-gray-600 hover:text-brand rounded-2xl text-xs font-bold transition-all flex items-center justify-center space-x-2 cursor-pointer"
-                    >
-                      <Plus size={16} />
-                      <span>+ Add Another Sub-Category Level</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Step 3: Generated Combinations Matrix Table & Sub-Category Pricing */}
-            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-200/80 shadow-xs space-y-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800 flex items-center gap-1.5">
-                    <Sparkles size={14} className="text-brand" />
-                    <span>3. Generated Combinations & Sub-Category Pricing ({includedCount} Active)</span>
-                  </h3>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    All permutations from the tree above. Set rates by branch, by sub-category level, or per combination. Order:{" "}
-                    <strong className="text-brand font-black">
-                      {nameOrder === "forward"
-                        ? "Forward (Main Category → Sub-Categories)"
-                        : "Reverse (Sub-Categories → Main Category)"}
-                    </strong>
-                  </p>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={handleToggleSelectAll}
-                    className="text-xs font-bold text-gray-600 hover:text-brand flex items-center space-x-1 py-1 px-2.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                  >
-                    {includedCount === activeCombinations.length ? (
-                      <>
-                        <CheckSquare size={14} className="text-brand" />
-                        <span>Deselect All</span>
-                      </>
-                    ) : (
-                      <>
-                        <Square size={14} />
-                        <span>Select All</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleResetAllToBasePrice}
-                    className="text-xs font-bold text-gray-500 hover:text-rose-600 flex items-center space-x-1 py-1 px-2.5 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
-                    title={`Reset all custom rates back to Default Base Rate (₹${batchBasePrice || "0"})`}
+                    onClick={handleResetToSampleTree}
+                    className="px-3 py-2 text-xs font-bold text-brand bg-brand/5 hover:bg-brand/10 border border-brand/20 rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer"
+                    title="Reload Finolex sample structure"
                   >
                     <RotateCcw size={13} />
-                    <span>Reset to Base Rate</span>
+                    <span>Load Finolex Sample</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearTree}
+                    className="px-3 py-2 text-xs font-bold text-gray-500 hover:text-rose-600 hover:bg-rose-50 border border-gray-200 rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer"
+                    title="Clear all categories and start blank"
+                  >
+                    <Trash2 size={13} />
+                    <span>Clear</span>
                   </button>
                 </div>
               </div>
+            </div>
 
-              {/* Collapsible: Quick Level-Based Pricing Drawer */}
-              {generatorMode === "matrix" && activeCombinations.length > 0 && subCategoryLevels.some((l) => l.values.length > 0) && (
-                <div className="rounded-2xl border border-blue-200/70 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 overflow-hidden shadow-xs">
-                  <button
-                    type="button"
-                    onClick={() => setShowLevelPricingDrawer(!showLevelPricingDrawer)}
-                    className="w-full px-4 py-3 flex items-center justify-between text-left cursor-pointer hover:bg-blue-100/40 transition-colors"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <Tag size={15} className="text-brand" />
-                      <span className="text-xs font-bold text-gray-800">
-                        ⚡ Quick Price by Sub-Category Level (e.g. Size, Length, or Grade)
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand text-white">
-                        Fast Rate Setup
-                      </span>
-                    </div>
-                    {showLevelPricingDrawer ? (
-                      <ChevronDown size={16} className="text-gray-500" />
-                    ) : (
-                      <ChevronRight size={16} className="text-gray-500" />
-                    )}
-                  </button>
-
-                  {showLevelPricingDrawer && (
-                    <div className="p-4 pt-1 border-t border-blue-100/80 space-y-3 bg-white/70">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="flex items-center space-x-2">
-                          <label className="text-xs font-bold text-gray-700">
-                            Apply prices based on:
-                          </label>
-                          <select
-                            value={selectedPricingLevelId}
-                            onChange={(e) => setSelectedPricingLevelId(e.target.value)}
-                            className="px-3 py-1.5 bg-white rounded-xl text-xs font-bold text-brand border border-blue-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
-                          >
-                            {subCategoryLevels
-                              .filter((lvl) => lvl.values.length > 0)
-                              .map((lvl) => (
-                                <option key={lvl.id} value={lvl.id}>
-                                  {lvl.label} ({lvl.values.length} values)
-                                </option>
-                              ))}
-                          </select>
-                        </div>
-
+            {/* Card 2: Cascading Category Builder */}
+            <div className="bg-white rounded-2xl p-5 border border-gray-200/80 shadow-xs space-y-4">
+              {/* Breadcrumb Trail */}
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center flex-wrap gap-1.5 text-xs">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mr-1 flex items-center gap-1">
+                    <FolderTree size={12} className="text-brand" />
+                    Current Level:
+                  </span>
+                  {activeDrillDownPath.map((node, idx) => {
+                    const isLast = idx === activeDrillDownPath.length - 1;
+                    return (
+                      <React.Fragment key={node.id}>
                         <button
                           type="button"
-                          onClick={handleApplyLevelPrices}
-                          className="px-4 py-1.5 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-sm transition-all flex items-center space-x-1.5 self-start sm:self-auto cursor-pointer"
+                          onClick={() => setActiveDrillDownId(node.id)}
+                          className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center space-x-1 ${
+                            isLast
+                              ? "bg-brand text-white shadow-xs"
+                              : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                          }`}
                         >
-                          <Check size={14} />
-                          <span>Apply Level Rates to Matching Combinations</span>
+                          {idx === 0 ? <Folder size={11} /> : <CornerDownRight size={11} />}
+                          <span>{node.name}</span>
                         </button>
+                        {!isLast && <ChevronRight size={12} className="text-gray-400 shrink-0" />}
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+
+                {activeDrillDownPath.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const parentNode = activeDrillDownPath[activeDrillDownPath.length - 2];
+                      if (parentNode) setActiveDrillDownId(parentNode.id);
+                    }}
+                    className="text-xs font-bold text-brand hover:underline flex items-center space-x-1 cursor-pointer shrink-0 ml-2"
+                  >
+                    <ArrowUp size={13} />
+                    <span>Back to {activeDrillDownPath[activeDrillDownPath.length - 2].name}</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Active Node Workspace */}
+              <div className="space-y-4">
+                {/* Sub-categories input & Presets */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-gray-700">
+                    Add sub-categories inside <span className="text-brand font-black">&quot;{activeDrillDownNode.name}&quot;</span>:
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={drillDownInput}
+                      onChange={(e) => setDrillDownInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddChildrenToActiveNode();
+                        }
+                      }}
+                      placeholder="Type sub-categories (comma-separated, e.g. 180 mts, 90 mts or red, blue, green)"
+                      className="flex-1 px-4 py-2 bg-gray-50 rounded-xl text-xs font-semibold text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleAddChildrenToActiveNode()}
+                      className="px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer shrink-0"
+                    >
+                      <Plus size={14} />
+                      <span>+ Add</span>
+                    </button>
+                  </div>
+
+                  {/* Quick Suggestions */}
+                  <div className="flex items-center flex-wrap gap-1 pt-0.5">
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mr-1">
+                      Suggestions:
+                    </span>
+                    {[
+                      { label: "Wires & Pipes", val: "wires, pipes" },
+                      { label: "Lengths", val: "180 mts, 90 mts" },
+                      { label: "Grades", val: "fr, frls" },
+                      { label: "Wire Sizes", val: "1.0 sqmm, 1.5 sqmm, 2.5 sqmm, 4.0 sqmm" },
+                      { label: "Colors", val: "red, blue, green, yellow, black" },
+                      { label: "Pipe Sizes", val: "20mm, 25mm, 32mm" },
+                      { label: "Pipe Thickness", val: "heavy, light" },
+                    ].map((item) => (
+                      <button
+                        key={item.label}
+                        type="button"
+                        onClick={() => handleAddChildrenToActiveNode(item.val)}
+                        className="px-2 py-0.5 rounded-lg bg-gray-100 hover:bg-brand/10 hover:text-brand text-gray-600 text-[10px] font-bold border border-gray-200 transition-colors cursor-pointer"
+                      >
+                        + {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Replicate / Copy tool helper */}
+                {nodesWithChildren.length > 0 && (
+                  <div className="flex items-center space-x-2 p-2.5 bg-blue-50/60 rounded-xl border border-blue-100 text-xs">
+                    <Copy size={13} className="text-brand shrink-0" />
+                    <span className="text-gray-600 font-semibold text-[11px] shrink-0">
+                      Copy sub-categories from:
+                    </span>
+                    <select
+                      value={copySourceNodeId}
+                      onChange={(e) => setCopySourceNodeId(e.target.value)}
+                      className="px-2.5 py-1 bg-white rounded-lg text-xs font-bold text-gray-800 border border-blue-200 flex-1 max-w-xs focus:outline-none"
+                    >
+                      <option value="">-- Choose a branch --</option>
+                      {nodesWithChildren.map((src) => (
+                        <option key={src.id} value={src.id}>
+                          {src.pathStr} ({src.count} items)
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={!copySourceNodeId}
+                      onClick={() => handleCopyChildren(copySourceNodeId, activeDrillDownNode.id)}
+                      className="px-3 py-1 bg-brand text-white text-xs font-bold rounded-lg hover:bg-brand-hover disabled:opacity-40 cursor-pointer"
+                    >
+                      Copy Here
+                    </button>
+                  </div>
+                )}
+
+                {/* Active Category Children or Leaf Pricing */}
+                {activeDrillDownNode.children.length === 0 ? (
+                  /* Leaf final product */
+                  <div className="p-4 bg-emerald-50/70 rounded-xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black text-emerald-900">
+                        🌿 Final Product Tier: &quot;{activeDrillDownNode.name}&quot;
+                      </p>
+                      <p className="text-[11px] text-emerald-700">
+                        This category has no further sub-categories. Enter its commercial selling price:
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-bold text-emerald-900">Rate:</span>
+                      <div className="relative w-32">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={activeDrillDownNode.price || ""}
+                          onChange={(e) => handleSetTreeNodePrice(activeDrillDownNode.id, e.target.value)}
+                          placeholder="0.00"
+                          className="w-full pl-6 pr-2.5 py-1.5 bg-white rounded-xl text-sm font-bold text-gray-900 border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        />
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-600 text-xs font-bold">
+                          ₹
+                        </span>
                       </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* List of children */
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-700">
+                        Sub-categories in &quot;{activeDrillDownNode.name}&quot; ({activeDrillDownNode.children.length}):
+                      </span>
+                      <span className="text-[10px] text-gray-400">
+                        Click &quot;Open &gt;&quot; to drill down into any sub-category
+                      </span>
+                    </div>
 
-                      {/* Inputs for each value of selected level */}
-                      {(() => {
-                        const targetLevel =
-                          subCategoryLevels.find((lvl) => lvl.id === selectedPricingLevelId) ||
-                          subCategoryLevels.find((lvl) => lvl.values.length > 0);
-                        if (!targetLevel || targetLevel.values.length === 0) return null;
-
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                      {activeDrillDownNode.children.map((child) => {
+                        const childIsLeaf = !child.children || child.children.length === 0;
                         return (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
-                            {targetLevel.values.map((val) => (
-                              <div
-                                key={val}
-                                className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-200/80 shadow-xs"
-                              >
-                                <span className="text-xs font-bold text-gray-800 truncate pr-2">
-                                  {val}
-                                </span>
-                                <div className="relative w-28 shrink-0">
+                          <div
+                            key={child.id}
+                            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+                              childIsLeaf
+                                ? "bg-emerald-50/40 border-emerald-200"
+                                : "bg-gray-50 border-gray-200 hover:border-brand/40"
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center space-x-1.5">
+                                <span className="text-xs">{childIsLeaf ? "🌿" : "📁"}</span>
+                                <p className="text-xs font-bold text-gray-900 truncate">
+                                  {child.name}
+                                </p>
+                              </div>
+                              {childIsLeaf ? (
+                                <div className="flex items-center space-x-1 mt-1">
+                                  <span className="text-[10px] font-bold text-gray-500">₹</span>
                                   <input
                                     type="number"
                                     step="0.01"
                                     min="0"
-                                    value={levelPricesInput[val] ?? ""}
-                                    onChange={(e) =>
-                                      setLevelPricesInput((prev) => ({
-                                        ...prev,
-                                        [val]: e.target.value,
-                                      }))
-                                    }
+                                    value={child.price || ""}
+                                    onChange={(e) => handleSetTreeNodePrice(child.id, e.target.value)}
                                     placeholder="Rate"
-                                    className="w-full pl-5 pr-2 py-1 bg-gray-50 rounded-lg text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                                    className="w-20 px-1.5 py-0.5 bg-white rounded border border-emerald-300 text-xs font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                                   />
-                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
-                                    ₹
-                                  </span>
                                 </div>
-                              </div>
-                            ))}
+                              ) : (
+                                <p className="text-[10px] text-gray-500 mt-0.5">
+                                  {child.children.length} sub-categories
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center space-x-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setActiveDrillDownId(child.id)}
+                                className="px-2 py-1 bg-white hover:bg-brand hover:text-white text-gray-700 text-[11px] font-bold border border-gray-200 rounded-lg transition-colors cursor-pointer"
+                              >
+                                {childIsLeaf ? "+ Sub" : "Open >"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTreeNode(child.id, child.name)}
+                                className="p-1 text-gray-400 hover:text-rose-600 rounded hover:bg-rose-50 transition-colors cursor-pointer"
+                                title={`Delete ${child.name}`}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
                           </div>
                         );
-                      })()}
+                      })}
                     </div>
-                  )}
-                </div>
-              )}
-
-              {/* Search Filter & Bulk Action Bar */}
-              {activeCombinations.length > 0 && (
-                <div className="bg-gray-50/80 p-3.5 rounded-2xl border border-gray-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div className="flex-1 relative">
-                    <Search
-                      size={15}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                    />
-                    <input
-                      type="text"
-                      value={matrixSearch}
-                      onChange={(e) => setMatrixSearch(e.target.value)}
-                      placeholder="Filter combinations (e.g. 180 mts, frls, 1.0 sqmm, red)..."
-                      className="w-full pl-9 pr-8 py-2 bg-white rounded-xl text-xs font-medium text-gray-900 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                    />
-                    {matrixSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setMatrixSearch("")}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
-                      >
-                        <X size={13} />
-                      </button>
-                    )}
                   </div>
+                )}
+              </div>
+            </div>
 
-                  {/* Bulk Rate for Filtered Items */}
-                  <div className="flex items-center space-x-2 flex-wrap sm:flex-nowrap gap-y-2">
-                    <div className="relative w-28">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={bulkFilteredPrice}
-                        onChange={(e) => setBulkFilteredPrice(e.target.value)}
-                        placeholder="Bulk Rate"
-                        className="w-full pl-5 pr-2 py-1.5 bg-white rounded-xl text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand shadow-xs"
-                      />
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
-                        ₹
-                      </span>
-                    </div>
+            {/* Card 3: Generated Products Preview & Creation */}
+            <div className="bg-white rounded-2xl p-5 border border-gray-200/80 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800 flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-brand" />
+                    <span>Generated Catalog Products ({includedCount} Active)</span>
+                  </h3>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    All leaf combinations automatically compiled from your categories above.
+                  </p>
+                </div>
 
+                <div className="flex items-center space-x-2">
+                  {/* Name Order Toggle */}
+                  <div className="flex items-center bg-gray-100 p-0.5 rounded-lg text-[10px] font-bold text-gray-600">
                     <button
                       type="button"
-                      onClick={handleApplyBulkFilteredPrice}
-                      disabled={filteredCombinations.length === 0}
-                      className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
-                      title="Apply this rate to all filtered/visible combinations"
+                      onClick={() => setNameOrder("forward")}
+                      className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                        nameOrder === "forward"
+                          ? "bg-white text-brand shadow-2xs font-black"
+                          : "hover:text-gray-900"
+                      }`}
                     >
-                      Set for Filtered ({filteredCombinations.length})
+                      Brand First
                     </button>
-
-                    {matrixSearch && (
-                      <div className="flex items-center space-x-1 pl-1 border-l border-gray-300">
-                        <button
-                          type="button"
-                          onClick={() => handleIncludeAllFiltered(true)}
-                          className="px-2 py-1 bg-white hover:bg-gray-100 text-brand border border-gray-200 rounded-lg text-[10px] font-bold cursor-pointer"
-                        >
-                          Include Visible
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleIncludeAllFiltered(false)}
-                          className="px-2 py-1 bg-white hover:bg-gray-100 text-gray-600 border border-gray-200 rounded-lg text-[10px] font-bold cursor-pointer"
-                        >
-                          Exclude Visible
-                        </button>
-                      </div>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setNameOrder("reverse")}
+                      className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                        nameOrder === "reverse"
+                          ? "bg-white text-brand shadow-2xs font-black"
+                          : "hover:text-gray-900"
+                      }`}
+                    >
+                      Spec First
+                    </button>
                   </div>
-                </div>
-              )}
 
-              {/* View Mode Controls: Grouped by Branch vs Flat List */}
+                  <button
+                    type="button"
+                    onClick={handleToggleSelectAll}
+                    className="text-xs font-bold text-gray-600 hover:text-brand px-2.5 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  >
+                    {includedCount === activeCombinations.length ? "Deselect All" : "Select All"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Search filter */}
               {activeCombinations.length > 0 && (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
-                  <div className="flex items-center space-x-2">
-                    <div className="flex items-center bg-gray-100 p-0.5 rounded-xl">
-                      <button
-                        type="button"
-                        onClick={() => setPricingViewMode("grouped")}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
-                          pricingViewMode === "grouped"
-                            ? "bg-white text-brand shadow-xs"
-                            : "text-gray-600 hover:text-gray-900"
-                        }`}
-                      >
-                        <Layers size={13} />
-                        <span>Grouped by Branch ({filteredBranches.length})</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPricingViewMode("flat")}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
-                          pricingViewMode === "flat"
-                            ? "bg-white text-brand shadow-xs"
-                            : "text-gray-600 hover:text-gray-900"
-                        }`}
-                      >
-                        <Package size={13} />
-                        <span>Flat List ({filteredCombinations.length})</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {pricingViewMode === "grouped" && (
-                    <div className="flex items-center space-x-2 text-xs font-bold text-gray-500">
-                      <button
-                        type="button"
-                        onClick={() => handleExpandAllBranches(true)}
-                        className="hover:text-brand cursor-pointer"
-                      >
-                        Expand All
-                      </button>
-                      <span>•</span>
-                      <button
-                        type="button"
-                        onClick={() => handleExpandAllBranches(false)}
-                        className="hover:text-brand cursor-pointer"
-                      >
-                        Collapse All
-                      </button>
-                    </div>
-                  )}
+                <div className="relative">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={matrixSearch}
+                    onChange={(e) => setMatrixSearch(e.target.value)}
+                    placeholder="Filter products (e.g. 180 mts, pipes, red)..."
+                    className="w-full pl-8 pr-3 py-1.5 bg-gray-50 rounded-xl text-xs font-medium text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30"
+                  />
                 </div>
               )}
 
-              {/* Combinations Render Area */}
+              {/* Products list */}
               {activeCombinations.length === 0 ? (
-                <div className="py-12 text-center text-gray-400 text-xs">
-                  Enter a Main Category and values in your sub-category levels above to view generated combinations.
-                </div>
-              ) : pricingViewMode === "grouped" ? (
-                /* =================== VIEW 1: GROUPED BY BRANCH =================== */
-                <div className="space-y-3 max-h-[32rem] overflow-y-auto pr-1">
-                  {filteredBranches.length === 0 ? (
-                    <div className="py-8 text-center text-gray-400 text-xs">
-                      No branches match &quot;{matrixSearch}&quot;.
-                    </div>
-                  ) : (
-                    filteredBranches.map((b) => (
-                      <div
-                        key={b.branchKey}
-                        className="border border-gray-200/90 rounded-2xl bg-white shadow-xs overflow-hidden transition-all hover:border-brand/40"
-                      >
-                        {/* Branch Header */}
-                        <div className="p-3.5 bg-gray-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-150">
-                          <div className="flex items-center space-x-3 min-w-0">
-                            <input
-                              type="checkbox"
-                              checked={b.allIncluded}
-                              ref={(el) => {
-                                if (el) el.indeterminate = b.someIncluded;
-                              }}
-                              onChange={(e) =>
-                                handleToggleBranchIncluded(b.rows, e.target.checked)
-                              }
-                              className="w-4 h-4 rounded accent-brand cursor-pointer shrink-0"
-                              title="Toggle all items in this branch"
-                            />
-
-                            <div
-                              className="cursor-pointer select-none min-w-0 flex items-center space-x-2"
-                              onClick={() => toggleBranchExpanded(b.branchKey)}
-                            >
-                              {expandedBranches[b.branchKey] ? (
-                                <ChevronDown size={16} className="text-gray-500 shrink-0" />
-                              ) : (
-                                <ChevronRight size={16} className="text-gray-500 shrink-0" />
-                              )}
-                              <div>
-                                <div className="flex items-center space-x-2">
-                                  <span className="text-xs font-black text-gray-900 tracking-tight">
-                                    {b.branchLabel}
-                                  </span>
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-brand border border-blue-100">
-                                    {b.rows.length} variants
-                                  </span>
-                                </div>
-                                <p className="text-[11px] text-gray-500 mt-0.5 truncate">
-                                  {b.rows
-                                    .map((r) => r.hierarchy[r.hierarchy.length - 1])
-                                    .join(", ")}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Branch Price Control */}
-                          <div className="flex items-center space-x-2 self-end sm:self-center shrink-0">
-                            <div className="text-right">
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                                Branch Rate
-                              </label>
-                              {b.hasMixedPrices && (
-                                <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
-                                  Mixed rates
-                                </span>
-                              )}
-                            </div>
-                            <div className="relative w-28">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={b.commonPrice}
-                                placeholder={b.hasMixedPrices ? "Mixed" : "Rate"}
-                                onChange={(e) => handleSetBranchPrice(b.rows, e.target.value)}
-                                className="w-full pl-5 pr-2 py-1.5 bg-white rounded-xl text-xs font-black text-brand border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand shadow-xs"
-                              />
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
-                                ₹
-                              </span>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteBranch(b.rows)}
-                              className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
-                              title="Exclude entire branch"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Expanded Variant Rows */}
-                        {expandedBranches[b.branchKey] && (
-                          <div className="divide-y divide-gray-100 bg-white">
-                            {b.rows.map((row) => {
-                              const leafValue = row.hierarchy[row.hierarchy.length - 1];
-                              const isCustom =
-                                row.price !== undefined &&
-                                row.price !== "" &&
-                                row.price !== batchBasePrice;
-                              return (
-                                <div
-                                  key={row.id}
-                                  className={`px-4 py-2.5 flex items-center justify-between transition-colors ${
-                                    row.included ? "hover:bg-gray-50/70" : "bg-gray-50/40 opacity-50"
-                                  }`}
-                                >
-                                  <div className="flex items-center space-x-3 min-w-0 pr-2">
-                                    <input
-                                      type="checkbox"
-                                      checked={row.included}
-                                      onChange={(e) => {
-                                        const val = !e.target.checked;
-                                        setRowOverrides((prev) => ({
-                                          ...prev,
-                                          [row.id]: { ...prev[row.id], excluded: val },
-                                        }));
-                                      }}
-                                      className="w-3.5 h-3.5 rounded accent-brand cursor-pointer shrink-0"
-                                    />
-                                    <div className="min-w-0">
-                                      <div className="flex items-center space-x-2">
-                                        <span className="text-xs font-bold text-gray-900">
-                                          {leafValue}
-                                        </span>
-                                        <span className="text-[10px] text-gray-400 font-mono truncate">
-                                          ({row.name})
-                                        </span>
-                                        {isCustom && (
-                                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                            Custom
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Individual Variant Price Input & Exclude */}
-                                  <div className="flex items-center space-x-1 shrink-0">
-                                    <div className="relative w-24">
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        disabled={!row.included}
-                                        value={row.price}
-                                        onChange={(e) => {
-                                          const val = e.target.value;
-                                          setRowOverrides((prev) => ({
-                                            ...prev,
-                                            [row.id]: { ...prev[row.id], price: val },
-                                          }));
-                                        }}
-                                        className="w-full pl-4 pr-2 py-1 bg-gray-50 rounded-lg text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand disabled:bg-gray-100"
-                                      />
-                                      <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] font-bold">
-                                        ₹
-                                      </span>
-                                    </div>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteCombination(row.id)}
-                                      className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                      title="Exclude combination"
-                                    >
-                                      <Trash2 size={13} />
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
+                <div className="py-8 text-center text-gray-400 text-xs">
+                  No products created yet. Add sub-categories above to generate catalog products.
                 </div>
               ) : (
-                /* =================== VIEW 2: FLAT LIST =================== */
-                <div className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
-                  {filteredCombinations.length === 0 ? (
-                    <div className="py-8 text-center text-gray-400 text-xs">
-                      No combinations match &quot;{matrixSearch}&quot;.
-                    </div>
-                  ) : (
-                    filteredCombinations.map((row, idx) => {
-                      const isCustom =
-                        row.price !== undefined &&
-                        row.price !== "" &&
-                        row.price !== batchBasePrice;
-                      return (
-                        <div
-                          key={row.id}
-                          className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
-                            row.included
-                              ? "bg-white border-gray-200 hover:border-brand/40 shadow-xs"
-                              : "bg-gray-50/70 border-gray-150 opacity-50"
-                          }`}
-                        >
-                          {/* Checkbox & Product Name */}
-                          <div className="flex items-center space-x-3 flex-1 min-w-0 pr-3">
-                            <input
-                              type="checkbox"
-                              checked={row.included}
-                              onChange={(e) => {
-                                const val = !e.target.checked;
-                                setRowOverrides((prev) => ({
-                                  ...prev,
-                                  [row.id]: { ...prev[row.id], excluded: val },
-                                }));
-                              }}
-                              className="w-4 h-4 rounded-md accent-brand cursor-pointer shrink-0"
-                            />
-
-                            <div className="min-w-0">
-                              <div className="flex items-center space-x-2">
-                                <span className="text-[10px] font-mono font-bold text-gray-400">
-                                  #{idx + 1}
-                                </span>
-                                <p className="text-xs font-black text-gray-900 tracking-tight truncate">
-                                  {row.name}
-                                </p>
-                                {isCustom && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                    Custom Rate
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center space-x-2 text-[10px] text-gray-500 font-medium mt-0.5">
-                                <span className="px-1.5 py-0.2 rounded bg-gray-100 font-mono">
-                                  Unit: {batchUnit || "COILS"}
-                                </span>
-                                {batchHsn && (
-                                  <span className="px-1.5 py-0.2 rounded bg-gray-100 font-mono">
-                                    HSN: {batchHsn}
-                                  </span>
-                                )}
-                                <span className="px-1.5 py-0.2 rounded bg-blue-50 text-brand font-bold">
-                                  GST: {batchGst || 18}%
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Editable Price & Exclude for this combination */}
-                          <div className="flex items-center space-x-1.5 shrink-0">
-                            <div className="w-28 relative">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                disabled={!row.included}
-                                value={row.price}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setRowOverrides((prev) => ({
-                                    ...prev,
-                                    [row.id]: { ...prev[row.id], price: val },
-                                  }));
-                                }}
-                                placeholder="Rate"
-                                className="w-full pl-5 pr-2.5 py-1.5 bg-gray-50 rounded-xl text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand disabled:bg-gray-100"
-                              />
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
-                                ₹
-                              </span>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCombination(row.id)}
-                              className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
-                              title="Exclude combination"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
+                <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+                  {filteredCombinations.map((row, idx) => (
+                    <div
+                      key={row.id}
+                      className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs transition-all ${
+                        row.included
+                          ? "bg-white border-gray-200/80 hover:border-brand/40"
+                          : "bg-gray-50/60 border-gray-200/40 opacity-50"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2.5 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={row.included}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setRowOverrides((prev) => ({
+                              ...prev,
+                              [row.id]: { ...prev[row.id], excluded: !checked },
+                            }));
+                          }}
+                          className="w-4 h-4 rounded accent-brand cursor-pointer shrink-0"
+                        />
+                        <span className="text-[10px] font-mono text-gray-400 w-5 text-right shrink-0">
+                          #{idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="font-bold text-gray-900 truncate">{row.name}</p>
+                          <p className="text-[10px] text-gray-400 font-medium truncate">
+                            {row.hierarchy.join(" > ")}
+                          </p>
                         </div>
-                      );
-                    })
-                  )}
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0">
+                        <div className="relative w-28">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            disabled={!row.included}
+                            value={row.price}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setRowOverrides((prev) => ({
+                                ...prev,
+                                [row.id]: { ...prev[row.id], price: val },
+                              }));
+                            }}
+                            placeholder="Rate"
+                            className="w-full pl-5 pr-2 py-1 bg-gray-50 rounded-lg text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand disabled:bg-gray-100"
+                          />
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
+                            ₹
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCombination(row.id)}
+                          className="p-1 text-gray-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                          title="Exclude product"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
-              {/* Bottom Matrix Summary & Action */}
+              {/* Bottom Action Footer */}
               <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <p className="text-xs text-gray-500 font-medium">
-                  Ready to create <strong className="text-brand font-bold">{includedCount}</strong> combinations in commercial catalog.
+                  Ready to create <strong className="text-brand font-black">{includedCount}</strong> products in your commercial catalog.
                 </p>
 
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                    className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -3690,16 +2406,16 @@ export default function ProductModal({
                     type="button"
                     onClick={handleBatchSubmit}
                     disabled={loading || includedCount === 0}
-                    className="px-6 py-3 bg-brand hover:bg-brand-hover text-white rounded-xl font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+                    className="px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xl font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
                   >
                     {loading ? (
                       <>
-                        <Loader2 size={15} className="animate-spin" />
-                        <span>Generating...</span>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Creating...</span>
                       </>
                     ) : (
                       <>
-                        <Sparkles size={15} />
+                        <Sparkles size={14} />
                         <span>Create All ({includedCount}) Products</span>
                       </>
                     )}
