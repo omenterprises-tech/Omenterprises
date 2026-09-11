@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { categories, brands, brandLengths, brandModels, brandVariations, catalogNodes } from "@/db/schema";
+import { categories, brands, brandLengths, brandModels, brandVariations } from "@/db/schema";
 import { eq, desc, asc, and } from "drizzle-orm";
 
 export async function GET(req: Request) {
@@ -11,26 +11,28 @@ export async function GET(req: Request) {
     // 1. Fetch Categories
     const allCategories = await db.select().from(categories).orderBy(asc(categories.displayOrder));
 
-    // 2. Fetch all dynamic catalog nodes
-    const allNodes = await db
-      .select()
-      .from(catalogNodes)
-      .orderBy(asc(catalogNodes.displayOrder), asc(catalogNodes.id));
-
-    // 3. Legacy Brands & Lengths (for backward compatibility)
+    // 2. Fetch Brands
     const allBrands = await db
       .select()
       .from(brands)
       .where(categoryName ? eq(brands.category, categoryName) : undefined)
       .orderBy(asc(brands.displayOrder));
 
+    // 3. Fetch Brand Lengths
     const allLengths = await db.select().from(brandLengths).orderBy(asc(brandLengths.lengthInMeters));
+
+    // 4. Fetch Brand Models
     const allModels = await db.select().from(brandModels).orderBy(asc(brandModels.name));
+
+    // 5. Fetch Variations
     const allVariations = await db.select().from(brandVariations).orderBy(asc(brandVariations.thickness));
 
     // Nest the data hierarchically
     const nestedBrands = allBrands.map((b) => {
+      // 1. Fetch direct variations (belonging directly to brand, no modelId)
       const directVariations = allVariations.filter((v) => v.brandId === b.id && !v.modelId);
+
+      // 2. Fetch direct models (belonging directly to brand, no brandLengthId)
       const directModels = allModels
         .filter((m) => m.brandId === b.id && !m.brandLengthId)
         .map((m) => {
@@ -38,6 +40,7 @@ export async function GET(req: Request) {
           return { ...m, variations };
         });
 
+      // 3. Fetch lengths (belonging to brand)
       const lengths = allLengths
         .filter((l) => l.brandId === b.id)
         .map((l) => {
@@ -57,7 +60,6 @@ export async function GET(req: Request) {
       success: true,
       categories: allCategories,
       catalog: nestedBrands,
-      nodes: allNodes,
     });
   } catch (error: any) {
     console.error("Error fetching master catalog:", error);
@@ -69,49 +71,6 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { type } = body;
-
-    if (type === "category") {
-      const { name, levelNames, imageUrl } = body;
-      if (!name || !name.trim()) {
-        return NextResponse.json({ error: "Category name is required" }, { status: 400 });
-      }
-      const slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
-      const [inserted] = await db
-        .insert(categories)
-        .values({
-          name: name.trim(),
-          slug,
-          imageUrl: imageUrl || null,
-          levelNames: levelNames ? (typeof levelNames === "string" ? levelNames : JSON.stringify(levelNames)) : null,
-        })
-        .returning();
-      return NextResponse.json({ success: true, data: inserted });
-    }
-
-    if (type === "node") {
-      const { categoryId, parentId, levelIndex, name, imageUrl, description, price, salePrice, stock, colors, specKey } = body;
-      if (!name || !String(name).trim() || categoryId === undefined) {
-        return NextResponse.json({ error: "Name and Category ID are required" }, { status: 400 });
-      }
-
-      const [inserted] = await db
-        .insert(catalogNodes)
-        .values({
-          categoryId: Number(categoryId),
-          parentId: parentId ? Number(parentId) : null,
-          levelIndex: Number(levelIndex) || 0,
-          name: String(name).trim(),
-          imageUrl: imageUrl || null,
-          description: description || null,
-          price: price !== undefined && price !== null && price !== "" ? Number(price) : null,
-          salePrice: salePrice !== undefined && salePrice !== null && salePrice !== "" ? Number(salePrice) : null,
-          stock: stock !== undefined && stock !== null ? Number(stock) : 100,
-          colors: Array.isArray(colors) ? JSON.stringify(colors) : (colors || "[]"),
-          specKey: specKey || null,
-        })
-        .returning();
-      return NextResponse.json({ success: true, data: inserted });
-    }
 
     if (type === "brand") {
       const { name, category, imageUrl } = body;
@@ -241,18 +200,7 @@ export async function DELETE(req: Request) {
 
     const numId = Number(id);
 
-    if (type === "node") {
-      const deleteRecursive = async (nodeId: number) => {
-        const children = await db.select({ id: catalogNodes.id }).from(catalogNodes).where(eq(catalogNodes.parentId, nodeId));
-        for (const child of children) {
-          await deleteRecursive(child.id);
-        }
-        await db.delete(catalogNodes).where(eq(catalogNodes.id, nodeId));
-      };
-      await deleteRecursive(numId);
-    } else if (type === "category") {
-      await db.delete(categories).where(eq(categories.id, numId));
-    } else if (type === "brand") {
+    if (type === "brand") {
       await db.delete(brands).where(eq(brands.id, numId));
     } else if (type === "length") {
       await db.delete(brandLengths).where(eq(brandLengths.id, numId));
@@ -281,45 +229,6 @@ export async function PUT(req: Request) {
     }
 
     const numId = Number(id);
-
-    if (type === "node") {
-      const { name, imageUrl, description, price, salePrice, stock, colors, specKey } = body;
-      const updateData: any = {};
-      if (name !== undefined) updateData.name = String(name).trim();
-      if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
-      if (description !== undefined) updateData.description = description;
-      if (price !== undefined) updateData.price = price !== "" && price !== null ? Number(price) : null;
-      if (salePrice !== undefined) updateData.salePrice = salePrice !== "" && salePrice !== null ? Number(salePrice) : null;
-      if (stock !== undefined) updateData.stock = Number(stock) || 100;
-      if (colors !== undefined) updateData.colors = Array.isArray(colors) ? JSON.stringify(colors) : (colors || "[]");
-      if (specKey !== undefined) updateData.specKey = specKey;
-
-      const [updated] = await db
-        .update(catalogNodes)
-        .set(updateData)
-        .where(eq(catalogNodes.id, numId))
-        .returning();
-      return NextResponse.json({ success: true, data: updated });
-    }
-
-    if (type === "category") {
-      const { name, levelNames, imageUrl } = body;
-      const updateData: any = {};
-      if (name && name.trim()) {
-        updateData.name = name.trim();
-        updateData.slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
-      }
-      if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
-      if (levelNames !== undefined) {
-        updateData.levelNames = typeof levelNames === "string" ? levelNames : JSON.stringify(levelNames);
-      }
-      const [updated] = await db
-        .update(categories)
-        .set(updateData)
-        .where(eq(categories.id, numId))
-        .returning();
-      return NextResponse.json({ success: true, data: updated });
-    }
 
     if (type === "brand") {
       const { name, category, imageUrl } = body;
