@@ -42,6 +42,8 @@ interface CategoryLevel {
   values: string[];
   inputValue: string;
   appliesToParents?: string[];
+  valueParentMap?: Record<string, string[]>;
+  mappingMode?: "level" | "per_value";
 }
 
 interface BatchCombinationRow {
@@ -384,6 +386,48 @@ export default function ProductModal({
     );
   };
 
+  const toggleValueParent = (levelId: string, val: string, parentVal: string) => {
+    setSubCategoryLevels((prev) =>
+      prev.map((lvl) => {
+        if (lvl.id !== levelId) return lvl;
+        const currentMap = lvl.valueParentMap || {};
+        // If not yet set, default to level-wide parents or all available
+        const currentValParents = currentMap[val] || lvl.appliesToParents || [];
+        const exists = currentValParents.includes(parentVal);
+        const nextValParents = exists
+          ? currentValParents.filter((p) => p !== parentVal)
+          : [...currentValParents, parentVal];
+
+        return {
+          ...lvl,
+          valueParentMap: {
+            ...currentMap,
+            [val]: nextValParents,
+          },
+        };
+      })
+    );
+  };
+
+  const setValueAllParents = (levelId: string, val: string, allParents: string[]) => {
+    setSubCategoryLevels((prev) =>
+      prev.map((lvl) => {
+        if (lvl.id !== levelId) return lvl;
+        const currentMap = lvl.valueParentMap || {};
+        const currentValParents = currentMap[val] || [];
+        const isAllSelected = currentValParents.length === allParents.length;
+
+        return {
+          ...lvl,
+          valueParentMap: {
+            ...currentMap,
+            [val]: isAllSelected ? [] : [...allParents],
+          },
+        };
+      })
+    );
+  };
+
   const handleDeleteCombination = (rowId: string) => {
     setRowOverrides((prev) => ({
       ...prev,
@@ -431,24 +475,40 @@ export default function ProductModal({
     for (const lvl of activeLevels) {
       const hasParentFilter =
         Array.isArray(lvl.appliesToParents) && lvl.appliesToParents.length > 0;
+      const hasValueMap =
+        Boolean(lvl.valueParentMap && Object.keys(lvl.valueParentMap).length > 0);
 
       const nextPaths: string[][] = [];
 
       for (const path of currentPaths) {
-        if (!hasParentFilter) {
+        if (!hasParentFilter && !hasValueMap) {
           // Applies to all paths
           for (const val of lvl.values) {
             nextPaths.push([...path, val]);
           }
         } else {
-          // Check if this path contains at least one of the parent values
-          const matchesParent = lvl.appliesToParents!.some((parentVal) =>
-            path.includes(parentVal)
-          );
+          // Determine which values in this level are allowed for this path
+          const allowedValues: string[] = [];
 
-          if (matchesParent) {
-            // Expand with this level's values
-            for (const val of lvl.values) {
+          for (const val of lvl.values) {
+            const specificParents = lvl.valueParentMap?.[val];
+            if (Array.isArray(specificParents) && specificParents.length > 0) {
+              // Value has its own specific parent assignment
+              if (specificParents.some((p) => path.includes(p))) {
+                allowedValues.push(val);
+              }
+            } else if (hasParentFilter) {
+              // Level-wide parent filter
+              if (lvl.appliesToParents!.some((p) => path.includes(p))) {
+                allowedValues.push(val);
+              }
+            } else {
+              allowedValues.push(val);
+            }
+          }
+
+          if (allowedValues.length > 0) {
+            for (const val of allowedValues) {
               nextPaths.push([...path, val]);
             }
           } else {
@@ -1660,11 +1720,18 @@ export default function ProductModal({
                       (() => {
                         const parentValues = getAvailableParentValues(index);
                         if (parentValues.length === 0) return null;
-                        const hasFilter =
+
+                        const hasLevelFilter =
                           Array.isArray(lvl.appliesToParents) && lvl.appliesToParents.length > 0;
+                        const hasValueMap = Boolean(
+                          lvl.valueParentMap && Object.keys(lvl.valueParentMap).length > 0
+                        );
+                        const isPerValueMode = lvl.mappingMode === "per_value";
+                        const isSpecificParentActive =
+                          hasLevelFilter || isPerValueMode || hasValueMap;
 
                         return (
-                          <div className="pt-2.5 border-t border-gray-200/60 mt-1 space-y-2">
+                          <div className="pt-2.5 border-t border-gray-200/60 mt-1 space-y-2.5">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex items-center space-x-2">
                                 <GitBranch size={13} className="text-brand" />
@@ -1672,9 +1739,22 @@ export default function ProductModal({
                                 <div className="flex items-center bg-white border border-gray-200 rounded-lg p-0.5 shadow-2xs">
                                   <button
                                     type="button"
-                                    onClick={() => updateSubCategoryAppliesTo(lvl.id, [])}
+                                    onClick={() => {
+                                      setSubCategoryLevels((prev) =>
+                                        prev.map((l) =>
+                                          l.id === lvl.id
+                                            ? {
+                                                ...l,
+                                                appliesToParents: [],
+                                                valueParentMap: {},
+                                                mappingMode: "level",
+                                              }
+                                            : l
+                                        )
+                                      );
+                                    }}
                                     className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                                      !hasFilter
+                                      !isSpecificParentActive
                                         ? "bg-brand text-white shadow-xs"
                                         : "text-gray-600 hover:text-gray-900"
                                     }`}
@@ -1684,12 +1764,12 @@ export default function ProductModal({
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      if (!hasFilter && parentValues.length > 0) {
+                                      if (!isSpecificParentActive && parentValues.length > 0) {
                                         updateSubCategoryAppliesTo(lvl.id, [parentValues[0]]);
                                       }
                                     }}
                                     className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                                      hasFilter
+                                      isSpecificParentActive
                                         ? "bg-brand text-white shadow-xs"
                                         : "text-gray-600 hover:text-gray-900"
                                     }`}
@@ -1699,18 +1779,68 @@ export default function ProductModal({
                                 </div>
                               </div>
 
-                              {hasFilter && (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                                  Conditional: Only for {lvl.appliesToParents!.join(", ")}
-                                </span>
+                              {isSpecificParentActive && (
+                                <div className="flex items-center space-x-2">
+                                  <div className="flex items-center bg-gray-100 p-0.5 rounded-lg text-[10px] font-bold">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setSubCategoryLevels((prev) =>
+                                          prev.map((l) =>
+                                            l.id === lvl.id ? { ...l, mappingMode: "level" } : l
+                                          )
+                                        )
+                                      }
+                                      className={`px-2 py-0.5 rounded-md cursor-pointer transition-all ${
+                                        !isPerValueMode
+                                          ? "bg-white text-brand shadow-2xs"
+                                          : "text-gray-500 hover:text-gray-800"
+                                      }`}
+                                    >
+                                      Whole Level
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSubCategoryLevels((prev) =>
+                                          prev.map((l) => {
+                                            if (l.id !== lvl.id) return l;
+                                            const map = { ...(l.valueParentMap || {}) };
+                                            l.values.forEach((v) => {
+                                              if (!map[v]) {
+                                                map[v] =
+                                                  l.appliesToParents && l.appliesToParents.length > 0
+                                                    ? [...l.appliesToParents]
+                                                    : [...parentValues];
+                                              }
+                                            });
+                                            return {
+                                              ...l,
+                                              mappingMode: "per_value",
+                                              valueParentMap: map,
+                                            };
+                                          })
+                                        );
+                                      }}
+                                      className={`px-2 py-0.5 rounded-md cursor-pointer transition-all ${
+                                        isPerValueMode
+                                          ? "bg-white text-brand shadow-2xs"
+                                          : "text-gray-500 hover:text-gray-800"
+                                      }`}
+                                      title="Set different parents for different values (e.g. 90 mts for Wires only, 180 mts for both)"
+                                    >
+                                      Assign Per Value (Advanced)
+                                    </button>
+                                  </div>
+                                </div>
                               )}
                             </div>
 
-                            {/* Parent Value Selection Chips */}
-                            {hasFilter && (
-                              <div className="p-2.5 bg-white rounded-xl border border-blue-100/80 shadow-2xs space-y-1.5">
+                            {/* Option A: Whole Level Parent Chips */}
+                            {isSpecificParentActive && !isPerValueMode && (
+                              <div className="p-3 bg-white rounded-xl border border-blue-100/80 shadow-2xs space-y-1.5">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-[11px] font-semibold text-gray-600">
+                                  <span className="text-[11px] font-semibold text-gray-700">
                                     Select parent specification(s) where this level applies:
                                   </span>
                                   <span className="text-[10px] text-gray-400 font-medium">
@@ -1738,6 +1868,86 @@ export default function ProductModal({
                                         )}
                                         <span>{pval}</span>
                                       </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Option B: Per-Value Parent Assignment */}
+                            {isSpecificParentActive && isPerValueMode && (
+                              <div className="p-3 bg-white rounded-xl border border-blue-100/80 shadow-2xs space-y-2.5">
+                                <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
+                                  <div>
+                                    <p className="text-[11px] font-bold text-gray-800">
+                                      Per-Value Parent Assignment
+                                    </p>
+                                    <p className="text-[10px] text-gray-500">
+                                      Check which parents each value belongs to (e.g. 90 mts for Wires only, 180 mts for both).
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  {lvl.values.map((val) => {
+                                    const assigned =
+                                      lvl.valueParentMap?.[val] ||
+                                      lvl.appliesToParents ||
+                                      parentValues;
+
+                                    return (
+                                      <div
+                                        key={val}
+                                        className="p-2 bg-gray-50/70 rounded-xl border border-gray-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                                      >
+                                        <div className="flex items-center space-x-2">
+                                          <span className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs font-black text-gray-900 shadow-2xs">
+                                            {val}
+                                          </span>
+                                          <span className="text-[10px] text-gray-400 font-medium">
+                                            applies to:
+                                          </span>
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          {parentValues.map((pval) => {
+                                            const isChecked = assigned.includes(pval);
+                                            return (
+                                              <button
+                                                key={pval}
+                                                type="button"
+                                                onClick={() =>
+                                                  toggleValueParent(lvl.id, val, pval)
+                                                }
+                                                className={`px-2 py-0.5 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center space-x-1 ${
+                                                  isChecked
+                                                    ? "bg-blue-50 border-brand text-brand shadow-2xs"
+                                                    : "bg-white border-gray-200 text-gray-500 hover:bg-gray-100"
+                                                }`}
+                                              >
+                                                {isChecked ? (
+                                                  <Check size={11} className="text-brand" />
+                                                ) : (
+                                                  <Square size={11} className="text-gray-300" />
+                                                )}
+                                                <span>{pval}</span>
+                                              </button>
+                                            );
+                                          })}
+
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setValueAllParents(lvl.id, val, parentValues)
+                                            }
+                                            className="px-1.5 py-0.5 text-[10px] font-bold text-gray-400 hover:text-brand underline cursor-pointer ml-1"
+                                          >
+                                            {assigned.length === parentValues.length
+                                              ? "Clear"
+                                              : "All"}
+                                          </button>
+                                        </div>
+                                      </div>
                                     );
                                   })}
                                 </div>
