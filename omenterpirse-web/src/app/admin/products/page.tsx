@@ -1031,17 +1031,7 @@ export default function ProductManagement() {
                 <Package className="text-[#FF9800]" size={22} />
                 <h2 className="text-2xl font-playfair font-bold text-brand">Inventory</h2>
               </div>
-              <div className="flex items-center gap-2">
-                <a
-                  href="/admin/catalog"
-                  className="flex items-center gap-1.5 bg-[#FF9800] hover:bg-[#F57C00] text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm transition-all"
-                  title="Generate all combinations as individual products from Master Catalog"
-                >
-                  <Sparkles size={12} />
-                  <span>Generate Matrix</span>
-                </a>
-                <span className="text-[10px] font-black text-brand/30 uppercase tracking-widest bg-brand/5 px-3 py-1.5 rounded-full">{products.length} total</span>
-              </div>
+              <span className="text-[10px] font-black text-brand/30 uppercase tracking-widest bg-brand/5 px-3 py-1.5 rounded-full">{products.length} total</span>
             </div>
 
             {/* Search Bar */}
