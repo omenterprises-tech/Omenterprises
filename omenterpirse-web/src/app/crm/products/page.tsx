@@ -15,6 +15,7 @@ import {
   FolderTree,
 } from "lucide-react";
 import ProductModal from "@/components/crm/ProductModal";
+import { alphabeticalCompare } from "@/lib/utils";
 
 export default function CrmProductsPage() {
   const router = useRouter();
@@ -74,20 +75,25 @@ export default function CrmProductsPage() {
     init();
   }, [router]);
 
-  // Filtered products
+  // Filtered products sorted alphabetically (A → Z)
   const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return products;
-    const q = searchQuery.toLowerCase().trim();
-    return products.filter(
-      (p) =>
-        p.name?.toLowerCase().includes(q) ||
-        p.category?.toLowerCase().includes(q) ||
-        p.hsn?.toLowerCase().includes(q) ||
-        p.unit?.toLowerCase().includes(q)
+    let list = products;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = products.filter(
+        (p) =>
+          p.name?.toLowerCase().includes(q) ||
+          p.category?.toLowerCase().includes(q) ||
+          p.hsn?.toLowerCase().includes(q) ||
+          p.unit?.toLowerCase().includes(q)
+      );
+    }
+    return [...list].sort((a, b) =>
+      alphabeticalCompare(a.name || "", b.name || "")
     );
   }, [products, searchQuery]);
 
-  // Group products by main category and sort each group alphabetically by product name
+  // Group products by main category and sort each group alphabetically by product name (A → Z)
   const groupedProducts = useMemo(() => {
     const map: Record<string, any[]> = {};
     for (const prod of filteredProducts) {
@@ -97,13 +103,13 @@ export default function CrmProductsPage() {
     }
 
     const sortedCategories = Object.keys(map).sort((a, b) =>
-      a.localeCompare(b, undefined, { sensitivity: "base" })
+      alphabeticalCompare(a, b)
     );
 
     return sortedCategories.map((category) => ({
       category,
       products: [...map[category]].sort((a, b) =>
-        (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" })
+        alphabeticalCompare(a.name || "", b.name || "")
       ),
     }));
   }, [filteredProducts]);

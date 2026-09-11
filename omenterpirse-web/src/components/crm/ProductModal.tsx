@@ -28,6 +28,7 @@ import {
   FolderPlus,
   CornerDownRight,
 } from "lucide-react";
+import { alphabeticalCompare } from "@/lib/utils";
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -964,7 +965,7 @@ export default function ProductModal({
       );
     }
     return [...list].sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+      alphabeticalCompare(a.name, b.name)
     );
   }, [activeCombinations, matrixSearch]);
 
