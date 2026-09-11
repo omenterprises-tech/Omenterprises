@@ -47,9 +47,9 @@ export interface TreeNode {
   children: TreeNode[];
 }
 
-const createDefaultCategoryTree = (brand: string = "Finolex"): TreeNode => ({
+const createDefaultCategoryTree = (brand: string = ""): TreeNode => ({
   id: "root",
-  name: brand || "Finolex",
+  name: brand || "",
   children: [],
 });
 
@@ -294,11 +294,11 @@ export default function ProductModal({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // ================= DYNAMIC BATCH GENERATOR STATE =================
-  const [batchMainCategory, setBatchMainCategory] = useState("Finolex");
+  const [batchMainCategory, setBatchMainCategory] = useState("");
   const [batchBasePrice, setBatchBasePrice] = useState("");
-  const [batchUnit, setBatchUnit] = useState("COILS");
+  const [batchUnit, setBatchUnit] = useState("");
   const [batchHsn, setBatchHsn] = useState("");
-  const [batchGst, setBatchGst] = useState("18");
+  const [batchGst, setBatchGst] = useState("");
   const [batchDescription, setBatchDescription] = useState("");
 
   // Mode Switcher: "tree" (Interactive Nested Tree) vs "matrix" (Flat Level Matrix)
@@ -306,7 +306,7 @@ export default function ProductModal({
 
   // Interactive Tree State
   const [treeRoot, setTreeRoot] = useState<TreeNode>(() =>
-    createDefaultCategoryTree("Finolex")
+    createDefaultCategoryTree("")
   );
   const [activeDrillDownId, setActiveDrillDownId] = useState<string>("root");
   const [drillDownInput, setDrillDownInput] = useState<string>("");
@@ -314,20 +314,11 @@ export default function ProductModal({
   const [treeSearchQuery, setTreeSearchQuery] = useState<string>("");
   const [treeExpandedNodes, setTreeExpandedNodes] = useState<Record<string, boolean>>({
     root: true,
-    wires: true,
-    "w-180": true,
-    "w-180-fr": true,
-    "w-180-frls": true,
-    "w-90": true,
-    pipes: true,
-    "p-20mm": true,
   });
 
   // Keep tree root name synced to brand/main category
   useEffect(() => {
-    if (batchMainCategory.trim() && treeRoot.name !== batchMainCategory.trim()) {
-      setTreeRoot((prev) => ({ ...prev, name: batchMainCategory.trim() }));
-    }
+    setTreeRoot((prev) => ({ ...prev, name: batchMainCategory.trim() }));
   }, [batchMainCategory]);
 
   const activeDrillDownNode = useMemo(() => {
@@ -392,9 +383,14 @@ export default function ProductModal({
   };
 
   const handleClearTree = () => {
+    setBatchMainCategory("");
+    setBatchUnit("");
+    setBatchGst("");
+    setBatchBasePrice("");
+    setBatchHsn("");
     setTreeRoot({
       id: "root",
-      name: batchMainCategory.trim() || "Main Category",
+      name: "",
       children: [],
     });
     setActiveDrillDownId("root");
@@ -406,32 +402,19 @@ export default function ProductModal({
     {
       id: "lvl-1",
       label: "Sub-Category 1",
-      values: ["wires"],
+      values: [],
       inputValue: "",
     },
     {
       id: "lvl-2",
       label: "Sub-Category 2",
-      values: ["180 mts", "90 mts"],
+      values: [],
       inputValue: "",
     },
     {
       id: "lvl-3",
       label: "Sub-Category 3",
-      values: ["fr", "frls"],
-      inputValue: "",
-      appliesToParents: ["180 mts"],
-    },
-    {
-      id: "lvl-4",
-      label: "Sub-Category 4",
-      values: ["1.0 sqmm", "1.5 sqmm"],
-      inputValue: "",
-    },
-    {
-      id: "lvl-5",
-      label: "Sub-Category 5",
-      values: ["red", "blue", "green", "yellow", "black"],
+      values: [],
       inputValue: "",
     },
   ]);
@@ -539,12 +522,12 @@ export default function ProductModal({
       // Prepopulate batch tab with same common details
       setBatchMainCategory(loadedHierarchy[0] || initialProduct.category || "");
       setBatchBasePrice(loadedPrice);
-      setBatchUnit(initialProduct.unit || "COILS");
+      setBatchUnit(initialProduct.unit || "");
       setBatchHsn(initialProduct.hsn || "");
       setBatchGst(
         initialProduct.gst !== undefined && initialProduct.gst !== null
           ? String(initialProduct.gst)
-          : "18"
+          : ""
       );
       setBatchDescription(initialProduct.description || "");
 
@@ -558,6 +541,18 @@ export default function ProductModal({
       setDescription("");
       setUnit("");
       setHsn("");
+      setBatchMainCategory("");
+      setBatchBasePrice("");
+      setBatchUnit("");
+      setBatchHsn("");
+      setBatchGst("");
+      setBatchDescription("");
+      setTreeRoot({
+        id: "root",
+        name: "",
+        children: [],
+      });
+      setActiveDrillDownId("root");
       setActiveTab("single");
     }
     setErrors({});
@@ -1767,8 +1762,8 @@ export default function ProductModal({
                     type="text"
                     value={batchUnit}
                     onChange={(e) => setBatchUnit(e.target.value)}
-                    placeholder="COILS"
-                    className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold uppercase text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    placeholder="e.g. COILS, PCS"
+                    className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold uppercase text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand"
                   />
                 </div>
 
@@ -1779,8 +1774,8 @@ export default function ProductModal({
                     type="number"
                     value={batchGst}
                     onChange={(e) => setBatchGst(e.target.value)}
-                    placeholder="18"
-                    className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                    placeholder="e.g. 18"
+                    className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold text-gray-900 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand"
                   />
                 </div>
 
@@ -1822,7 +1817,7 @@ export default function ProductModal({
                           }`}
                         >
                           {idx === 0 ? <Folder size={11} /> : <CornerDownRight size={11} />}
-                          <span>{node.name}</span>
+                          <span>{node.name || (idx === 0 ? "Main Category" : "Sub-Category")}</span>
                         </button>
                         {!isLast && <ChevronRight size={12} className="text-gray-400 shrink-0" />}
                       </React.Fragment>
@@ -1850,7 +1845,7 @@ export default function ProductModal({
                 {/* Sub-categories input & Presets */}
                 <div className="space-y-2">
                   <label className="block text-xs font-bold text-gray-700">
-                    Add sub-categories inside <span className="text-brand font-black">&quot;{activeDrillDownNode.name}&quot;</span>:
+                    Add sub-categories inside <span className="text-brand font-black">&quot;{activeDrillDownNode.name || "Main Category"}&quot;</span>:
                   </label>
                   <div className="flex items-center space-x-2">
                     <input
@@ -1908,7 +1903,7 @@ export default function ProductModal({
                     <div className="p-6 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-center">
                       <FolderTree size={20} className="mx-auto text-gray-400 mb-1.5" />
                       <p className="text-xs font-bold text-gray-700">
-                        No sub-categories yet in &quot;{activeDrillDownNode.name}&quot;
+                        No sub-categories yet in &quot;{activeDrillDownNode.name || "Main Category"}&quot;
                       </p>
                       <p className="text-[11px] text-gray-400 mt-1 max-w-sm mx-auto">
                         Type sub-categories above (e.g. wires, pipes) and click &quot;+ Add&quot; or select from Suggestions to begin building your catalog.
