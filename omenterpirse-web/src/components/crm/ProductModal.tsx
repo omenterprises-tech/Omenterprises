@@ -2011,7 +2011,7 @@ export default function ProductModal({
                             value={activeDrillDownNode.price || ""}
                             onChange={(e) => handleSetTreeNodePrice(activeDrillDownNode.id, e.target.value)}
                             placeholder="0.00"
-                            className="w-full pl-6 pr-2.5 py-1.5 bg-white rounded-xl text-sm font-bold text-gray-900 border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                            className="w-full pl-6 pr-2.5 py-1.5 bg-white rounded-xl text-sm font-bold text-gray-900 border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-600 text-xs font-bold">
                             ₹
@@ -2061,7 +2061,7 @@ export default function ProductModal({
                                     value={child.price || ""}
                                     onChange={(e) => handleSetTreeNodePrice(child.id, e.target.value)}
                                     placeholder="Rate"
-                                    className="w-20 px-1.5 py-0.5 bg-white rounded border border-emerald-300 text-xs font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                    className="w-20 px-1.5 py-0.5 bg-white rounded border border-emerald-300 text-xs font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   />
                                 </div>
                               ) : (
@@ -2191,7 +2191,7 @@ export default function ProductModal({
                               }));
                             }}
                             placeholder="Rate"
-                            className="w-full pl-5 pr-2 py-1 bg-gray-50 rounded-lg text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand disabled:bg-gray-100"
+                            className="w-full pl-5 pr-2 py-1 bg-gray-50 rounded-lg text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand disabled:bg-gray-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
                             ₹
