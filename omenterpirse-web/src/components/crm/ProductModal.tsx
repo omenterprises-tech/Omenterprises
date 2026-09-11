@@ -25,7 +25,225 @@ import {
   RotateCcw,
   Tag,
   GitBranch,
+  Pencil,
+  Award,
+  Ruler,
+  DollarSign,
+  CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
+
+export function getCrmColorStyles(colorName: string) {
+  const name = (colorName || "").toLowerCase().trim();
+  const colorMap: Record<string, { bg: string; text: string; border: string }> = {
+    red: { bg: "#EF4444", text: "#FFFFFF", border: "#DC2626" },
+    yellow: { bg: "#FBBF24", text: "#000000", border: "#D97706" },
+    blue: { bg: "#2563EB", text: "#FFFFFF", border: "#1D4ED8" },
+    green: { bg: "#10B981", text: "#FFFFFF", border: "#059669" },
+    black: { bg: "#1F2937", text: "#FFFFFF", border: "#111827" },
+    white: { bg: "#FFFFFF", text: "#1F2937", border: "#E5E7EB" },
+    grey: { bg: "#9CA3AF", text: "#FFFFFF", border: "#7B808A" },
+    gray: { bg: "#9CA3AF", text: "#FFFFFF", border: "#7B808A" },
+    orange: { bg: "#F97316", text: "#FFFFFF", border: "#EA580C" },
+    pink: { bg: "#EC4899", text: "#FFFFFF", border: "#DB2777" },
+    purple: { bg: "#8B5CF6", text: "#FFFFFF", border: "#7C3AED" },
+    brown: { bg: "#78350F", text: "#FFFFFF", border: "#451A03" },
+  };
+  return colorMap[name] || { bg: "#E5E7EB", text: "#374151", border: "#D1D5DB" };
+}
+
+export interface CascadingNode {
+  id: string;
+  name: string;
+  parentId: string | null;
+  levelIndex: number;
+  price?: number;
+  salePrice?: number;
+  colors?: string[];
+  stock?: number;
+  imageUrl?: string | null;
+}
+
+export interface GeneratedCascadingProduct {
+  id: string;
+  name: string;
+  hierarchy: string[];
+  price: number;
+  salePrice: number;
+  color?: string;
+  stock: number;
+  included: boolean;
+  rootCategory: string;
+}
+
+const DEFAULT_CASCADING_NODES: CascadingNode[] = [
+  // Column 1: Brands / Main Categories
+  { id: "brand-1", name: "Polycab", parentId: null, levelIndex: 0 },
+  { id: "brand-2", name: "Finolex", parentId: null, levelIndex: 0 },
+  { id: "brand-3", name: "KEI", parentId: null, levelIndex: 0 },
+
+  // Column 2: Lengths (under Polycab)
+  { id: "len-1", name: "90 metres", parentId: "brand-1", levelIndex: 1 },
+  { id: "len-2", name: "180 metres", parentId: "brand-1", levelIndex: 1 },
+  { id: "len-3", name: "200 metres", parentId: "brand-1", levelIndex: 1 },
+  { id: "len-4", name: "300 metres", parentId: "brand-1", levelIndex: 1 },
+
+  // Column 2: Types/Sub-Categories (under Finolex)
+  { id: "fin-wires", name: "Wires", parentId: "brand-2", levelIndex: 1 },
+  { id: "fin-cables", name: "Cables", parentId: "brand-2", levelIndex: 1 },
+  { id: "fin-pipes", name: "Pipes", parentId: "brand-2", levelIndex: 1 },
+
+  // Column 3: Models (under Polycab 90m)
+  { id: "mod-1", name: "GREEN +", parentId: "len-1", levelIndex: 2 },
+  { id: "mod-2", name: "OPTIMA +", parentId: "len-1", levelIndex: 2 },
+
+  // Column 3: Lengths (under Finolex Wires)
+  { id: "fin-w-90", name: "90 mts", parentId: "fin-wires", levelIndex: 2 },
+  { id: "fin-w-180", name: "180 mts", parentId: "fin-wires", levelIndex: 2 },
+
+  // Column 4: Specs & Prices (under Polycab 90m OPTIMA +)
+  {
+    id: "spec-1",
+    name: "1.0 SQMM",
+    parentId: "mod-2",
+    levelIndex: 3,
+    price: 3145,
+    salePrice: 2078,
+    colors: ["RED", "YELLOW", "BLUE", "BLACK", "GREEN"],
+    stock: 100,
+  },
+  {
+    id: "spec-2",
+    name: "1.5 SQMM",
+    parentId: "mod-2",
+    levelIndex: 3,
+    price: 4600,
+    salePrice: 3040,
+    colors: ["RED", "YELLOW", "BLUE", "BLACK", "GREEN"],
+    stock: 100,
+  },
+  {
+    id: "spec-3",
+    name: "2.5 SQMM",
+    parentId: "mod-2",
+    levelIndex: 3,
+    price: 4920,
+    salePrice: 3251,
+    colors: ["RED", "YELLOW", "BLUE", "BLACK", "GREEN"],
+    stock: 100,
+  },
+
+  // Column 4: Models & Specs (under Finolex Wires 180 mts)
+  {
+    id: "fin-mod-fr",
+    name: "FR",
+    parentId: "fin-w-180",
+    levelIndex: 3,
+    price: 1800,
+    salePrice: 1450,
+    colors: ["RED", "BLUE", "YELLOW", "BLACK"],
+    stock: 100,
+  },
+  {
+    id: "fin-mod-frls",
+    name: "FRLS",
+    parentId: "fin-w-180",
+    levelIndex: 3,
+    price: 2400,
+    salePrice: 1950,
+    colors: ["RED", "BLUE", "YELLOW", "BLACK"],
+    stock: 100,
+  },
+];
+
+export const computeCombinationsFromTree = (
+  nodes: CascadingNode[],
+  nameOrder: "forward" | "reverse" = "forward"
+): GeneratedCascadingProduct[] => {
+  const result: GeneratedCascadingProduct[] = [];
+
+  const childrenMap = new Map<string | null, CascadingNode[]>();
+  nodes.forEach((n) => {
+    const list = childrenMap.get(n.parentId) || [];
+    list.push(n);
+    childrenMap.set(n.parentId, list);
+  });
+
+  const traverse = (currentNode: CascadingNode, path: CascadingNode[]) => {
+    const children = childrenMap.get(currentNode.id) || [];
+
+    if (children.length === 0) {
+      const fullPath = [...path, currentNode];
+      const names = fullPath.map((n) => n.name.trim()).filter(Boolean);
+      const rootCategory = fullPath[0]?.name || "General";
+
+      let foundPrice = currentNode.price;
+      let foundSalePrice = currentNode.salePrice;
+      if (foundPrice === undefined) {
+        for (let i = fullPath.length - 1; i >= 0; i--) {
+          if (fullPath[i].price !== undefined) {
+            foundPrice = fullPath[i].price;
+            foundSalePrice = fullPath[i].salePrice;
+            break;
+          }
+        }
+      }
+      const finalPrice = foundPrice || 0;
+      const finalSalePrice = foundSalePrice || finalPrice;
+      const finalStock = currentNode.stock || 100;
+
+      let colors: string[] = [];
+      for (let i = fullPath.length - 1; i >= 0; i--) {
+        if (fullPath[i].colors && fullPath[i].colors!.length > 0) {
+          colors = fullPath[i].colors!;
+          break;
+        }
+      }
+
+      if (colors.length > 0) {
+        colors.forEach((col) => {
+          const comboNames = [...names, col];
+          const displayName = nameOrder === "reverse" ? [...comboNames].reverse().join(" ") : comboNames.join(" ");
+          result.push({
+            id: `${fullPath.map((n) => n.id).join("-")}-${col}`,
+            name: displayName,
+            hierarchy: comboNames,
+            price: finalPrice,
+            salePrice: finalSalePrice,
+            color: col,
+            stock: finalStock,
+            included: true,
+            rootCategory,
+          });
+        });
+      } else {
+        const displayName = nameOrder === "reverse" ? [...names].reverse().join(" ") : names.join(" ");
+        result.push({
+          id: fullPath.map((n) => n.id).join("-"),
+          name: displayName,
+          hierarchy: names,
+          price: finalPrice,
+          salePrice: finalSalePrice,
+          stock: finalStock,
+          included: true,
+          rootCategory,
+        });
+      }
+      return;
+    }
+
+    children.forEach((child) => {
+      traverse(child, [...path, currentNode]);
+    });
+  };
+
+  const roots = childrenMap.get(null) || nodes.filter((n) => n.parentId === null);
+  roots.forEach((root) => {
+    traverse(root, []);
+  });
+
+  return result;
+};
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -64,11 +282,48 @@ export default function ProductModal({
 }: ProductModalProps) {
   const isEditing = Boolean(initialProduct?.id && !initialProduct?._isClone);
 
-  // Tab: "single" or "batch"
-  const [activeTab, setActiveTab] = useState<"single" | "batch">("single");
+  // Tab: "single", "cascading" (Multi-Column Tree), or "batch" (Tag List)
+  const [activeTab, setActiveTab] = useState<"single" | "cascading" | "batch">("single");
 
   // Name order preference: "forward" (a b c d) vs "reverse" (d c b a)
   const [nameOrder, setNameOrder] = useState<"forward" | "reverse">("forward");
+
+  // ================= CASCADING MULTI-COLUMN TREE STATE =================
+  const [cascadingNodes, setCascadingNodes] = useState<CascadingNode[]>(DEFAULT_CASCADING_NODES);
+  const [columnLabels, setColumnLabels] = useState<string[]>([
+    "1. BRANDS (MAIN)",
+    "2. LENGTHS / TYPES",
+    "3. MODELS / GRADES",
+    "4. SPECS & PRICES",
+  ]);
+  const [selectedPath, setSelectedPath] = useState<Record<number, string | null>>({
+    0: "brand-1",
+    1: "len-1",
+    2: "mod-2",
+  });
+
+  // Modal to Add / Edit a node in any column
+  const [nodeModalOpen, setNodeModalOpen] = useState(false);
+  const [nodeEditingId, setNodeEditingId] = useState<string | null>(null);
+  const [nodeModalLevel, setNodeModalLevel] = useState<number>(0);
+  const [nodeModalParentId, setNodeModalParentId] = useState<string | null>(null);
+  const [nodeName, setNodeName] = useState("");
+  const [nodePrice, setNodePrice] = useState("");
+  const [nodeSalePrice, setNodeSalePrice] = useState("");
+  const [nodeColors, setNodeColors] = useState<string[]>(["RED", "YELLOW", "BLUE", "BLACK", "GREEN"]);
+  const [nodeColorInput, setNodeColorInput] = useState("");
+  const [nodeStock, setNodeStock] = useState("100");
+
+  // Combinations Preview & Generation Modal
+  const [cascadingPreviewOpen, setCascadingPreviewOpen] = useState(false);
+  const [cascadingGeneratedList, setCascadingGeneratedList] = useState<GeneratedCascadingProduct[]>([]);
+  const [cascadingSearch, setCascadingSearch] = useState("");
+  const [cascadingUnit, setCascadingUnit] = useState("COILS");
+  const [cascadingHsn, setCascadingHsn] = useState("8544");
+  const [cascadingGst, setCascadingGst] = useState("18");
+  const [cascadingPriceAdjPercent, setCascadingPriceAdjPercent] = useState("");
+  const [isCascadingSaving, setIsCascadingSaving] = useState(false);
+  const [cascadingSaveSuccess, setCascadingSaveSuccess] = useState<string | null>(null);
 
   // ================= SINGLE MODE STATE =================
   const [categories, setCategories] = useState<string[]>(["", "", ""]);
@@ -171,6 +426,252 @@ export default function ProductModal({
     }
     return valid.join(" ");
   }, [categories, nameOrder]);
+
+  // ── Cascading Multi-Column Helpers ──────────────────────────
+  const activeCascadingCombinations = useMemo(() => {
+    return computeCombinationsFromTree(cascadingNodes, nameOrder);
+  }, [cascadingNodes, nameOrder]);
+
+  const filteredCascadingProducts = useMemo(() => {
+    if (!cascadingSearch.trim()) return cascadingGeneratedList;
+    const q = cascadingSearch.toLowerCase().trim();
+    return cascadingGeneratedList.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.hierarchy.some((h) => h.toLowerCase().includes(q)) ||
+        (p.color && p.color.toLowerCase().includes(q))
+    );
+  }, [cascadingGeneratedList, cascadingSearch]);
+
+  const parentNodeForModal = useMemo(() => {
+    if (!nodeModalParentId) return null;
+    return cascadingNodes.find((n) => n.id === nodeModalParentId) || null;
+  }, [cascadingNodes, nodeModalParentId]);
+
+  const handleSelectCascadingNode = (level: number, nodeId: string) => {
+    setSelectedPath((prev) => {
+      const next: Record<number, string | null> = { ...prev, [level]: nodeId };
+      for (let k = level + 1; k < 10; k++) {
+        delete next[k];
+      }
+      return next;
+    });
+  };
+
+  const openAddNodeModal = (level: number) => {
+    const parentId = level === 0 ? null : (selectedPath[level - 1] || null);
+    if (level > 0 && !parentId) {
+      alert(`Please select an item in Column ${level} first before adding sub-categories.`);
+      return;
+    }
+    setNodeEditingId(null);
+    setNodeModalLevel(level);
+    setNodeModalParentId(parentId);
+    setNodeName("");
+    setNodePrice("");
+    setNodeSalePrice("");
+    setNodeColors(["RED", "YELLOW", "BLUE", "BLACK", "GREEN"]);
+    setNodeColorInput("");
+    setNodeStock("100");
+    setNodeModalOpen(true);
+  };
+
+  const openEditNodeModal = (node: CascadingNode) => {
+    setNodeEditingId(node.id);
+    setNodeModalLevel(node.levelIndex);
+    setNodeModalParentId(node.parentId);
+    setNodeName(node.name);
+    setNodePrice(node.price !== undefined ? String(node.price) : "");
+    setNodeSalePrice(node.salePrice !== undefined ? String(node.salePrice) : "");
+    setNodeColors(node.colors || ["RED", "YELLOW", "BLUE", "BLACK", "GREEN"]);
+    setNodeColorInput("");
+    setNodeStock(node.stock !== undefined ? String(node.stock) : "100");
+    setNodeModalOpen(true);
+  };
+
+  const handleSaveNode = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nodeName.trim()) return;
+
+    const parsedPrice = nodePrice.trim() !== "" ? parseFloat(nodePrice) : undefined;
+    const parsedSalePrice = nodeSalePrice.trim() !== "" ? parseFloat(nodeSalePrice) : undefined;
+    const parsedStock = nodeStock.trim() !== "" ? parseInt(nodeStock) : 100;
+
+    if (nodeEditingId) {
+      setCascadingNodes((prev) =>
+        prev.map((n) =>
+          n.id === nodeEditingId
+            ? {
+                ...n,
+                name: nodeName.trim(),
+                price: parsedPrice,
+                salePrice: parsedSalePrice,
+                colors: nodeColors,
+                stock: parsedStock,
+              }
+            : n
+        )
+      );
+    } else {
+      const newNode: CascadingNode = {
+        id: `node-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        name: nodeName.trim(),
+        parentId: nodeModalParentId,
+        levelIndex: nodeModalLevel,
+        price: parsedPrice,
+        salePrice: parsedSalePrice,
+        colors: nodeColors,
+        stock: parsedStock,
+      };
+      setCascadingNodes((prev) => [...prev, newNode]);
+      setSelectedPath((prev) => ({
+        ...prev,
+        [nodeModalLevel]: newNode.id,
+      }));
+    }
+
+    setNodeModalOpen(false);
+  };
+
+  const handleDeleteNode = (nodeId: string) => {
+    if (!confirm("Are you sure you want to delete this category and all its sub-categories?")) return;
+
+    const toDelete = new Set<string>([nodeId]);
+    let added = true;
+    while (added) {
+      added = false;
+      cascadingNodes.forEach((n) => {
+        if (n.parentId && toDelete.has(n.parentId) && !toDelete.has(n.id)) {
+          toDelete.add(n.id);
+          added = true;
+        }
+      });
+    }
+
+    setCascadingNodes((prev) => prev.filter((n) => !toDelete.has(n.id)));
+    setSelectedPath((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((lvlStr) => {
+        const lvl = Number(lvlStr);
+        if (next[lvl] && toDelete.has(next[lvl]!)) {
+          delete next[lvl];
+        }
+      });
+      return next;
+    });
+  };
+
+  const handleAddColumn = () => {
+    const nextIdx = columnLabels.length + 1;
+    setColumnLabels((prev) => [...prev, `${nextIdx}. SUB-CATEGORIES`]);
+  };
+
+  const handleResetToTemplate = () => {
+    if (confirm("Reset to sample Polycab & Finolex catalog tree template?")) {
+      setCascadingNodes(DEFAULT_CASCADING_NODES);
+      setSelectedPath({ 0: "brand-1", 1: "len-1", 2: "mod-2" });
+    }
+  };
+
+  const handleClearAllCascading = () => {
+    if (confirm("Clear all categories and start with an empty catalog?")) {
+      setCascadingNodes([]);
+      setSelectedPath({});
+    }
+  };
+
+  const openCascadingPreview = () => {
+    const items = computeCombinationsFromTree(cascadingNodes, nameOrder);
+    setCascadingGeneratedList(items);
+    setCascadingSearch("");
+    setCascadingPriceAdjPercent("");
+    setCascadingSaveSuccess(null);
+    setCascadingPreviewOpen(true);
+  };
+
+  const handleToggleCascadingRow = (id: string) => {
+    setCascadingGeneratedList((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, included: !item.included } : item))
+    );
+  };
+
+  const handleToggleSelectAllCascading = (check: boolean) => {
+    setCascadingGeneratedList((prev) => prev.map((item) => ({ ...item, included: check })));
+  };
+
+  const handleUpdateCascadingRowPrice = (id: string, price: number, salePrice?: number) => {
+    setCascadingGeneratedList((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, price, salePrice: salePrice ?? price } : item
+      )
+    );
+  };
+
+  const handleUpdateCascadingRowName = (id: string, name: string) => {
+    setCascadingGeneratedList((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, name } : item))
+    );
+  };
+
+  const applyCascadingPriceAdjustment = (percentStr: string) => {
+    const p = parseFloat(percentStr);
+    if (isNaN(p)) return;
+    setCascadingGeneratedList((prev) =>
+      prev.map((item) => {
+        if (!item.included) return item;
+        const factor = 1 + p / 100;
+        return {
+          ...item,
+          price: Math.round(item.price * factor),
+          salePrice: Math.round(item.salePrice * factor),
+        };
+      })
+    );
+  };
+
+  const handleSaveCascadingProductsToCrm = async () => {
+    const selected = cascadingGeneratedList.filter((p) => p.included);
+    if (selected.length === 0) {
+      alert("Please select at least one product to create.");
+      return;
+    }
+
+    setIsCascadingSaving(true);
+    try {
+      const payload = selected.map((p) => ({
+        name: p.name.trim(),
+        category: p.rootCategory || "General",
+        price: p.salePrice || p.price,
+        basePrice: p.price,
+        unit: cascadingUnit || "COILS",
+        hsn: cascadingHsn || "8544",
+        gst: cascadingGst || "18",
+        description: `${p.name} - Premium Quality ISI Certified`,
+        specifications: p.hierarchy.map((h, i) => ({ key: `Level ${i + 1}`, value: h })),
+      }));
+
+      const res = await fetch("/api/crm/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ products: payload }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setCascadingSaveSuccess(`Successfully created ${selected.length} individual products in your CRM catalog!`);
+        if (onProductsCreated && data.products) {
+          onProductsCreated(data.products);
+        }
+      } else {
+        alert(data.error || "Failed to create products.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Network error while creating products.");
+    } finally {
+      setIsCascadingSaving(false);
+    }
+  };
 
   // Keep name synced to compiled name if not manually overridden in single mode
   useEffect(() => {
@@ -1007,6 +1508,16 @@ export default function ProductModal({
                     )}
                   </button>
                 </>
+              ) : activeTab === "cascading" ? (
+                <button
+                  type="button"
+                  onClick={openCascadingPreview}
+                  disabled={activeCascadingCombinations.length === 0}
+                  className="px-5 py-2.5 bg-[#FF9800] hover:bg-[#F57C00] text-white rounded-xl text-xs font-black shadow-md shadow-[#FF9800]/20 transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Sparkles size={15} />
+                  <span>Generate All ({activeCascadingCombinations.length}) Products</span>
+                </button>
               ) : (
                 <button
                   type="button"
@@ -1033,7 +1544,7 @@ export default function ProductModal({
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+      <main className={`flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 ${activeTab === "cascading" ? "max-w-7xl" : "max-w-4xl"}`}>
         {/* Toast feedback */}
         {toastMessage && (
           <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 font-bold flex items-center justify-between shadow-xs animate-in fade-in duration-200">
@@ -1044,7 +1555,7 @@ export default function ProductModal({
             <button
               type="button"
               onClick={() => setToastMessage(null)}
-              className="text-emerald-600 hover:text-emerald-800 p-1"
+              className="text-emerald-600 hover:text-emerald-800 p-1 cursor-pointer"
             >
               <X size={14} />
             </button>
@@ -1053,40 +1564,53 @@ export default function ProductModal({
 
         {/* Tab Switcher (Only in create mode) */}
         {!isEditing && (
-          <div className="bg-white p-1.5 rounded-2xl border border-gray-200/80 shadow-xs flex items-center">
+          <div className="bg-white p-1.5 rounded-2xl border border-gray-200/80 shadow-xs flex flex-wrap sm:flex-nowrap items-center gap-1">
             <button
               type="button"
               onClick={() => setActiveTab("single")}
-              className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 cursor-pointer ${
+              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 cursor-pointer ${
                 activeTab === "single"
                   ? "bg-brand text-white shadow-sm"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
               }`}
             >
               <Package size={15} />
-              <span>Single Product Entry</span>
+              <span>Single Product</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("cascading")}
+              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 cursor-pointer relative ${
+                activeTab === "cascading"
+                  ? "bg-[#0D47A1] text-white shadow-sm"
+                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+              }`}
+            >
+              <Layers size={15} className="text-[#FF9800]" />
+              <span>Cascading Multi-Column Builder</span>
+              <span
+                className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                  activeTab === "cascading"
+                    ? "bg-[#FF9800] text-white"
+                    : "bg-amber-50 text-[#FF9800] border border-amber-200"
+                }`}
+              >
+                Recommended
+              </span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab("batch")}
-              className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 cursor-pointer relative ${
+              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 cursor-pointer relative ${
                 activeTab === "batch"
                   ? "bg-brand text-white shadow-sm"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
               }`}
             >
-              <Sparkles size={15} className="text-amber-400" />
-              <span>Hierarchy & Combination Generator</span>
-              <span
-                className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
-                  activeTab === "batch"
-                    ? "bg-white/20 text-white"
-                    : "bg-blue-50 text-brand border border-blue-100"
-                }`}
-              >
-                Unlimited Levels
-              </span>
+              <Sparkles size={14} className="text-gray-400" />
+              <span>Tags List Form</span>
             </button>
           </div>
         )}
@@ -1460,7 +1984,261 @@ export default function ProductModal({
         )}
 
         {/* ========================================================================= */}
-        {/* ==================== TAB 2: UNLIMITED HIERARCHICAL GENERATOR ============ */}
+        {/* ==================== TAB 2: CASCADING MULTI-COLUMN BUILDER ============== */}
+        {/* ========================================================================= */}
+        {activeTab === "cascading" && (
+          <div className="space-y-6">
+            {/* Top Config & Actions Card */}
+            <div className="bg-white p-6 rounded-3xl border border-gray-200/80 shadow-xs space-y-4">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-wider text-[#0D47A1] flex items-center gap-2">
+                    <Layers className="text-[#FF9800]" size={20} />
+                    Cascading Multi-Column Category Builder
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    1. Click <span className="font-bold text-[#FF9800]">+</span> to add items in any column.
+                    2. Select an item in any column to drill down and add its sub-categories in the next column.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetToTemplate}
+                    className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Reset to Polycab & Finolex sample tree"
+                  >
+                    <RefreshCw size={13} />
+                    <span>Sample Template</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClearAllCascading}
+                    className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Clear tree to start fresh"
+                  >
+                    <Trash2 size={13} />
+                    <span>Clear All</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleAddColumn}
+                    className="px-3.5 py-2 bg-[#0D47A1]/10 hover:bg-[#0D47A1]/20 text-[#0D47A1] text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus size={14} />
+                    <span>Add Level Column</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={openCascadingPreview}
+                    disabled={activeCascadingCombinations.length === 0}
+                    className="px-5 py-2.5 bg-[#FF9800] hover:bg-[#F57C00] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl flex items-center gap-2 shadow-md shadow-[#FF9800]/20 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Sparkles size={15} />
+                    <span>Generate Individual Products ({activeCascadingCombinations.length})</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Breadcrumb drill-down bar */}
+              <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100 text-xs">
+                <span className="font-bold text-gray-400 uppercase tracking-wider text-[10px]">Active Drill-down:</span>
+                {columnLabels.map((lbl, idx) => {
+                  const selectedId = selectedPath[idx];
+                  const selectedNode = cascadingNodes.find((n) => n.id === selectedId);
+                  return (
+                    <React.Fragment key={idx}>
+                      {idx > 0 && <ChevronRight size={12} className="text-gray-300" />}
+                      <span
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                          selectedNode
+                            ? "bg-[#0D47A1]/10 text-[#0D47A1] border border-[#0D47A1]/20"
+                            : "bg-gray-100 text-gray-400 border border-gray-200"
+                        }`}
+                      >
+                        {selectedNode ? selectedNode.name : `Level ${idx + 1} (None)`}
+                      </span>
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 4-Column Interactive Hierarchy Flow */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 items-start">
+              {columnLabels.map((colTitle, colIdx) => {
+                let nodesInColumn: CascadingNode[] = [];
+                let parentNode: CascadingNode | null = null;
+                let parentIsSelected = true;
+
+                if (colIdx === 0) {
+                  nodesInColumn = cascadingNodes.filter((n) => n.parentId === null || n.levelIndex === 0);
+                } else {
+                  const parentSelectedId = selectedPath[colIdx - 1];
+                  parentNode = cascadingNodes.find((n) => n.id === parentSelectedId) || null;
+                  if (parentSelectedId) {
+                    nodesInColumn = cascadingNodes.filter((n) => n.parentId === parentSelectedId);
+                  } else {
+                    parentIsSelected = false;
+                  }
+                }
+
+                const selectedNodeId = selectedPath[colIdx];
+
+                return (
+                  <div
+                    key={colIdx}
+                    className="bg-white rounded-3xl p-5 shadow-xl border border-gray-100 space-y-4 min-h-[460px] flex flex-col"
+                  >
+                    {/* Column Header */}
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                      <div className="min-w-0 pr-2">
+                        <h3 className="text-xs font-black uppercase tracking-wider text-[#0D47A1] flex items-center gap-1.5 truncate">
+                          {colIdx === 0 ? (
+                            <Award size={15} className="text-[#FF9800] shrink-0" />
+                          ) : colIdx === 1 ? (
+                            <Ruler size={15} className="text-[#FF9800] shrink-0" />
+                          ) : colIdx === 2 ? (
+                            <Package size={15} className="text-[#FF9800] shrink-0" />
+                          ) : (
+                            <Tag size={15} className="text-[#FF9800] shrink-0" />
+                          )}
+                          <span className="truncate">{colTitle}</span>
+                          <span className="text-gray-400 text-[11px] font-bold">({nodesInColumn.length})</span>
+                        </h3>
+                        {colIdx > 0 && parentNode && (
+                          <p className="text-[10px] text-gray-400 truncate mt-0.5">under {parentNode.name}</p>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => openAddNodeModal(colIdx)}
+                        disabled={!parentIsSelected && colIdx > 0}
+                        className="p-1.5 bg-[#FF9800] hover:bg-[#F57C00] disabled:bg-gray-200 disabled:cursor-not-allowed text-white rounded-lg transition-colors cursor-pointer shrink-0 shadow-xs"
+                        title={`Add item to ${colTitle}`}
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+
+                    {/* Column Content */}
+                    <div className="flex-1 space-y-2 overflow-y-auto max-h-[500px] pr-1">
+                      {!parentIsSelected && colIdx > 0 ? (
+                        <div className="py-16 text-center space-y-2 text-gray-400">
+                          <p className="text-xs font-bold">Select an item in Column {colIdx} first</p>
+                          <p className="text-[11px] opacity-70">
+                            Sub-categories in this column belong to the selected parent.
+                          </p>
+                        </div>
+                      ) : nodesInColumn.length === 0 ? (
+                        <div className="py-16 text-center space-y-2 text-gray-400">
+                          <p className="text-xs font-bold">No items added yet</p>
+                          <p className="text-[11px] opacity-70">
+                            Click <span className="font-bold text-[#FF9800]">+</span> above to add an item.
+                          </p>
+                        </div>
+                      ) : (
+                        nodesInColumn.map((item) => {
+                          const isSelected = selectedNodeId === item.id;
+                          const hasPrice = item.price !== undefined || item.salePrice !== undefined;
+                          const hasColors = item.colors && item.colors.length > 0;
+
+                          return (
+                            <div
+                              key={item.id}
+                              onClick={() => handleSelectCascadingNode(colIdx, item.id)}
+                              className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col gap-1.5 ${
+                                isSelected
+                                  ? "border-[#0D47A1] bg-[#0D47A1]/5 shadow-sm"
+                                  : "border-gray-100 hover:border-gray-300 bg-gray-50/40"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-[#0D47A1] truncate">
+                                  {item.name}
+                                </span>
+                                <div className="flex items-center gap-0.5 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditNodeModal(item);
+                                    }}
+                                    className="text-gray-300 hover:text-[#0D47A1] p-1"
+                                    title="Edit item"
+                                  >
+                                    <Pencil size={12} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteNode(item.id);
+                                    }}
+                                    className="text-gray-300 hover:text-red-500 p-1"
+                                    title="Delete item"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                  <ChevronRight
+                                    size={14}
+                                    className={isSelected ? "text-[#0D47A1]" : "text-gray-400"}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Pricing Display if configured */}
+                              {hasPrice && (
+                                <div className="flex items-center gap-2 text-xs font-bold text-[#0D47A1]">
+                                  <span>₹{item.salePrice || item.price}</span>
+                                  {item.salePrice && item.price && item.salePrice !== item.price && (
+                                    <span className="text-[10px] text-gray-400 line-through">
+                                      ₹{item.price}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Colors display if configured */}
+                              {hasColors && (
+                                <div className="flex flex-wrap gap-1 pt-1">
+                                  {item.colors!.map((c, cIdx) => {
+                                    const style = getCrmColorStyles(c);
+                                    return (
+                                      <span
+                                        key={cIdx}
+                                        style={{
+                                          backgroundColor: style.bg,
+                                          color: style.text,
+                                          borderColor: style.border,
+                                        }}
+                                        className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase border shadow-2xs"
+                                      >
+                                        {c}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* ==================== TAB 3: TAGS FORM GENERATOR (LEGACY) ================= */}
         {/* ========================================================================= */}
         {activeTab === "batch" && (
           <div className="space-y-6">
@@ -2582,6 +3360,589 @@ export default function ProductModal({
             </div>
           </div>
         )}
+
+        {/* ========================================================================= */}
+        {/* ==================== CASCADING NODE ADD/EDIT MODAL ====================== */}
+        {/* ========================================================================= */}
+        {nodeModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div
+              className="bg-white rounded-3xl shadow-2xl border border-gray-150 w-full max-w-lg overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="p-5 border-b border-gray-150 flex items-center justify-between bg-gray-50/60">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-[#FF9800]/10 border border-[#FF9800]/20 flex items-center justify-center text-[#FF9800]">
+                    {nodeModalLevel === 0 ? (
+                      <Award size={20} />
+                    ) : nodeModalLevel === 1 ? (
+                      <Ruler size={20} />
+                    ) : nodeModalLevel === 2 ? (
+                      <Package size={20} />
+                    ) : (
+                      <Tag size={20} />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-[#0D47A1]">
+                      {nodeEditingId ? "Edit Item" : "Add Item"} in{" "}
+                      {columnLabels[nodeModalLevel] || `Column ${nodeModalLevel + 1}`}
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      {nodeModalLevel === 0
+                        ? "Root category / brand level"
+                        : parentNodeForModal
+                        ? `Belongs under: ${parentNodeForModal.name}`
+                        : "Sub-category level"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNodeModalOpen(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Form Body */}
+              <form onSubmit={handleSaveNode} className="p-6 space-y-5">
+                {/* Item Name */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-600">
+                    Item Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={nodeName}
+                    onChange={(e) => setNodeName(e.target.value)}
+                    placeholder={
+                      nodeModalLevel === 0
+                        ? "e.g. Polycab, Finolex, Havells"
+                        : nodeModalLevel === 1
+                        ? "e.g. 180 mts, 90 mts, 45 mts"
+                        : nodeModalLevel === 2
+                        ? "e.g. FR, FRLS, ZHFR"
+                        : "e.g. 1.0 sqmm, 1.5 sqmm, 2.5 sqmm"
+                    }
+                    className="w-full px-4 py-2.5 bg-gray-50 rounded-xl text-sm font-semibold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#0D47A1]/20 focus:border-[#0D47A1]"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Pricing & Stock Fields (Optional, overrides price for this branch) */}
+                <div className="p-4 bg-gray-50/70 rounded-2xl border border-gray-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-[#0D47A1] flex items-center gap-1.5">
+                      <DollarSign size={14} className="text-[#FF9800]" />
+                      Branch Pricing & Stock (Optional)
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-medium">Applied to child variants</span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-500 mb-1">MRP Price (₹)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={nodePrice}
+                        onChange={(e) => setNodePrice(e.target.value)}
+                        placeholder="e.g. 2400"
+                        className="w-full px-3 py-2 bg-white rounded-xl text-xs font-bold text-gray-800 border border-gray-200 focus:outline-none focus:border-[#0D47A1]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-500 mb-1">Sale Price (₹)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={nodeSalePrice}
+                        onChange={(e) => setNodeSalePrice(e.target.value)}
+                        placeholder="e.g. 2250"
+                        className="w-full px-3 py-2 bg-white rounded-xl text-xs font-bold text-gray-800 border border-gray-200 focus:outline-none focus:border-[#0D47A1]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-500 mb-1">Default Stock</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={nodeStock}
+                        onChange={(e) => setNodeStock(e.target.value)}
+                        placeholder="100"
+                        className="w-full px-3 py-2 bg-white rounded-xl text-xs font-bold text-gray-800 border border-gray-200 focus:outline-none focus:border-[#0D47A1]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Color Chips Selector (For leaf specifications or color variants) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-600">
+                      Color Variants (Optional)
+                    </label>
+                    <span className="text-[11px] text-gray-400">
+                      {nodeColors.length} colors configured
+                    </span>
+                  </div>
+
+                  {/* Active Color Chips */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {nodeColors.map((c) => {
+                      const style = getCrmColorStyles(c);
+                      return (
+                        <span
+                          key={c}
+                          style={{
+                            backgroundColor: style.bg,
+                            color: style.text,
+                            borderColor: style.border,
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase border shadow-2xs"
+                        >
+                          <span>{c}</span>
+                          <button
+                            type="button"
+                            onClick={() => setNodeColors((prev) => prev.filter((item) => item !== c))}
+                            className="hover:opacity-75 cursor-pointer"
+                          >
+                            <X size={12} />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+
+                  {/* Quick Color Toggles & Custom Add */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={nodeColorInput}
+                      onChange={(e) => setNodeColorInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const val = nodeColorInput.trim().toUpperCase();
+                          if (val && !nodeColors.includes(val)) {
+                            setNodeColors((prev) => [...prev, val]);
+                            setNodeColorInput("");
+                          }
+                        }
+                      }}
+                      placeholder="Add color (e.g. GREY, ORANGE, WHITE)"
+                      className="flex-1 px-3 py-1.5 bg-gray-50 rounded-xl text-xs font-medium text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:border-[#0D47A1]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const val = nodeColorInput.trim().toUpperCase();
+                        if (val && !nodeColors.includes(val)) {
+                          setNodeColors((prev) => [...prev, val]);
+                          setNodeColorInput("");
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-[#0D47A1] hover:bg-[#0A3880] text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      + Add
+                    </button>
+                  </div>
+
+                  {/* Standard Color Suggestions */}
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {["RED", "YELLOW", "BLUE", "BLACK", "GREEN", "WHITE", "GREY"].map((preset) => {
+                      const isAdded = nodeColors.includes(preset);
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => {
+                            if (isAdded) {
+                              setNodeColors((prev) => prev.filter((c) => c !== preset));
+                            } else {
+                              setNodeColors((prev) => [...prev, preset]);
+                            }
+                          }}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-all cursor-pointer border ${
+                            isAdded
+                              ? "bg-gray-800 text-white border-gray-900 shadow-2xs"
+                              : "bg-gray-100 hover:bg-gray-200 text-gray-600 border-gray-200"
+                          }`}
+                        >
+                          {isAdded ? `✓ ${preset}` : `+ ${preset}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="pt-4 border-t border-gray-150 flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setNodeModalOpen(false)}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-[#FF9800] hover:bg-[#F57C00] text-white text-xs font-black rounded-xl transition-colors cursor-pointer shadow-md shadow-[#FF9800]/20 flex items-center gap-1.5"
+                  >
+                    <Check size={14} />
+                    <span>{nodeEditingId ? "Save Changes" : "Add Item"}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* ============== CASCADING COMBINATIONS REVIEW & CRM GENERATION =========== */}
+        {/* ========================================================================= */}
+        {cascadingPreviewOpen && (
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 lg:p-6">
+            <div
+              className="bg-white rounded-3xl shadow-2xl border border-gray-150 w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Top Header */}
+              <div className="p-6 border-b border-gray-150 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50/60 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-[#0D47A1]/10 border border-[#0D47A1]/20 flex items-center justify-center text-[#0D47A1] shrink-0">
+                    <Sparkles size={22} className="text-[#FF9800]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-black text-[#0D47A1]">
+                        Review & Generate Individual Products
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full bg-[#FF9800]/15 text-[#FF9800] border border-[#FF9800]/30 text-[11px] font-black">
+                        {cascadingGeneratedList.filter((p) => p.included).length} Ready
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Preview and fine-tune every combination compiled from your category drill-down before saving to CRM catalog.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCascadingPreviewOpen(false)}
+                    className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-200 transition-colors cursor-pointer"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Success Notification Banner */}
+              {cascadingSaveSuccess && (
+                <div className="p-4 bg-emerald-50 border-b border-emerald-200 flex items-center justify-between gap-3 shrink-0">
+                  <div className="flex items-center gap-2.5 text-emerald-800 text-xs font-bold">
+                    <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                    <span>{cascadingSaveSuccess}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCascadingPreviewOpen(false);
+                      onClose();
+                    }}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Done & Close
+                  </button>
+                </div>
+              )}
+
+              {/* Controls & Common Catalog Settings Bar */}
+              <div className="p-4 bg-white border-b border-gray-150 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                {/* Search & Bulk Selection */}
+                <div className="flex items-center gap-2 flex-1 min-w-[280px]">
+                  <div className="relative flex-1">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={cascadingSearch}
+                      onChange={(e) => setCascadingSearch(e.target.value)}
+                      placeholder="Search products by brand, length, spec, or color..."
+                      className="w-full pl-9 pr-8 py-2 bg-gray-50 rounded-xl text-xs font-medium text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:border-[#0D47A1]"
+                    />
+                    {cascadingSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setCascadingSearch("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSelectAllCascading(true)}
+                      className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSelectAllCascading(false)}
+                      className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+                    >
+                      Deselect
+                    </button>
+                  </div>
+                </div>
+
+                {/* Price percentage adjuster & Common Metadata */}
+                <div className="flex flex-wrap items-center gap-3 shrink-0">
+                  {/* Bulk % price adjustment */}
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      step="1"
+                      value={cascadingPriceAdjPercent}
+                      onChange={(e) => setCascadingPriceAdjPercent(e.target.value)}
+                      placeholder="± %"
+                      className="w-16 px-2 py-1.5 bg-gray-50 rounded-lg text-xs font-bold text-gray-800 border border-gray-200 focus:outline-none focus:border-[#0D47A1]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        applyCascadingPriceAdjustment(cascadingPriceAdjPercent);
+                        setCascadingPriceAdjPercent("");
+                      }}
+                      className="px-2.5 py-1.5 bg-[#0D47A1]/10 hover:bg-[#0D47A1]/20 text-[#0D47A1] text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                    >
+                      Apply % Price
+                    </button>
+                  </div>
+
+                  {/* Common Unit */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold uppercase text-gray-400">Unit:</span>
+                    <input
+                      type="text"
+                      value={cascadingUnit}
+                      onChange={(e) => setCascadingUnit(e.target.value)}
+                      placeholder="COILS"
+                      className="w-20 px-2 py-1 bg-gray-50 rounded-lg text-xs font-bold text-gray-800 border border-gray-200 focus:outline-none focus:border-[#0D47A1]"
+                    />
+                  </div>
+
+                  {/* Common HSN */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold uppercase text-gray-400">HSN:</span>
+                    <input
+                      type="text"
+                      value={cascadingHsn}
+                      onChange={(e) => setCascadingHsn(e.target.value)}
+                      placeholder="8544"
+                      className="w-20 px-2 py-1 bg-gray-50 rounded-lg text-xs font-bold text-gray-800 border border-gray-200 focus:outline-none focus:border-[#0D47A1]"
+                    />
+                  </div>
+
+                  {/* Common GST */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold uppercase text-gray-400">GST %:</span>
+                    <input
+                      type="number"
+                      value={cascadingGst}
+                      onChange={(e) => setCascadingGst(e.target.value)}
+                      placeholder="18"
+                      className="w-16 px-2 py-1 bg-gray-50 rounded-lg text-xs font-bold text-gray-800 border border-gray-200 focus:outline-none focus:border-[#0D47A1]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Scrollable Products Table / Matrix */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                {filteredCascadingProducts.length === 0 ? (
+                  <div className="py-20 text-center text-gray-400 space-y-2">
+                    <p className="text-sm font-bold">No combinations found</p>
+                    <p className="text-xs">Try clearing your search or add items to your cascading tree columns.</p>
+                  </div>
+                ) : (
+                  filteredCascadingProducts.map((p) => {
+                    const colorStyle = p.color ? getCrmColorStyles(p.color) : null;
+                    return (
+                      <div
+                        key={p.id}
+                        className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                          p.included
+                            ? "bg-white border-gray-200 shadow-2xs hover:border-[#0D47A1]/40"
+                            : "bg-gray-50/70 border-gray-150 opacity-60"
+                        }`}
+                      >
+                        {/* Checkbox and Product Details */}
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <input
+                            type="checkbox"
+                            checked={p.included}
+                            onChange={() => handleToggleCascadingRow(p.id)}
+                            className="w-4 h-4 rounded accent-[#FF9800] cursor-pointer shrink-0"
+                          />
+
+                          <div className="min-w-0 flex-1">
+                            {/* Editable Name */}
+                            <input
+                              type="text"
+                              value={p.name}
+                              onChange={(e) => handleUpdateCascadingRowName(p.id, e.target.value)}
+                              className="w-full bg-transparent hover:bg-gray-50 focus:bg-white text-xs font-bold text-[#0D47A1] rounded px-1.5 py-0.5 border border-transparent focus:border-[#0D47A1] focus:outline-none transition-all"
+                            />
+
+                            {/* Hierarchy Path Badges */}
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1 px-1.5">
+                              {p.hierarchy.map((seg, sIdx) => (
+                                <span
+                                  key={sIdx}
+                                  className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 border border-gray-200"
+                                >
+                                  {seg}
+                                </span>
+                              ))}
+
+                              {/* Color Pill */}
+                              {p.color && colorStyle && (
+                                <span
+                                  style={{
+                                    backgroundColor: colorStyle.bg,
+                                    color: colorStyle.text,
+                                    borderColor: colorStyle.border,
+                                  }}
+                                  className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase border shadow-2xs"
+                                >
+                                  {p.color}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Price & Action */}
+                        <div className="flex items-center gap-3 shrink-0 self-end sm:self-center pl-7 sm:pl-0">
+                          {/* MRP Price */}
+                          <div className="w-24 relative">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={p.price}
+                              onChange={(e) =>
+                                handleUpdateCascadingRowPrice(
+                                  p.id,
+                                  parseFloat(e.target.value) || 0,
+                                  p.salePrice
+                                )
+                              }
+                              placeholder="MRP"
+                              className="w-full pl-5 pr-2 py-1.5 bg-gray-50 rounded-xl text-xs font-bold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:border-[#0D47A1]"
+                            />
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
+                              ₹
+                            </span>
+                          </div>
+
+                          {/* Sale Price */}
+                          <div className="w-24 relative">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={p.salePrice}
+                              onChange={(e) =>
+                                handleUpdateCascadingRowPrice(
+                                  p.id,
+                                  p.price,
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
+                              placeholder="Sale"
+                              className="w-full pl-5 pr-2 py-1.5 bg-gray-50 rounded-xl text-xs font-bold text-[#FF9800] border border-gray-200 focus:outline-none focus:bg-white focus:border-[#FF9800]"
+                            />
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#FF9800] text-xs font-bold">
+                              ₹
+                            </span>
+                          </div>
+
+                          {/* Delete Combination */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCascadingGeneratedList((prev) => prev.filter((item) => item.id !== p.id))
+                            }
+                            className="p-1.5 text-gray-300 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Remove combination"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Bottom Summary & Generate Action */}
+              <div className="p-5 border-t border-gray-150 bg-gray-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
+                <div className="text-xs text-gray-600">
+                  Ready to create{" "}
+                  <strong className="text-[#0D47A1] font-bold">
+                    {cascadingGeneratedList.filter((p) => p.included).length}
+                  </strong>{" "}
+                  of {cascadingGeneratedList.length} combinations as individual products in your commercial catalog.
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCascadingPreviewOpen(false)}
+                    className="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveCascadingProductsToCrm}
+                    disabled={isCascadingSaving || cascadingGeneratedList.filter((p) => p.included).length === 0}
+                    className="px-6 py-2.5 bg-[#FF9800] hover:bg-[#F57C00] disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-black text-xs shadow-lg shadow-[#FF9800]/25 hover:shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isCascadingSaving ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin" />
+                        <span>Creating in CRM...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={15} />
+                        <span>
+                          Create {cascadingGeneratedList.filter((p) => p.included).length} Products in CRM
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
     </div>
   );
