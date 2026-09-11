@@ -291,11 +291,13 @@ export default function ProductModal({
   // ================= CASCADING MULTI-COLUMN TREE STATE =================
   const [cascadingNodes, setCascadingNodes] = useState<CascadingNode[]>(DEFAULT_CASCADING_NODES);
   const [columnLabels, setColumnLabels] = useState<string[]>([
-    "1. BRANDS (MAIN)",
-    "2. LENGTHS / TYPES",
-    "3. MODELS / GRADES",
-    "4. SPECS & PRICES",
+    "Main Category",
+    "Sub Category",
+    "Sub Category",
+    "Sub Category",
   ]);
+  const [editingColIdx, setEditingColIdx] = useState<number | null>(null);
+  const [editingColName, setEditingColName] = useState("");
   const [selectedPath, setSelectedPath] = useState<Record<number, string | null>>({
     0: "brand-1",
     1: "len-1",
@@ -561,15 +563,61 @@ export default function ProductModal({
     });
   };
 
+  const startEditingColumn = (idx: number) => {
+    setEditingColIdx(idx);
+    setEditingColName(columnLabels[idx] || (idx === 0 ? "Main Category" : "Sub Category"));
+  };
+
+  const saveEditingColumn = () => {
+    if (editingColIdx !== null) {
+      const trimmed = editingColName.trim();
+      if (trimmed) {
+        setColumnLabels((prev) =>
+          prev.map((c, i) => (i === editingColIdx ? trimmed : c))
+        );
+      }
+      setEditingColIdx(null);
+    }
+  };
+
   const handleAddColumn = () => {
-    const nextIdx = columnLabels.length + 1;
-    setColumnLabels((prev) => [...prev, `${nextIdx}. SUB-CATEGORIES`]);
+    setColumnLabels((prev) => [...prev, "Sub Category"]);
+  };
+
+  const handleRemoveColumn = (colIdxToRemove: number) => {
+    if (columnLabels.length <= 1) {
+      alert("You must have at least one Category column.");
+      return;
+    }
+
+    const nodesToDelete = cascadingNodes.filter((n) => n.levelIndex >= colIdxToRemove);
+    if (nodesToDelete.length > 0) {
+      if (
+        !confirm(
+          `Removing this column will also delete ${nodesToDelete.length} item(s) in this and subsequent columns. Continue?`
+        )
+      ) {
+        return;
+      }
+    }
+
+    setCascadingNodes((prev) => prev.filter((n) => n.levelIndex < colIdxToRemove));
+    setSelectedPath((prev) => {
+      const next = { ...prev };
+      for (let k = colIdxToRemove; k < 20; k++) {
+        delete next[k];
+      }
+      return next;
+    });
+
+    setColumnLabels((prev) => prev.filter((_, idx) => idx !== colIdxToRemove));
   };
 
   const handleResetToTemplate = () => {
     if (confirm("Reset to sample Polycab & Finolex catalog tree template?")) {
       setCascadingNodes(DEFAULT_CASCADING_NODES);
       setSelectedPath({ 0: "brand-1", 1: "len-1", 2: "mod-2" });
+      setColumnLabels(["Main Category", "Sub Category", "Sub Category", "Sub Category"]);
     }
   };
 
@@ -577,6 +625,7 @@ export default function ProductModal({
     if (confirm("Clear all categories and start with an empty catalog?")) {
       setCascadingNodes([]);
       setSelectedPath({});
+      setColumnLabels(["Main Category", "Sub Category", "Sub Category", "Sub Category"]);
     }
   };
 
@@ -2060,7 +2109,7 @@ export default function ProductModal({
                             : "bg-gray-100 text-gray-400 border border-gray-200"
                         }`}
                       >
-                        {selectedNode ? selectedNode.name : `Level ${idx + 1} (None)`}
+                        {selectedNode ? selectedNode.name : (idx === 0 ? "Main Category" : "Sub Category")}
                       </span>
                     </React.Fragment>
                   );
@@ -2068,7 +2117,7 @@ export default function ProductModal({
               </div>
             </div>
 
-            {/* 4-Column Interactive Hierarchy Flow */}
+            {/* Interactive Hierarchy Flow */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 items-start">
               {columnLabels.map((colTitle, colIdx) => {
                 let nodesInColumn: CascadingNode[] = [];
@@ -2096,34 +2145,76 @@ export default function ProductModal({
                   >
                     {/* Column Header */}
                     <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                      <div className="min-w-0 pr-2">
-                        <h3 className="text-xs font-black uppercase tracking-wider text-[#0D47A1] flex items-center gap-1.5 truncate">
-                          {colIdx === 0 ? (
-                            <Award size={15} className="text-[#FF9800] shrink-0" />
-                          ) : colIdx === 1 ? (
-                            <Ruler size={15} className="text-[#FF9800] shrink-0" />
-                          ) : colIdx === 2 ? (
-                            <Package size={15} className="text-[#FF9800] shrink-0" />
-                          ) : (
-                            <Tag size={15} className="text-[#FF9800] shrink-0" />
-                          )}
-                          <span className="truncate">{colTitle}</span>
-                          <span className="text-gray-400 text-[11px] font-bold">({nodesInColumn.length})</span>
-                        </h3>
+                      <div className="min-w-0 pr-2 flex-1">
+                        {editingColIdx === colIdx ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={editingColName}
+                              onChange={(e) => setEditingColName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveEditingColumn();
+                                if (e.key === "Escape") setEditingColIdx(null);
+                              }}
+                              className="w-full px-2 py-0.5 text-xs font-bold text-[#0D47A1] bg-gray-50 border border-[#0D47A1] rounded focus:outline-none"
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              onClick={saveEditingColumn}
+                              className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
+                              title="Save column title"
+                            >
+                              <Check size={13} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 group">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-[#0D47A1] flex items-center gap-1.5 truncate">
+                              {colIdx === 0 ? (
+                                <Layers size={15} className="text-[#FF9800] shrink-0" />
+                              ) : (
+                                <Tag size={15} className="text-[#FF9800] shrink-0" />
+                              )}
+                              <span className="truncate">{colTitle}</span>
+                              <span className="text-gray-400 text-[11px] font-bold">({nodesInColumn.length})</span>
+                            </h3>
+                            <button
+                              type="button"
+                              onClick={() => startEditingColumn(colIdx)}
+                              className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-[#0D47A1] p-0.5 transition-opacity cursor-pointer"
+                              title="Rename column"
+                            >
+                              <Pencil size={11} />
+                            </button>
+                          </div>
+                        )}
                         {colIdx > 0 && parentNode && (
                           <p className="text-[10px] text-gray-400 truncate mt-0.5">under {parentNode.name}</p>
                         )}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => openAddNodeModal(colIdx)}
-                        disabled={!parentIsSelected && colIdx > 0}
-                        className="p-1.5 bg-[#FF9800] hover:bg-[#F57C00] disabled:bg-gray-200 disabled:cursor-not-allowed text-white rounded-lg transition-colors cursor-pointer shrink-0 shadow-xs"
-                        title={`Add item to ${colTitle}`}
-                      >
-                        <Plus size={14} />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {colIdx > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveColumn(colIdx)}
+                            className="p-1.5 text-gray-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title={`Remove this ${colTitle} column`}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => openAddNodeModal(colIdx)}
+                          disabled={!parentIsSelected && colIdx > 0}
+                          className="p-1.5 bg-[#FF9800] hover:bg-[#F57C00] disabled:bg-gray-200 disabled:cursor-not-allowed text-white rounded-lg transition-colors cursor-pointer shrink-0 shadow-xs"
+                          title={`Add item to ${colTitle}`}
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Column Content */}
@@ -3375,11 +3466,7 @@ export default function ProductModal({
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-[#FF9800]/10 border border-[#FF9800]/20 flex items-center justify-center text-[#FF9800]">
                     {nodeModalLevel === 0 ? (
-                      <Award size={20} />
-                    ) : nodeModalLevel === 1 ? (
-                      <Ruler size={20} />
-                    ) : nodeModalLevel === 2 ? (
-                      <Package size={20} />
+                      <Layers size={20} />
                     ) : (
                       <Tag size={20} />
                     )}
@@ -3387,11 +3474,11 @@ export default function ProductModal({
                   <div>
                     <h3 className="text-base font-black text-[#0D47A1]">
                       {nodeEditingId ? "Edit Item" : "Add Item"} in{" "}
-                      {columnLabels[nodeModalLevel] || `Column ${nodeModalLevel + 1}`}
+                      {columnLabels[nodeModalLevel] || (nodeModalLevel === 0 ? "Main Category" : "Sub Category")}
                     </h3>
                     <p className="text-xs text-gray-500">
                       {nodeModalLevel === 0
-                        ? "Root category / brand level"
+                        ? "Main category level"
                         : parentNodeForModal
                         ? `Belongs under: ${parentNodeForModal.name}`
                         : "Sub-category level"}
@@ -3421,12 +3508,8 @@ export default function ProductModal({
                     onChange={(e) => setNodeName(e.target.value)}
                     placeholder={
                       nodeModalLevel === 0
-                        ? "e.g. Polycab, Finolex, Havells"
-                        : nodeModalLevel === 1
-                        ? "e.g. 180 mts, 90 mts, 45 mts"
-                        : nodeModalLevel === 2
-                        ? "e.g. FR, FRLS, ZHFR"
-                        : "e.g. 1.0 sqmm, 1.5 sqmm, 2.5 sqmm"
+                        ? "e.g. Finolex, Polycab, Havells"
+                        : "e.g. Wires, Pipes, 180 mts, 90 mts, FR, 1.0 sqmm..."
                     }
                     className="w-full px-4 py-2.5 bg-gray-50 rounded-xl text-sm font-semibold text-gray-900 border border-gray-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#0D47A1]/20 focus:border-[#0D47A1]"
                     autoFocus
