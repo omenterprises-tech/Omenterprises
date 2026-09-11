@@ -166,38 +166,6 @@ function applyPriceToDescendantLeaves(root: TreeNode, nodeId: string, price: str
   };
 }
 
-// Copy children from source to target
-function copyChildrenBetweenNodes(root: TreeNode, sourceNodeId: string, targetNodeId: string): TreeNode {
-  const sourceNode = findNodeInTree(root, sourceNodeId);
-  if (!sourceNode || !sourceNode.children || sourceNode.children.length === 0) return root;
-
-  const clonedChildren = sourceNode.children.map(deepCloneWithNewIds);
-
-  function insertCloned(node: TreeNode): TreeNode {
-    if (node.id === targetNodeId) {
-      const existingNames = new Set((node.children || []).map((c) => c.name.toLowerCase().trim()));
-      const combined = [...(node.children || [])];
-      clonedChildren.forEach((child) => {
-        if (!existingNames.has(child.name.toLowerCase().trim())) {
-          existingNames.add(child.name.toLowerCase().trim());
-          combined.push(child);
-        }
-      });
-      return {
-        ...node,
-        price: undefined,
-        children: combined,
-      };
-    }
-    return {
-      ...node,
-      children: (node.children || []).map(insertCloned),
-    };
-  }
-
-  return insertCloned(root);
-}
-
 // Count total leaf nodes under a node
 function countLeafNodes(node: TreeNode): number {
   if (!node.children || node.children.length === 0) return 1;
@@ -319,8 +287,6 @@ export default function ProductModal({
   const [activeDrillDownId, setActiveDrillDownId] = useState<string>("root");
   const [drillDownInput, setDrillDownInput] = useState<string>("");
   const [bulkBranchPriceInput, setBulkBranchPriceInput] = useState<string>("");
-  const [copySourceNodeId, setCopySourceNodeId] = useState<string>("");
-  const [showCopyBranchModal, setShowCopyBranchModal] = useState<boolean>(false);
   const [treeSearchQuery, setTreeSearchQuery] = useState<string>("");
   const [treeExpandedNodes, setTreeExpandedNodes] = useState<Record<string, boolean>>({
     root: true,
@@ -397,14 +363,6 @@ export default function ProductModal({
     showLocalToast(`Applied ₹${priceVal} to all leaf products under "${activeDrillDownNode.name}"!`);
   };
 
-  const handleCopyChildren = (sourceId: string, targetId: string) => {
-    setTreeRoot((prev) => copyChildrenBetweenNodes(prev, sourceId, targetId));
-    setShowCopyBranchModal(false);
-    setCopySourceNodeId("");
-    showLocalToast("Copied specifications successfully!");
-  };
-
-
   const handleClearTree = () => {
     setTreeRoot({
       id: "root",
@@ -414,28 +372,6 @@ export default function ProductModal({
     setActiveDrillDownId("root");
     showLocalToast("Started fresh with an empty category tree!");
   };
-
-  const nodesWithChildren = useMemo(() => {
-    const list: { id: string; name: string; pathStr: string; count: number }[] = [];
-    function scan(node: TreeNode, path: string[]) {
-      const currentPath = [...path, node.name];
-      if (node.children && node.children.length > 0) {
-        if (node.id !== activeDrillDownNode.id) {
-          list.push({
-            id: node.id,
-            name: node.name,
-            pathStr: currentPath.join(" > "),
-            count: node.children.length,
-          });
-        }
-        for (const child of node.children) {
-          scan(child, currentPath);
-        }
-      }
-    }
-    scan(treeRoot, []);
-    return list;
-  }, [treeRoot, activeDrillDownNode.id]);
 
   // Unlimited dynamic sub-category levels
   const [subCategoryLevels, setSubCategoryLevels] = useState<CategoryLevel[]>([
@@ -1947,36 +1883,6 @@ export default function ProductModal({
                     ))}
                   </div>
                 </div>
-
-                {/* Replicate / Copy tool helper */}
-                {nodesWithChildren.length > 0 && (
-                  <div className="flex items-center space-x-2 p-2.5 bg-blue-50/60 rounded-xl border border-blue-100 text-xs">
-                    <Copy size={13} className="text-brand shrink-0" />
-                    <span className="text-gray-600 font-semibold text-[11px] shrink-0">
-                      Copy sub-categories from:
-                    </span>
-                    <select
-                      value={copySourceNodeId}
-                      onChange={(e) => setCopySourceNodeId(e.target.value)}
-                      className="px-2.5 py-1 bg-white rounded-lg text-xs font-bold text-gray-800 border border-blue-200 flex-1 max-w-xs focus:outline-none"
-                    >
-                      <option value="">-- Choose a branch --</option>
-                      {nodesWithChildren.map((src) => (
-                        <option key={src.id} value={src.id}>
-                          {src.pathStr} ({src.count} items)
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={!copySourceNodeId}
-                      onClick={() => handleCopyChildren(copySourceNodeId, activeDrillDownNode.id)}
-                      className="px-3 py-1 bg-brand text-white text-xs font-bold rounded-lg hover:bg-brand-hover disabled:opacity-40 cursor-pointer"
-                    >
-                      Copy Here
-                    </button>
-                  </div>
-                )}
 
                 {/* Active Category Children or Leaf Pricing */}
                 {activeDrillDownNode.children.length === 0 ? (
