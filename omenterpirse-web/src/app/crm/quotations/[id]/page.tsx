@@ -273,6 +273,87 @@ export default function QuotationDetailPage({
             sheet.style.border = "none";
             sheet.style.boxShadow = "none";
             sheet.style.backgroundColor = "#ffffff";
+            sheet.style.color = "#111827";
+
+            // Inject explicit fallback stylesheet ensuring all classes have solid hex colors (preventing oklch transparent text bug)
+            const fallbackStyle = clonedDoc.createElement("style");
+            fallbackStyle.textContent = `
+              #quotation-sheet, #quotation-sheet * {
+                box-sizing: border-box !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              #quotation-sheet {
+                color: #111827 !important;
+                background-color: #ffffff !important;
+              }
+              #quotation-sheet [class*="text-gray-900"],
+              #quotation-sheet [class*="text-slate-900"] { color: #111827 !important; }
+              #quotation-sheet [class*="text-gray-800"],
+              #quotation-sheet [class*="text-slate-800"] { color: #1F2937 !important; }
+              #quotation-sheet [class*="text-gray-700"],
+              #quotation-sheet [class*="text-slate-700"] { color: #374151 !important; }
+              #quotation-sheet [class*="text-gray-600"],
+              #quotation-sheet [class*="text-slate-600"] { color: #4B5563 !important; }
+              #quotation-sheet [class*="text-gray-500"],
+              #quotation-sheet [class*="text-slate-500"] { color: #6B7280 !important; }
+              #quotation-sheet [class*="text-gray-400"],
+              #quotation-sheet [class*="text-slate-400"] { color: #9CA3AF !important; }
+              #quotation-sheet [class*="text-brand"] { color: #0D47A1 !important; }
+              #quotation-sheet [class*="bg-brand"] { background-color: #0D47A1 !important; color: #ffffff !important; }
+              #quotation-sheet [class*="bg-gray-100"] { background-color: #F3F4F6 !important; }
+              #quotation-sheet [class*="bg-gray-50"] { background-color: #F9FAFB !important; }
+              #quotation-sheet [class*="bg-blue-50"] { background-color: #EFF6FF !important; }
+              #quotation-sheet [class*="border-gray-100"] { border-color: #F3F4F6 !important; }
+              #quotation-sheet [class*="border-gray-200"] { border-color: #E5E7EB !important; }
+              #quotation-sheet [class*="border-gray-300"] { border-color: #D1D5DB !important; }
+              #quotation-sheet [class*="border-gray-400"] { border-color: #9CA3AF !important; }
+              #quotation-sheet [class*="border-gray-900"] { border-color: #111827 !important; }
+              #quotation-sheet [class*="divide-gray-200"] > * + * { border-color: #E5E7EB !important; }
+              #quotation-sheet table { border-collapse: collapse !important; width: 100% !important; }
+              #quotation-sheet th, #quotation-sheet td { visibility: visible !important; opacity: 1 !important; }
+            `;
+            clonedDoc.head.appendChild(fallbackStyle);
+
+            // Directly sanitize any computed styles containing oklch
+            try {
+              const allEls = sheet.querySelectorAll("*");
+              const canvasHelper = clonedDoc.createElement("canvas");
+              const ctxHelper = canvasHelper.getContext("2d");
+
+              allEls.forEach((node) => {
+                const el = node as HTMLElement;
+                const win = clonedDoc.defaultView || window;
+                const comp = win.getComputedStyle(el);
+
+                const resolveColor = (c: string, fallback: string): string => {
+                  if (!c) return fallback;
+                  if (c.includes("oklch") || c.includes("color(")) {
+                    if (ctxHelper) {
+                      try {
+                        ctxHelper.fillStyle = c;
+                        const res = ctxHelper.fillStyle;
+                        if (res && res !== "#000000" && !res.includes("oklch")) return res;
+                      } catch (e) {}
+                    }
+                    return fallback;
+                  }
+                  return c;
+                };
+
+                if (comp.color && (comp.color.includes("oklch") || comp.color.includes("color("))) {
+                  el.style.color = resolveColor(comp.color, "#111827");
+                }
+                if (comp.backgroundColor && (comp.backgroundColor.includes("oklch") || comp.backgroundColor.includes("color("))) {
+                  el.style.backgroundColor = resolveColor(comp.backgroundColor, "transparent");
+                }
+                if (comp.borderColor && (comp.borderColor.includes("oklch") || comp.borderColor.includes("color("))) {
+                  el.style.borderColor = resolveColor(comp.borderColor, "#E5E7EB");
+                }
+              });
+            } catch (err) {
+              console.warn("Color sanitization warning:", err);
+            }
           }
         },
       });
@@ -283,15 +364,15 @@ export default function QuotationDetailPage({
       const imgHeight = (canvas.height * pdfWidth) / canvas.width;
 
       // 1. Single-page document: fits within or near standard A4 height
-      if (imgHeight <= pdfHeight * 1.1) {
-        const pageHeight = Math.min(imgHeight, pdfHeight);
+      if (imgHeight <= pdfHeight * 1.15) {
         const pdf = new jsPDF({
           orientation: "portrait",
           unit: "mm",
-          format: [pdfWidth, pageHeight],
+          format: "a4",
         });
 
-        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pageHeight);
+        const drawHeight = Math.min(imgHeight, pdfHeight);
+        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, drawHeight);
         return pdf.output("blob");
       }
 
@@ -308,8 +389,6 @@ export default function QuotationDetailPage({
       pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
       heightLeft -= pdfHeight;
 
-      // Only add a new page if the leftover content is substantial (> 25mm),
-      // preventing accidental blank pages caused by trailing whitespace or padding
       while (heightLeft > 25) {
         position -= pdfHeight;
         pdf.addPage();
@@ -351,12 +430,12 @@ export default function QuotationDetailPage({
         const file = new File([blob], fileName, { type: "application/pdf" });
 
         // If device supports sharing files directly (e.g. mobile devices, Safari, Edge)
+        // Only share the complete PDF file without any accompanying text message
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({
               files: [file],
               title: `Quotation ${quotation.quotationNumber}`,
-              text: `Please find attached quotation ${quotation.quotationNumber} for amount ₹${Number(quotation.grandTotal).toLocaleString("en-IN")}.`,
             });
             setIsGeneratingPdf(false);
             return;
@@ -417,12 +496,10 @@ export default function QuotationDetailPage({
       const cleanDigits = targetRaw?.replace(/[^0-9]/g, "") || "";
       const finalPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
 
-      const customerLabel = quotation.customerName ? ` ${quotation.customerName}` : "";
-      const msg = `Hello${customerLabel}, please find attached Quotation ${quotation.quotationNumber} for ₹${Number(quotation.grandTotal).toLocaleString("en-IN")} from ${business?.businessName || "OM Enterprises"}.`;
-
+      // Open WhatsApp directly without any prefilled text message per user requirement
       const waUrl = finalPhone
-        ? `https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(msg)}`
-        : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+        ? `https://api.whatsapp.com/send?phone=${finalPhone}`
+        : `https://api.whatsapp.com/send`;
 
       window.open(waUrl, "_blank");
     } catch (err) {
