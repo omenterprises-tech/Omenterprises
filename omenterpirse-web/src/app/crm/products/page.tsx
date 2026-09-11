@@ -315,9 +315,6 @@ export default function CrmProductsPage() {
                                 {group.products.length} {group.products.length === 1 ? "Product" : "Products"}
                               </span>
                             </div>
-                            <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
-                              Sorted A → Z
-                            </span>
                           </div>
                         </td>
                       </tr>
