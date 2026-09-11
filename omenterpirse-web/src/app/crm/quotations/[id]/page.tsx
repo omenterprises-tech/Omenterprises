@@ -438,10 +438,13 @@ export default function QuotationDetailPage({
               title: `Quotation ${quotation.quotationNumber}`,
             });
             setIsGeneratingPdf(false);
+            setIsShareModalOpen(false);
+            showToast("Quotation PDF shared successfully!");
             return;
           } catch (shareErr: any) {
+            setIsGeneratingPdf(false);
+            setIsShareModalOpen(false);
             if (shareErr?.name === "AbortError") {
-              setIsGeneratingPdf(false);
               return;
             }
           }
