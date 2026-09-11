@@ -8,24 +8,27 @@ import {
   Package, 
   Plus, 
   Trash2, 
-  Pencil,
+  Pencil, 
   Check, 
   X, 
   RefreshCw, 
   ChevronRight, 
   Sparkles, 
   Tag, 
-  DollarSign,
-  AlertTriangle,
-  Grid,
-  Loader2,
-  ExternalLink,
-  Search,
-  CheckSquare,
-  Square,
-  ArrowRight,
-  SlidersHorizontal,
-  CheckCircle2
+  DollarSign, 
+  AlertTriangle, 
+  Grid, 
+  Loader2, 
+  ExternalLink, 
+  Search, 
+  CheckSquare, 
+  Square, 
+  ArrowRight, 
+  SlidersHorizontal, 
+  CheckCircle2,
+  FolderPlus,
+  Settings,
+  MoreVertical
 } from "lucide-react";
 
 function getColorStyles(colorName: string) {
@@ -43,66 +46,44 @@ function getColorStyles(colorName: string) {
     pink: { bg: "#EC4899", text: "#FFFFFF", border: "#DB2777" },
     purple: { bg: "#8B5CF6", text: "#FFFFFF", border: "#7C3AED" },
     brown: { bg: "#78350F", text: "#FFFFFF", border: "#451A03" },
+    ivory: { bg: "#FFFFF0", text: "#374151", border: "#E5E7EB" },
   };
   return colorMap[name] || { bg: "#E5E7EB", text: "#374151", border: "#D1D5DB" };
 }
 
-type Category = {
+export type Category = {
   id: number;
   name: string;
   slug: string;
-};
-
-type Variation = {
-  id: number;
-  modelId?: number | null;
-  brandId?: number | null;
-  thickness?: string | null;
-  colors: string; // JSON string
-  price: number;
-  salePrice?: number | null;
-  stock: number;
-  isActive: boolean;
-};
-
-type BrandModel = {
-  id: number;
-  brandLengthId?: number | null;
-  brandId?: number | null;
-  name: string;
-  description?: string | null;
-  isActive: boolean;
-  variations: Variation[];
-};
-
-type BrandLength = {
-  id: number;
-  brandId: number;
-  lengthInMeters: number;
-  isActive: boolean;
-  models: BrandModel[];
-};
-
-type Brand = {
-  id: number;
-  name: string;
-  category: string;
   imageUrl?: string | null;
-  displayOrder: number;
-  isActive: boolean;
-  lengths: BrandLength[];
-  directModels?: BrandModel[];
-  directVariations?: Variation[];
+  displayOrder?: number;
+  isActive?: boolean;
+  tagline?: string | null;
+  levelNames?: string | null; // JSON string array of column titles, e.g. ["Brands", "Lengths", "Models", "Specs & Prices"]
+};
+
+export type CatalogNode = {
+  id: number;
+  categoryId: number;
+  parentId: number | null;
+  levelIndex: number;
+  name: string;
+  imageUrl?: string | null;
+  description?: string | null;
+  price?: number | null;
+  salePrice?: number | null;
+  stock?: number | null;
+  colors?: string | null; // JSON array string
+  specKey?: string | null;
+  displayOrder?: number;
+  isActive?: boolean;
 };
 
 export type CombinationRow = {
   id: string;
   brand: string;
   category: string;
-  length?: string;
-  model?: string;
-  thickness?: string;
-  color?: string;
+  pathNames: string[];
   name: string;
   basePrice: number;
   salePrice: number;
@@ -112,83 +93,68 @@ export type CombinationRow = {
   gst: number;
   included: boolean;
   imageUrl?: string | null;
+  color?: string;
 };
 
 export default function MasterCatalogPage() {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [catalog, setCatalog] = useState<Brand[]>([]);
+  const [nodes, setNodes] = useState<CatalogNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Current Selections for step-by-step editing
+  // Selected Category
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
-  const [selectedLengthId, setSelectedLengthId] = useState<number | null>(null);
-  const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
 
-  // Modal / Form state
-  const [activeModal, setActiveModal] = useState<"brand" | "length" | "model" | "variation" | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  // Selected Path: array of node IDs selected at each level
+  // selectedPath[0] = selected ID at Level 0, selectedPath[1] = selected ID at Level 1, etc.
+  const [selectedPath, setSelectedPath] = useState<(number | null)[]>([]);
 
-  // Combination Generator Modal state
+  // Category Modal (Add / Edit)
+  const [categoryModalMode, setCategoryModalMode] = useState<"add" | "edit" | null>(null);
+  const [catNameInput, setCatNameInput] = useState("");
+  const [catImageInput, setCatImageInput] = useState("");
+  const [catLevelsInput, setCatLevelsInput] = useState<string[]>(["Brands", "Types", "Specs & Prices"]);
+  const [isCategoryUploading, setIsCategoryUploading] = useState(false);
+
+  // Column Rename Modal
+  const [renamingColIdx, setRenamingColIdx] = useState<number | null>(null);
+  const [renamingColValue, setRenamingColValue] = useState("");
+
+  // Node Add / Edit Modal
+  const [nodeModalConfig, setNodeModalConfig] = useState<{
+    levelIndex: number;
+    parentId: number | null;
+    isLeaf: boolean;
+    editingNode: CatalogNode | null;
+  } | null>(null);
+
+  const [nodeNameInput, setNodeNameInput] = useState("");
+  const [nodeImageInput, setNodeImageInput] = useState("");
+  const [nodeDescInput, setNodeDescInput] = useState("");
+  const [nodePriceInput, setNodePriceInput] = useState("");
+  const [nodeSalePriceInput, setNodeSalePriceInput] = useState("");
+  const [nodeStockInput, setNodeStockInput] = useState("100");
+  const [nodeColors, setNodeColors] = useState<string[]>(["Red", "Yellow", "Blue", "Black", "Green"]);
+  const [colorTagInput, setColorTagInput] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Combination Generator Modal State
   const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
-  const [generatorScope, setGeneratorScope] = useState<"category" | "brand">("category");
+  const [generatorScope, setGeneratorScope] = useState<"category" | "selected">("category");
   const [includeCategoryInName, setIncludeCategoryInName] = useState(false);
   const [reverseNameOrder, setReverseNameOrder] = useState(false);
   const [globalUnit, setGlobalUnit] = useState("COILS");
   const [globalHsn, setGlobalHsn] = useState("8544");
   const [globalGst, setGlobalGst] = useState("18");
   const [generatorSearch, setGeneratorSearch] = useState("");
-  const [generatorBrandFilter, setGeneratorBrandFilter] = useState("all");
   const [generatedProducts, setGeneratedProducts] = useState<CombinationRow[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationSummary, setGenerationSummary] = useState<{ created: number; updated: number; total: number } | null>(null);
   const [priceAdjPercent, setPriceAdjPercent] = useState("");
   const [priceAdjAmount, setPriceAdjAmount] = useState("");
 
-  const [newBrandName, setNewBrandName] = useState("");
-  const [newBrandImage, setNewBrandImage] = useState("");
-  const [newLength, setNewLength] = useState("");
-  const [newModelName, setNewModelName] = useState("");
-  const [newModelDesc, setNewModelDesc] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
-
-  const handleBrandImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    const data = new FormData();
-    data.append("file", file);
-
-    try {
-      const res = await fetch("/api/admin/upload", {
-        method: "POST",
-        body: data,
-      });
-      const result = await res.json();
-      if (result.url) {
-        setNewBrandImage(result.url);
-      } else {
-        alert(result.error || "Failed to upload image");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Error uploading image");
-    } finally {
-      setIsUploading(false);
-    }
-  };
-  
-  // Variation Form Fields
-  const [varThickness, setVarThickness] = useState("");
-  const [varColors, setVarColors] = useState<string[]>(["Red", "Yellow", "Blue", "Black", "Green"]);
-  const [colorInput, setColorInput] = useState("");
-  const [varPrice, setVarPrice] = useState("");
-  const [varSalePrice, setVarSalePrice] = useState("");
-  const [varStock, setVarStock] = useState("100");
-
+  // ── Fetch Catalog Data ──────────────────────────────────────
   const fetchCatalog = async () => {
     setLoading(true);
     setError("");
@@ -197,7 +163,7 @@ export default function MasterCatalogPage() {
       if (res.ok) {
         const data = await res.json();
         setCategories(data.categories || []);
-        setCatalog(data.catalog || []);
+        setNodes(data.nodes || []);
         if (!selectedCategory && data.categories?.length > 0) {
           setSelectedCategory(data.categories[0].name);
         }
@@ -214,219 +180,445 @@ export default function MasterCatalogPage() {
     fetchCatalog();
   }, []);
 
-  // Auto-select the "Default" model if it is configured under the selected length
-  useEffect(() => {
-    if (selectedLength) {
-      const defaultModel = selectedLength.models?.find((m) => m.name === "Default");
-      if (defaultModel) {
-        setSelectedModelId(defaultModel.id);
-      } else {
-        setSelectedModelId(null);
-      }
-    } else {
-      setSelectedModelId(null);
+  // Active Category Object
+  const activeCategory = useMemo(() => {
+    return categories.find((c) => c.name.toLowerCase() === selectedCategory.toLowerCase()) || categories[0] || null;
+  }, [categories, selectedCategory]);
+
+  // Current Level Names (customizable column names & count for this active category)
+  const currentLevelNames = useMemo((): string[] => {
+    if (activeCategory?.levelNames) {
+      try {
+        const parsed = typeof activeCategory.levelNames === "string" ? JSON.parse(activeCategory.levelNames) : activeCategory.levelNames;
+        if (Array.isArray(parsed) && parsed.length >= 2) {
+          return parsed;
+        }
+      } catch {}
     }
-  }, [selectedLengthId, catalog]);
+    const lower = (selectedCategory || "").toLowerCase();
+    if (lower.includes("pipe") || lower.includes("conduit")) {
+      return ["Brands", "Pipe Types", "Class / Schedule", "Sizes & Prices"];
+    }
+    if (lower.includes("switch") || lower.includes("modular")) {
+      return ["Brands", "Series / Range", "Modules", "Types & Prices"];
+    }
+    if (lower.includes("cable")) {
+      return ["Brands", "Core Count", "Armour Type", "Sizes & Prices"];
+    }
+    return ["Brands", "Lengths", "Models", "Specs & Prices"];
+  }, [activeCategory, selectedCategory]);
 
-  // Filtered lists based on selections
-  const selectedCatObj = categories.find(c => c.name.toLowerCase() === selectedCategory.toLowerCase()) || null;
+  const numColumns = currentLevelNames.length;
 
-  const filteredBrands = catalog.filter((b) => {
-    if (!selectedCategory) return true;
-    if (b.category.toLowerCase() === selectedCategory.toLowerCase()) return true;
-    if (selectedCatObj && b.category.toLowerCase() === selectedCatObj.slug.toLowerCase()) return true;
-    if (selectedCategory.toLowerCase().startsWith(b.category.toLowerCase())) return true;
-    if (b.category.toLowerCase().startsWith(selectedCategory.toLowerCase())) return true;
-    return false;
-  });
+  // Reset or adjust selectedPath when category changes
+  useEffect(() => {
+    setSelectedPath(new Array(numColumns).fill(null));
+  }, [selectedCategory, numColumns]);
 
-  const selectedBrand = catalog.find((b) => b.id === selectedBrandId) || filteredBrands[0] || null;
-  const availableLengths = selectedBrand ? selectedBrand.lengths : [];
+  // Auto-select first item at level 0 if nothing selected
+  useEffect(() => {
+    if (activeCategory && nodes.length > 0 && selectedPath[0] === null) {
+      const rootNodes = nodes.filter((n) => n.categoryId === activeCategory.id && (n.parentId === null || n.levelIndex === 0));
+      if (rootNodes.length > 0) {
+        setSelectedPath((prev) => {
+          const next = [...prev];
+          next[0] = rootNodes[0].id;
+          return next;
+        });
+      }
+    }
+  }, [activeCategory, nodes, selectedPath]);
 
-  const selectedLength = availableLengths.find((l) => l.id === selectedLengthId) || null;
-  const availableModels = selectedLength 
-    ? (selectedLength.models || []) 
-    : (selectedBrand ? (selectedBrand.directModels || []) : []);
+  // Auto-select first child at subsequent levels if parent selected and no child selected
+  useEffect(() => {
+    if (!activeCategory) return;
+    for (let lvl = 0; lvl < numColumns - 1; lvl++) {
+      const parentId = selectedPath[lvl];
+      if (parentId && selectedPath[lvl + 1] === null) {
+        const children = nodes.filter((n) => n.parentId === parentId && n.levelIndex === lvl + 1);
+        if (children.length > 0) {
+          setSelectedPath((prev) => {
+            const next = [...prev];
+            next[lvl + 1] = children[0].id;
+            return next;
+          });
+          break;
+        }
+      }
+    }
+  }, [activeCategory, nodes, selectedPath, numColumns]);
 
-  const selectedModel = availableModels.find((m) => m.id === selectedModelId) || null;
-  const availableVariations = selectedModel 
-    ? (selectedModel.variations || []) 
-    : (selectedBrand && !selectedLength ? (selectedBrand.directVariations || []) : []);
+  // ── Node Selection Handler ──────────────────────────────────
+  const handleSelectNode = (levelIdx: number, nodeId: number) => {
+    setSelectedPath((prev) => {
+      const next = prev.slice(0, levelIdx);
+      next[levelIdx] = nodeId;
+      // fill remaining with null
+      while (next.length < numColumns) next.push(null);
+      return next;
+    });
+  };
 
-  // ── Combination Generator Logic ──────────────────────────────
-  const generateCombinationsForBrands = (
-    targetBrands: Brand[],
+  // ── Column Management (Rename / Add / Remove) ───────────────
+  const openRenameColumnModal = (colIdx: number) => {
+    setRenamingColIdx(colIdx);
+    setRenamingColValue(currentLevelNames[colIdx] || `Level ${colIdx + 1}`);
+  };
+
+  const handleSaveColumnRename = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (renamingColIdx === null || !activeCategory || !renamingColValue.trim()) return;
+
+    try {
+      const updatedLevels = [...currentLevelNames];
+      updatedLevels[renamingColIdx] = renamingColValue.trim();
+
+      const res = await fetch("/api/admin/catalog", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "category",
+          id: activeCategory.id,
+          levelNames: updatedLevels,
+        }),
+      });
+
+      if (res.ok) {
+        setSuccess(`Column ${renamingColIdx + 1} renamed to "${renamingColValue.trim()}"!`);
+        setRenamingColIdx(null);
+        fetchCatalog();
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to rename column");
+    }
+  };
+
+  const handleAddColumn = async () => {
+    if (!activeCategory) return;
+    const newColName = prompt("Enter the name for the new sub-category column (e.g. Thickness, Class, Series):");
+    if (!newColName || !newColName.trim()) return;
+
+    try {
+      // Insert right before the last column (Specs & Prices)
+      const lastIndex = currentLevelNames.length - 1;
+      const updatedLevels = [
+        ...currentLevelNames.slice(0, lastIndex),
+        newColName.trim(),
+        currentLevelNames[lastIndex],
+      ];
+
+      const res = await fetch("/api/admin/catalog", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "category",
+          id: activeCategory.id,
+          levelNames: updatedLevels,
+        }),
+      });
+
+      if (res.ok) {
+        setSuccess(`Added new column "${newColName.trim()}"!`);
+        fetchCatalog();
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to add column");
+    }
+  };
+
+  const handleRemoveColumn = async (colIdx: number) => {
+    if (!activeCategory || currentLevelNames.length <= 2) {
+      alert("A category must have at least 2 columns.");
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to remove the column "${currentLevelNames[colIdx]}"? Items configured under this level will also be adjusted.`)) {
+      return;
+    }
+
+    try {
+      const updatedLevels = currentLevelNames.filter((_, idx) => idx !== colIdx);
+      const res = await fetch("/api/admin/catalog", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "category",
+          id: activeCategory.id,
+          levelNames: updatedLevels,
+        }),
+      });
+
+      if (res.ok) {
+        setSuccess(`Removed column "${currentLevelNames[colIdx]}".`);
+        fetchCatalog();
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to remove column");
+    }
+  };
+
+  // ── Category Management (Add / Edit / Delete) ───────────────
+  const openAddCategoryModal = () => {
+    setCatNameInput("");
+    setCatImageInput("");
+    setCatLevelsInput(["Brands", "Types", "Classes", "Specs & Prices"]);
+    setCategoryModalMode("add");
+  };
+
+  const openEditCategoryModal = (cat: Category) => {
+    setCatNameInput(cat.name);
+    setCatImageInput(cat.imageUrl || "");
+    let levels = ["Brands", "Types", "Classes", "Specs & Prices"];
+    if (cat.levelNames) {
+      try {
+        const parsed = typeof cat.levelNames === "string" ? JSON.parse(cat.levelNames) : cat.levelNames;
+        if (Array.isArray(parsed) && parsed.length >= 2) levels = parsed;
+      } catch {}
+    }
+    setCatLevelsInput(levels);
+    setCategoryModalMode("edit");
+  };
+
+  const handleSaveCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!catNameInput.trim()) return;
+
+    try {
+      const isEditing = categoryModalMode === "edit" && activeCategory;
+      const cleanLevels = catLevelsInput.map((l) => l.trim()).filter(Boolean);
+      if (cleanLevels.length < 2) {
+        alert("Please provide at least 2 column names (e.g. Brands and Specs & Prices).");
+        return;
+      }
+
+      const res = await fetch("/api/admin/catalog", {
+        method: isEditing ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "category",
+          id: isEditing ? activeCategory.id : undefined,
+          name: catNameInput.trim(),
+          imageUrl: catImageInput.trim() || null,
+          levelNames: cleanLevels,
+        }),
+      });
+
+      if (res.ok) {
+        setSuccess(isEditing ? "Category updated!" : "New category created!");
+        setSelectedCategory(catNameInput.trim());
+        setCategoryModalMode(null);
+        fetchCatalog();
+      } else {
+        const d = await res.json();
+        alert(d.error || "Failed to save category");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error saving category");
+    }
+  };
+
+  const handleDeleteCategory = async (cat: Category) => {
+    if (!confirm(`Are you sure you want to delete "${cat.name}" and all of its sub-categories and catalog items?`)) return;
+    try {
+      const res = await fetch(`/api/admin/catalog?type=category&id=${cat.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setSuccess(`Category "${cat.name}" deleted.`);
+        const remaining = categories.filter((c) => c.id !== cat.id);
+        if (remaining.length > 0) {
+          setSelectedCategory(remaining[0].name);
+        } else {
+          setSelectedCategory("");
+        }
+        fetchCatalog();
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete category");
+    }
+  };
+
+  // ── Node Add / Edit / Delete ────────────────────────────────
+  const openAddNodeModal = (levelIndex: number) => {
+    if (!activeCategory) return;
+    const parentId = levelIndex === 0 ? null : selectedPath[levelIndex - 1];
+    if (levelIndex > 0 && !parentId) {
+      alert(`Please select an item in Column ${levelIndex} first.`);
+      return;
+    }
+
+    const isLeaf = levelIndex === numColumns - 1;
+    setNodeModalConfig({
+      levelIndex,
+      parentId,
+      isLeaf,
+      editingNode: null,
+    });
+    setNodeNameInput("");
+    setNodeImageInput("");
+    setNodeDescInput("");
+    setNodePriceInput("");
+    setNodeSalePriceInput("");
+    setNodeStockInput("100");
+    setNodeColors(["Red", "Yellow", "Blue", "Black", "Green"]);
+    setColorTagInput("");
+  };
+
+  const openEditNodeModal = (node: CatalogNode) => {
+    const isLeaf = node.levelIndex === numColumns - 1;
+    setNodeModalConfig({
+      levelIndex: node.levelIndex,
+      parentId: node.parentId,
+      isLeaf,
+      editingNode: node,
+    });
+    setNodeNameInput(node.name);
+    setNodeImageInput(node.imageUrl || "");
+    setNodeDescInput(node.description || "");
+    setNodePriceInput(node.price !== null && node.price !== undefined ? String(node.price) : "");
+    setNodeSalePriceInput(node.salePrice !== null && node.salePrice !== undefined ? String(node.salePrice) : "");
+    setNodeStockInput(String(node.stock || 100));
+
+    let parsedColors: string[] = [];
+    try {
+      parsedColors = typeof node.colors === "string" ? JSON.parse(node.colors) : node.colors || [];
+    } catch {
+      parsedColors = node.colors ? String(node.colors).split(",").map((c) => c.trim()) : [];
+    }
+    setNodeColors(parsedColors);
+    setColorTagInput("");
+  };
+
+  const handleSaveNode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nodeModalConfig || !nodeNameInput.trim() || !activeCategory) return;
+
+    try {
+      const isEditing = Boolean(nodeModalConfig.editingNode);
+      const payload: any = {
+        type: "node",
+        id: isEditing ? nodeModalConfig.editingNode!.id : undefined,
+        categoryId: activeCategory.id,
+        parentId: nodeModalConfig.parentId,
+        levelIndex: nodeModalConfig.levelIndex,
+        name: nodeNameInput.trim(),
+        imageUrl: nodeImageInput.trim() || null,
+        description: nodeDescInput.trim() || null,
+        price: nodePriceInput ? Number(nodePriceInput) : null,
+        salePrice: nodeSalePriceInput ? Number(nodeSalePriceInput) : null,
+        stock: Number(nodeStockInput) || 100,
+        colors: nodeColors,
+        specKey: nodeModalConfig.isLeaf ? nodeNameInput.trim() : null,
+      };
+
+      const res = await fetch("/api/admin/catalog", {
+        method: isEditing ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        setSuccess(isEditing ? "Item updated!" : "New item added!");
+        setNodeModalConfig(null);
+        fetchCatalog();
+      } else {
+        const d = await res.json();
+        alert(d.error || "Failed to save item");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error saving item");
+    }
+  };
+
+  const handleDeleteNode = async (node: CatalogNode) => {
+    if (!confirm(`Are you sure you want to delete "${node.name}" and any sub-items configured beneath it?`)) return;
+
+    try {
+      const res = await fetch(`/api/admin/catalog?type=node&id=${node.id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setSuccess(`"${node.name}" deleted.`);
+        fetchCatalog();
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete item");
+    }
+  };
+
+  const handleAddColorTag = () => {
+    if (colorTagInput.trim() && !nodeColors.includes(colorTagInput.trim())) {
+      setNodeColors([...nodeColors, colorTagInput.trim()]);
+      setColorTagInput("");
+    }
+  };
+
+  const handleRemoveColorTag = (c: string) => {
+    setNodeColors(nodeColors.filter((col) => col !== c));
+  };
+
+  // ── Automated Combination Generator ────────────────────────
+  const generateAllCombinationsFromTree = (
+    catId: number,
+    scopeNodeId: number | null = null,
     includeCat: boolean = false,
     reverse: boolean = false
   ): CombinationRow[] => {
+    const catNodes = nodes.filter((n) => n.categoryId === catId);
     const rows: CombinationRow[] = [];
+    const catName = activeCategory?.name || "Electrical Wires";
 
-    targetBrands.forEach((b) => {
-      const catName = b.category || selectedCategory || "Electrical Wires";
+    const traverse = (parentId: number | null, lvl: number, path: CatalogNode[]) => {
+      let children = catNodes.filter((n) =>
+        parentId === null ? (n.parentId === null || n.levelIndex === 0) : n.parentId === parentId
+      );
 
-      // 1. Lengths hierarchy
-      if (b.lengths && b.lengths.length > 0) {
-        b.lengths.forEach((l) => {
-          const rawLength = String(l.lengthInMeters || "");
-          const lengthStr = rawLength ? (rawLength.toLowerCase().includes("m") ? rawLength : `${rawLength}m`) : "";
-
-          if (l.models && l.models.length > 0) {
-            l.models.forEach((m) => {
-              const modelName = m.name === "Default" ? "" : m.name;
-
-              if (m.variations && m.variations.length > 0) {
-                m.variations.forEach((v) => {
-                  let parsedColors: string[] = [];
-                  try {
-                    parsedColors = typeof v.colors === "string" ? JSON.parse(v.colors) : v.colors || [];
-                  } catch {
-                    parsedColors = v.colors ? String(v.colors).split(",").map((c) => c.trim()) : [];
-                  }
-
-                  const thickStr = v.thickness || "";
-                  const price = Number(v.price) || 0;
-                  const salePrice = v.salePrice ? Number(v.salePrice) : price;
-                  const stock = Number(v.stock) || 100;
-
-                  if (parsedColors.length > 0) {
-                    parsedColors.forEach((color) => {
-                      let parts = [b.name, includeCat ? catName : "", lengthStr, modelName, thickStr, color].filter(Boolean);
-                      if (reverse) parts = [...parts].reverse();
-                      rows.push({
-                        id: `${b.id}-${l.id}-${m.id}-${v.id}-${color}`,
-                        brand: b.name,
-                        category: catName,
-                        length: lengthStr,
-                        model: modelName,
-                        thickness: thickStr,
-                        color: color,
-                        name: parts.join(" "),
-                        basePrice: price,
-                        salePrice: salePrice,
-                        stock: stock,
-                        unit: globalUnit,
-                        hsn: globalHsn,
-                        gst: Number(globalGst) || 18,
-                        included: true,
-                        imageUrl: b.imageUrl,
-                      });
-                    });
-                  } else {
-                    let parts = [b.name, includeCat ? catName : "", lengthStr, modelName, thickStr].filter(Boolean);
-                    if (reverse) parts = [...parts].reverse();
-                    rows.push({
-                      id: `${b.id}-${l.id}-${m.id}-${v.id}-nocolor`,
-                      brand: b.name,
-                      category: catName,
-                      length: lengthStr,
-                      model: modelName,
-                      thickness: thickStr,
-                      name: parts.join(" "),
-                      basePrice: price,
-                      salePrice: salePrice,
-                      stock: stock,
-                      unit: globalUnit,
-                      hsn: globalHsn,
-                      gst: Number(globalGst) || 18,
-                      included: true,
-                      imageUrl: b.imageUrl,
-                    });
-                  }
-                });
-              }
-            });
-          }
-        });
+      if (scopeNodeId && lvl === 0) {
+        children = children.filter((n) => n.id === scopeNodeId);
       }
 
-      // 2. Direct models (no length)
-      if (b.directModels && b.directModels.length > 0) {
-        b.directModels.forEach((m) => {
-          const modelName = m.name === "Default" ? "" : m.name;
-          if (m.variations && m.variations.length > 0) {
-            m.variations.forEach((v) => {
-              let parsedColors: string[] = [];
-              try {
-                parsedColors = typeof v.colors === "string" ? JSON.parse(v.colors) : v.colors || [];
-              } catch {
-                parsedColors = v.colors ? String(v.colors).split(",").map((c) => c.trim()) : [];
-              }
-              const thickStr = v.thickness || "";
-              const price = Number(v.price) || 0;
-              const salePrice = v.salePrice ? Number(v.salePrice) : price;
-              const stock = Number(v.stock) || 100;
+      for (const child of children) {
+        const nextPath = [...path, child];
 
-              if (parsedColors.length > 0) {
-                parsedColors.forEach((color) => {
-                  let parts = [b.name, includeCat ? catName : "", modelName, thickStr, color].filter(Boolean);
-                  if (reverse) parts = [...parts].reverse();
-                  rows.push({
-                    id: `${b.id}-direct-${m.id}-${v.id}-${color}`,
-                    brand: b.name,
-                    category: catName,
-                    model: modelName,
-                    thickness: thickStr,
-                    color: color,
-                    name: parts.join(" "),
-                    basePrice: price,
-                    salePrice: salePrice,
-                    stock: stock,
-                    unit: globalUnit,
-                    hsn: globalHsn,
-                    gst: Number(globalGst) || 18,
-                    included: true,
-                    imageUrl: b.imageUrl,
-                  });
-                });
-              } else {
-                let parts = [b.name, includeCat ? catName : "", modelName, thickStr].filter(Boolean);
-                if (reverse) parts = [...parts].reverse();
-                rows.push({
-                  id: `${b.id}-direct-${m.id}-${v.id}-nocolor`,
-                  brand: b.name,
-                  category: catName,
-                  model: modelName,
-                  thickness: thickStr,
-                  name: parts.join(" "),
-                  basePrice: price,
-                  salePrice: salePrice,
-                  stock: stock,
-                  unit: globalUnit,
-                  hsn: globalHsn,
-                  gst: Number(globalGst) || 18,
-                  included: true,
-                  imageUrl: b.imageUrl,
-                });
-              }
-            });
-          }
-        });
-      }
+        // Terminal level check
+        const isTerminal = child.levelIndex === numColumns - 1 || (child.price && child.levelIndex >= numColumns - 2);
 
-      // 3. Direct variations (no length and no model)
-      if (b.directVariations && b.directVariations.length > 0) {
-        b.directVariations.forEach((v) => {
+        if (isTerminal) {
           let parsedColors: string[] = [];
           try {
-            parsedColors = typeof v.colors === "string" ? JSON.parse(v.colors) : v.colors || [];
+            parsedColors = typeof child.colors === "string" ? JSON.parse(child.colors) : child.colors || [];
           } catch {
-            parsedColors = v.colors ? String(v.colors).split(",").map((c) => c.trim()) : [];
+            parsedColors = child.colors ? String(child.colors).split(",").map((c) => c.trim()) : [];
           }
-          const thickStr = v.thickness || "";
-          const price = Number(v.price) || 0;
-          const salePrice = v.salePrice ? Number(v.salePrice) : price;
-          const stock = Number(v.stock) || 100;
+
+          const price = Number(child.price) || 0;
+          const salePrice = child.salePrice ? Number(child.salePrice) : price;
+          const stock = Number(child.stock) || 100;
+          const names = nextPath.map((n) => n.name).filter((n) => n && n !== "Default");
 
           if (parsedColors.length > 0) {
-            parsedColors.forEach((color) => {
-              let parts = [b.name, includeCat ? catName : "", thickStr, color].filter(Boolean);
+            for (const col of parsedColors) {
+              let parts = [
+                nextPath[0]?.name,
+                includeCat ? catName : "",
+                ...names.slice(1),
+                col,
+              ].filter(Boolean);
               if (reverse) parts = [...parts].reverse();
+
               rows.push({
-                id: `${b.id}-var-${v.id}-${color}`,
-                brand: b.name,
+                id: `${nextPath.map((n) => n.id).join("-")}-${col}`,
+                brand: nextPath[0]?.name || "",
                 category: catName,
-                thickness: thickStr,
-                color: color,
+                pathNames: names,
                 name: parts.join(" "),
                 basePrice: price,
                 salePrice: salePrice,
@@ -435,17 +627,19 @@ export default function MasterCatalogPage() {
                 hsn: globalHsn,
                 gst: Number(globalGst) || 18,
                 included: true,
-                imageUrl: b.imageUrl,
+                imageUrl: nextPath[0]?.imageUrl || null,
+                color: col,
               });
-            });
+            }
           } else {
-            let parts = [b.name, includeCat ? catName : "", thickStr].filter(Boolean);
+            let parts = [nextPath[0]?.name, includeCat ? catName : "", ...names.slice(1)].filter(Boolean);
             if (reverse) parts = [...parts].reverse();
+
             rows.push({
-              id: `${b.id}-var-${v.id}-nocolor`,
-              brand: b.name,
+              id: nextPath.map((n) => n.id).join("-"),
+              brand: nextPath[0]?.name || "",
               category: catName,
-              thickness: thickStr,
+              pathNames: names,
               name: parts.join(" "),
               basePrice: price,
               salePrice: salePrice,
@@ -454,29 +648,32 @@ export default function MasterCatalogPage() {
               hsn: globalHsn,
               gst: Number(globalGst) || 18,
               included: true,
-              imageUrl: b.imageUrl,
+              imageUrl: nextPath[0]?.imageUrl || null,
             });
           }
-        });
+        } else {
+          traverse(child.id, lvl + 1, nextPath);
+        }
       }
-    });
+    };
 
+    traverse(null, 0, []);
     return rows;
   };
 
-  // Real-time count of all combinations configured in the current category
   const activeCategoryCombinations = useMemo(() => {
-    return generateCombinationsForBrands(filteredBrands, includeCategoryInName, reverseNameOrder);
-  }, [filteredBrands, selectedCategory, includeCategoryInName, reverseNameOrder, globalUnit, globalHsn, globalGst]);
+    if (!activeCategory) return [];
+    return generateAllCombinationsFromTree(activeCategory.id, null, includeCategoryInName, reverseNameOrder);
+  }, [activeCategory, nodes, numColumns, includeCategoryInName, reverseNameOrder, globalUnit, globalHsn, globalGst]);
 
-  const openGeneratorModal = (scope: "category" | "brand" = "category") => {
+  const openGeneratorModal = (scope: "category" | "selected" = "category") => {
+    if (!activeCategory) return;
     setGeneratorScope(scope);
-    const targetBrands = scope === "brand" && selectedBrand ? [selectedBrand] : filteredBrands;
-    const items = generateCombinationsForBrands(targetBrands, includeCategoryInName, reverseNameOrder);
+    const scopeId = scope === "selected" ? selectedPath[0] : null;
+    const items = generateAllCombinationsFromTree(activeCategory.id, scopeId, includeCategoryInName, reverseNameOrder);
     setGeneratedProducts(items);
     setGenerationSummary(null);
     setGeneratorSearch("");
-    setGeneratorBrandFilter("all");
     setPriceAdjPercent("");
     setPriceAdjAmount("");
     setIsGeneratorOpen(true);
@@ -484,38 +681,18 @@ export default function MasterCatalogPage() {
 
   const handleToggleIncludeCategory = (val: boolean) => {
     setIncludeCategoryInName(val);
-    setGeneratedProducts((prev) =>
-      prev.map((p) => {
-        let parts = [
-          p.brand,
-          val ? p.category : "",
-          p.length,
-          p.model && p.model !== "Default" ? p.model : "",
-          p.thickness,
-          p.color,
-        ].filter(Boolean);
-        if (reverseNameOrder) parts = [...parts].reverse();
-        return { ...p, name: parts.join(" ") };
-      })
-    );
+    if (!activeCategory) return;
+    const scopeId = generatorScope === "selected" ? selectedPath[0] : null;
+    const items = generateAllCombinationsFromTree(activeCategory.id, scopeId, val, reverseNameOrder);
+    setGeneratedProducts(items);
   };
 
   const handleToggleReverseOrder = (val: boolean) => {
     setReverseNameOrder(val);
-    setGeneratedProducts((prev) =>
-      prev.map((p) => {
-        let parts = [
-          p.brand,
-          includeCategoryInName ? p.category : "",
-          p.length,
-          p.model && p.model !== "Default" ? p.model : "",
-          p.thickness,
-          p.color,
-        ].filter(Boolean);
-        if (val) parts = [...parts].reverse();
-        return { ...p, name: parts.join(" ") };
-      })
-    );
+    if (!activeCategory) return;
+    const scopeId = generatorScope === "selected" ? selectedPath[0] : null;
+    const items = generateAllCombinationsFromTree(activeCategory.id, scopeId, includeCategoryInName, val);
+    setGeneratedProducts(items);
   };
 
   const applyPercentPriceAdjustment = (percentStr: string) => {
@@ -566,22 +743,10 @@ export default function MasterCatalogPage() {
   };
 
   const displayedGeneratedProducts = useMemo(() => {
-    return generatedProducts.filter((p) => {
-      if (generatorBrandFilter !== "all" && p.brand.toLowerCase() !== generatorBrandFilter.toLowerCase()) {
-        return false;
-      }
-      if (!generatorSearch.trim()) return true;
-      const q = generatorSearch.toLowerCase().trim();
-      return (
-        p.name.toLowerCase().includes(q) ||
-        p.brand.toLowerCase().includes(q) ||
-        (p.length && p.length.toLowerCase().includes(q)) ||
-        (p.model && p.model.toLowerCase().includes(q)) ||
-        (p.thickness && p.thickness.toLowerCase().includes(q)) ||
-        (p.color && p.color.toLowerCase().includes(q))
-      );
-    });
-  }, [generatedProducts, generatorBrandFilter, generatorSearch]);
+    if (!generatorSearch.trim()) return generatedProducts;
+    const q = generatorSearch.toLowerCase().trim();
+    return generatedProducts.filter((p) => p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q));
+  }, [generatedProducts, generatorSearch]);
 
   const toggleSelectAllGenerated = (check: boolean) => {
     const ids = new Set(displayedGeneratedProducts.map((p) => p.id));
@@ -599,7 +764,7 @@ export default function MasterCatalogPage() {
   const handleSaveGeneratedProducts = async () => {
     const selectedItems = generatedProducts.filter((p) => p.included);
     if (selectedItems.length === 0) {
-      alert("Please select at least one individual product to generate.");
+      alert("Please select at least one product to generate.");
       return;
     }
 
@@ -616,17 +781,13 @@ export default function MasterCatalogPage() {
         gst: Number(p.gst) || 18,
         stock: Number(p.stock) || 100,
         color: p.color || null,
-        size: p.length || p.thickness || "Standard",
         brand: p.brand,
         imageUrl: p.imageUrl || null,
-        specifications: [
-          { key: "Brand", value: p.brand },
-          ...(p.length ? [{ key: "Length", value: p.length }] : []),
-          ...(p.model ? [{ key: "Model", value: p.model }] : []),
-          ...(p.thickness ? [{ key: "Thickness", value: p.thickness }] : []),
-          ...(p.color ? [{ key: "Color", value: p.color }] : []),
-        ],
-        tags: [p.brand, p.category, p.length, p.model, p.thickness, p.color].filter(Boolean).join(", "),
+        specifications: p.pathNames.map((val, idx) => ({
+          key: currentLevelNames[idx] || `Level ${idx + 1}`,
+          value: val,
+        })),
+        tags: [p.brand, p.category, ...p.pathNames, p.color].filter(Boolean).join(", "),
       }));
 
       const res = await fetch("/api/admin/catalog/generate", {
@@ -654,208 +815,6 @@ export default function MasterCatalogPage() {
     }
   };
 
-  // Handlers
-  // Start editing helpers
-  const startEditBrand = (b: Brand) => {
-    setNewBrandName(b.name);
-    setNewBrandImage(b.imageUrl || "");
-    setEditingId(b.id);
-    setActiveModal("brand");
-  };
-
-  const startEditLength = (l: BrandLength) => {
-    setNewLength(String(l.lengthInMeters));
-    setEditingId(l.id);
-    setActiveModal("length");
-  };
-
-  const startEditModel = (m: BrandModel) => {
-    setNewModelName(m.name);
-    setNewModelDesc(m.description || "");
-    setEditingId(m.id);
-    setActiveModal("model");
-  };
-
-  const startEditVariation = (v: Variation) => {
-    setVarThickness(v.thickness || "");
-    let parsedColors: string[] = [];
-    try {
-      parsedColors = typeof v.colors === "string" ? JSON.parse(v.colors) : v.colors || [];
-    } catch (e) {
-      parsedColors = v.colors ? v.colors.split(",") : [];
-    }
-    setVarColors(parsedColors);
-    setColorInput("");
-    setVarPrice(String(v.price));
-    setVarSalePrice(v.salePrice ? String(v.salePrice) : "");
-    setVarStock(String(v.stock));
-    setEditingId(v.id);
-    setActiveModal("variation");
-  };
-
-  const closeModal = () => {
-    setActiveModal(null);
-    setEditingId(null);
-    setNewBrandName("");
-    setNewBrandImage("");
-    setNewLength("");
-    setNewModelName("");
-    setNewModelDesc("");
-    setVarThickness("");
-    setVarColors(["Red", "Yellow", "Blue", "Black", "Green"]);
-    setColorInput("");
-    setVarPrice("");
-    setVarSalePrice("");
-    setVarStock("100");
-  };
-
-  // Handlers
-  const handleSaveBrand = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newBrandName.trim()) return;
-    try {
-      const isEditing = editingId !== null;
-      const res = await fetch("/api/admin/catalog", {
-        method: isEditing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "brand",
-          id: editingId,
-          name: newBrandName,
-          category: selectedCategory || "Electrical Wires",
-          imageUrl: newBrandImage || null,
-        }),
-      });
-      if (res.ok) {
-        setSuccess(isEditing ? "Brand updated!" : "Brand added!");
-        closeModal();
-        fetchCatalog();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleSaveLength = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedBrand || !newLength) return;
-    try {
-      const isEditing = editingId !== null;
-      const res = await fetch("/api/admin/catalog", {
-        method: isEditing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "length",
-          id: editingId,
-          brandId: selectedBrand.id,
-          lengthInMeters: newLength.trim(),
-        }),
-      });
-      if (res.ok) {
-        setSuccess(isEditing ? "Length updated!" : "Length option added!");
-        closeModal();
-        fetchCatalog();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleSaveModel = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedBrand || !newModelName.trim()) return;
-    try {
-      const isEditing = editingId !== null;
-      const res = await fetch("/api/admin/catalog", {
-        method: isEditing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "model",
-          id: editingId,
-          brandLengthId: selectedLength ? selectedLength.id : null,
-          brandId: selectedBrand.id,
-          name: newModelName,
-          description: newModelDesc,
-        }),
-      });
-      if (res.ok) {
-        setSuccess(isEditing ? "Model updated!" : "Model added!");
-        closeModal();
-        fetchCatalog();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const openAddVariationModal = () => {
-    setVarThickness("");
-    setVarColors(["Red", "Yellow", "Blue", "Black", "Green"]);
-    setColorInput("");
-    setVarPrice("");
-    setVarSalePrice("");
-    setVarStock("100");
-    setEditingId(null);
-    setActiveModal("variation");
-  };
-
-  const handleSaveVariation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedBrand || !varPrice) return;
-    try {
-      const isEditing = editingId !== null;
-      const res = await fetch("/api/admin/catalog", {
-        method: isEditing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "variation",
-          id: editingId,
-          modelId: selectedModel ? selectedModel.id : null,
-          brandId: selectedBrand.id,
-          brandLengthId: selectedLength ? selectedLength.id : null,
-          thickness: varThickness.trim() || null,
-          colors: varColors,
-          price: Number(varPrice),
-          salePrice: varSalePrice ? Number(varSalePrice) : null,
-          stock: Number(varStock) || 100,
-        }),
-      });
-      if (res.ok) {
-        setSuccess(isEditing ? "Variation updated!" : "Variation added!");
-        closeModal();
-        fetchCatalog();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleDeleteItem = async (type: string, id: number) => {
-    if (!confirm(`Are you sure you want to delete this ${type}?`)) return;
-    try {
-      const res = await fetch(`/api/admin/catalog?type=${type}&id=${id}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        setSuccess(`${type} deleted!`);
-        fetchCatalog();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleAddColorTag = () => {
-    if (colorInput.trim() && !varColors.includes(colorInput.trim())) {
-      setVarColors([...varColors, colorInput.trim()]);
-      setColorInput("");
-    }
-  };
-
-  const handleRemoveColorTag = (c: string) => {
-    setVarColors(varColors.filter((col) => col !== c));
-  };
-
   if (loading) {
     return (
       <div className="min-h-[80vh] flex flex-col items-center justify-center space-y-4">
@@ -870,6 +829,7 @@ export default function MasterCatalogPage() {
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">
+      
       {/* Top Banner */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#0D47A1]/10 pb-6">
         <div>
@@ -878,9 +838,10 @@ export default function MasterCatalogPage() {
             Master Catalog Configurator
           </h1>
           <p className="text-[#0D47A1]/60 text-sm mt-1">
-            Single-page management for Category → Brands → Lengths → Models → Thicknesses, Colors & Pricing.
+            Dynamic drill-down configurator: customize category names, column labels &amp; number of columns.
           </p>
         </div>
+
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => openGeneratorModal("category")}
@@ -904,7 +865,8 @@ export default function MasterCatalogPage() {
           </a>
           <button
             onClick={fetchCatalog}
-            className="flex items-center gap-2 bg-[#0D47A1]/5 hover:bg-[#0D47A1]/10 text-[#0D47A1] px-4 py-2.5 rounded-2xl font-bold text-xs transition-colors"
+            className="flex items-center gap-2 bg-[#0D47A1]/5 hover:bg-[#0D47A1]/10 text-[#0D47A1] px-4 py-2.5 rounded-2xl font-bold text-xs transition-colors cursor-pointer"
+            title="Refresh Catalog Data"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
             Sync Catalog
@@ -926,537 +888,560 @@ export default function MasterCatalogPage() {
         </div>
       )}
 
-      {/* Step 1: Category Selector Pills */}
+      {/* Step 1: Active Category Bar (Customizable Main Categories) */}
       <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 space-y-4">
-        <label className="text-xs font-black uppercase tracking-wider text-[#0D47A1]/70 flex items-center gap-2">
-          <Grid size={16} className="text-[#FF9800]" /> Select Active Category
-        </label>
-        <div className="flex flex-wrap gap-3">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => {
-                setSelectedCategory(cat.name);
-                setSelectedBrandId(null);
-                setSelectedLengthId(null);
-                setSelectedModelId(null);
-              }}
-              className={`px-5 py-3 rounded-2xl text-xs font-bold transition-all ${
-                selectedCategory.toLowerCase() === cat.name.toLowerCase()
-                  ? "bg-[#0D47A1] text-white shadow-lg shadow-[#0D47A1]/20 scale-105"
-                  : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              {cat.name}
-            </button>
-          ))}
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-black uppercase tracking-wider text-[#0D47A1]/70 flex items-center gap-2">
+            <Grid size={16} className="text-[#FF9800]" /> Select Active Category
+          </label>
+          <button
+            onClick={openAddCategoryModal}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FF9800]/10 hover:bg-[#FF9800]/20 text-[#FF9800] rounded-xl text-xs font-black transition-all cursor-pointer"
+          >
+            <Plus size={14} />
+            <span>Add Category</span>
+          </button>
         </div>
-      </div>
 
-      {/* 4-Column Interactive Hierarchy Flow */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-        
-        {/* COLUMN 1: BRANDS */}
-        <div className="bg-white rounded-3xl p-5 shadow-xl border border-gray-100 space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-            <h3 className="text-sm font-black uppercase tracking-wider text-[#0D47A1] flex items-center gap-2">
-              <Award size={16} className="text-[#FF9800]" />
-              1. Brands ({filteredBrands.length})
-            </h3>
-            <button
-              onClick={() => setActiveModal("brand")}
-              className="p-1.5 bg-[#FF9800] text-white rounded-lg hover:bg-[#F57C00] transition-colors"
-              title="Add Brand"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-
-          <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
-            {filteredBrands.length === 0 ? (
-              <p className="text-xs text-gray-400 py-6 text-center">No brands in {selectedCategory}. Click + to add one.</p>
-            ) : (
-              filteredBrands.map((b) => (
-                <div
-                  key={b.id}
-                  onClick={() => {
-                    setSelectedBrandId(b.id);
-                    setSelectedLengthId(null);
-                    setSelectedModelId(null);
-                  }}
-                  className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                    selectedBrand?.id === b.id
-                      ? "border-[#0D47A1] bg-[#0D47A1]/5 shadow-sm"
-                      : "border-gray-100 hover:border-gray-300"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {b.imageUrl ? (
-                      <img src={b.imageUrl} alt={b.name} className="w-7 h-7 object-contain rounded-md" />
-                    ) : (
-                      <Award size={18} className="text-[#0D47A1]" />
-                    )}
-                    <span className="text-xs font-bold text-[#0D47A1] truncate">{b.name}</span>
-                  </div>
-                  <div className="flex items-center gap-0.5">
+        <div className="flex flex-wrap items-center gap-3">
+          {categories.map((cat) => {
+            const isSelected = selectedCategory.toLowerCase() === cat.name.toLowerCase();
+            return (
+              <div
+                key={cat.id}
+                onClick={() => {
+                  setSelectedCategory(cat.name);
+                }}
+                className={`group px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer select-none ${
+                  isSelected
+                    ? "bg-[#0D47A1] text-white shadow-lg shadow-[#0D47A1]/20 scale-105"
+                    : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200/50"
+                }`}
+              >
+                <span>{cat.name}</span>
+                {isSelected && (
+                  <div className="flex items-center gap-1 ml-1 pl-2 border-l border-white/20">
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedBrandId(b.id);
-                        openGeneratorModal("brand");
+                        openEditCategoryModal(cat);
                       }}
-                      className="text-gray-300 hover:text-[#FF9800] p-1"
-                      title={`Generate individual products for ${b.name}`}
+                      className="p-1 hover:bg-white/20 rounded-md text-white/80 hover:text-white transition-colors cursor-pointer"
+                      title="Edit Category & Column Levels"
                     >
-                      <Sparkles size={12} />
+                      <Pencil size={11} />
                     </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); startEditBrand(b); }}
-                      className="text-gray-300 hover:text-[#0D47A1] p-1"
-                      title="Edit Brand"
-                    >
-                      <Pencil size={12} />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteItem("brand", b.id); }}
-                      className="text-gray-300 hover:text-red-500 p-1"
-                      title="Delete Brand"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                    <ChevronRight size={14} className="text-gray-400" />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* COLUMN 2: LENGTHS IN METRES */}
-        <div className="bg-white rounded-3xl p-5 shadow-xl border border-gray-100 space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-            <h3 className="text-sm font-black uppercase tracking-wider text-[#0D47A1] flex items-center gap-2">
-              <Ruler size={16} className="text-[#FF9800]" />
-              2. Lengths ({availableLengths.length})
-            </h3>
-            {selectedBrand && (
-              <button
-                onClick={() => setActiveModal("length")}
-                className="p-1.5 bg-[#FF9800] text-white rounded-lg hover:bg-[#F57C00] transition-colors"
-                title="Add Length"
-              >
-                <Plus size={14} />
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
-            {!selectedBrand ? (
-              <p className="text-xs text-gray-400 py-6 text-center">Select a brand first.</p>
-            ) : availableLengths.length === 0 ? (
-              <p className="text-xs text-gray-400 py-6 text-center">No lengths configured for {selectedBrand.name}. Click + to add.</p>
-            ) : (
-              availableLengths.map((l) => (
-                <div
-                  key={l.id}
-                  onClick={() => {
-                    setSelectedLengthId(l.id);
-                    setSelectedModelId(null);
-                  }}
-                  className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                    selectedLength?.id === l.id
-                      ? "border-[#0D47A1] bg-[#0D47A1]/5 shadow-sm"
-                      : "border-gray-100 hover:border-gray-300"
-                  }`}
-                >
-                  <span className="text-xs font-bold text-[#0D47A1]">
-                    {l.lengthInMeters} <span className="text-[10px] text-gray-400">metres</span>
-                  </span>
-                  <div className="flex items-center gap-0.5">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); startEditLength(l); }}
-                      className="text-gray-300 hover:text-[#0D47A1] p-1"
-                      title="Edit Length"
-                    >
-                      <Pencil size={12} />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteItem("length", l.id); }}
-                      className="text-gray-300 hover:text-red-500 p-1"
-                      title="Delete Length"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                    <ChevronRight size={14} className="text-gray-400" />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* COLUMN 3: MODELS / TYPES */}
-        <div className="bg-white rounded-3xl p-5 shadow-xl border border-gray-100 space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-            <h3 className="text-sm font-black uppercase tracking-wider text-[#0D47A1] flex items-center gap-2">
-              <Package size={16} className="text-[#FF9800]" />
-              3. Models ({availableModels.length})
-            </h3>
-            {selectedBrand && (
-              <button
-                onClick={() => setActiveModal("model")}
-                className="p-1.5 bg-[#FF9800] text-white rounded-lg hover:bg-[#F57C00] transition-colors"
-                title="Add Model"
-              >
-                <Plus size={14} />
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
-            {!selectedBrand ? (
-              <p className="text-xs text-gray-400 py-6 text-center">Select a brand first.</p>
-            ) : availableModels.filter(m => m.name !== "Default").length === 0 ? (
-              <p className="text-xs text-gray-400 py-6 text-center">No models added. Click + to add.</p>
-            ) : (
-              availableModels.filter(m => m.name !== "Default").map((m) => (
-                <div
-                  key={m.id}
-                  onClick={() => setSelectedModelId(m.id)}
-                  className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                    selectedModel?.id === m.id
-                      ? "border-[#0D47A1] bg-[#0D47A1]/5 shadow-sm"
-                      : "border-gray-100 hover:border-gray-300"
-                  }`}
-                >
-                  <span className="text-xs font-bold text-[#0D47A1] truncate">{m.name}</span>
-                  <div className="flex items-center gap-0.5">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); startEditModel(m); }}
-                      className="text-gray-300 hover:text-[#0D47A1] p-1"
-                      title="Edit Model"
-                    >
-                      <Pencil size={12} />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteItem("model", m.id); }}
-                      className="text-gray-300 hover:text-red-500 p-1"
-                      title="Delete Model"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                    <ChevronRight size={14} className="text-gray-400" />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* COLUMN 4: VARIATIONS (THICKNESS, COLORS, PRICES) */}
-        <div className="bg-white rounded-3xl p-5 shadow-xl border border-gray-100 space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-            <h3 className="text-sm font-black uppercase tracking-wider text-[#0D47A1] flex items-center gap-2">
-              <Tag size={16} className="text-[#FF9800]" />
-              4. Specs & Prices ({availableVariations.length})
-            </h3>
-            {selectedBrand && (
-              <button
-                onClick={openAddVariationModal}
-                className="p-1.5 bg-[#FF9800] text-white rounded-lg hover:bg-[#F57C00] transition-colors"
-                title="Add Spec & Price"
-              >
-                <Plus size={14} />
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
-            {!selectedBrand ? (
-              <p className="text-xs text-gray-400 py-6 text-center">Select a brand first.</p>
-            ) : availableVariations.length === 0 ? (
-              <p className="text-xs text-gray-400 py-6 text-center">No specifications added. Click + to add.</p>
-            ) : (
-              availableVariations.map((v) => {
-                let parsedColors: string[] = [];
-                try {
-                  parsedColors = typeof v.colors === "string" ? JSON.parse(v.colors) : v.colors || [];
-                } catch (e) {
-                  parsedColors = v.colors ? v.colors.split(",") : [];
-                }
-
-                return (
-                  <div key={v.id} className="p-3.5 rounded-2xl border border-gray-100 bg-gray-50/50 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-[#0D47A1]">{v.thickness || "Default Specification"}</span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => startEditVariation(v)}
-                          className="text-gray-300 hover:text-[#0D47A1]"
-                          title="Edit Spec & Price"
-                        >
-                          <Pencil size={12} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteItem("variation", v.id)}
-                          className="text-gray-300 hover:text-red-500"
-                          title="Delete Spec & Price"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-xs font-bold text-[#0D47A1]">
-                      <span>₹{v.salePrice || v.price}</span>
-                      {v.salePrice && <span className="text-[10px] text-gray-400 line-through">₹{v.price}</span>}
-                    </div>
-
-                    {parsedColors.length > 0 && (
-                      <div className="flex flex-wrap gap-1 pt-1">
-                        {parsedColors.map((col, idx) => {
-                          const style = getColorStyles(col);
-                          return (
-                            <span 
-                              key={idx} 
-                              style={{ backgroundColor: style.bg, color: style.text, borderColor: style.border }} 
-                              className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase border shadow-2xs"
-                            >
-                              {col}
-                            </span>
-                          );
-                        })}
-                      </div>
+                    {categories.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCategory(cat);
+                        }}
+                        className="p-1 hover:bg-red-500 rounded-md text-white/80 hover:text-white transition-colors cursor-pointer"
+                        title="Delete Category"
+                      >
+                        <Trash2 size={11} />
+                      </button>
                     )}
                   </div>
-                );
-              })
-            )}
-          </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-
       </div>
 
-      {/* MODALS FOR ADDING/EDITING HIERARCHICAL ITEMS */}
+      {/* Dynamic Customizable Columns (Miller Columns Board) */}
+      <div className="flex gap-6 items-start overflow-x-auto pb-6 custom-scrollbar">
+        {currentLevelNames.map((levelName, colIdx) => {
+          const isLeaf = colIdx === numColumns - 1;
+          const parentId = colIdx === 0 ? null : selectedPath[colIdx - 1];
+          const parentNode = colIdx > 0 && parentId ? nodes.find((n) => n.id === parentId) : null;
 
-      {/* 1. Brand Modal */}
-      {activeModal === "brand" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0D47A1]/50 backdrop-blur-sm">
-          <form onSubmit={handleSaveBrand} className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-[#0D47A1]">
-              {editingId ? "Edit Brand" : `Add Brand to ${selectedCategory}`}
-            </h3>
-            <input
-              type="text"
-              placeholder="Brand Name (e.g. Polycab, Havells)"
-              value={newBrandName}
-              onChange={(e) => setNewBrandName(e.target.value)}
-              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
-              required
-            />
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Brand Logo Image URL (optional)"
-                value={newBrandImage}
-                onChange={(e) => setNewBrandImage(e.target.value)}
-                className="flex-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
-              />
-              <div className="relative">
-                <input 
-                  type="file" 
-                  accept="image/*"
-                  onChange={handleBrandImageUpload}
-                  id="catalog-brand-image-file"
-                  className="hidden"
-                  disabled={isUploading}
-                />
-                <label 
-                  htmlFor="catalog-brand-image-file"
-                  className={`h-full flex items-center justify-center gap-1.5 px-4 bg-[#0D47A1] text-white text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer hover:bg-[#0D47A1]/95 active:scale-[0.98] transition-all whitespace-nowrap min-h-[46px] ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="animate-spin h-3.5 w-3.5" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Plus size={14} />
-                      Upload
-                    </>
+          // Filter nodes for this column
+          const colNodes = activeCategory
+            ? nodes.filter((n) => {
+                if (n.categoryId !== activeCategory.id) return false;
+                if (colIdx === 0) return n.parentId === null || n.levelIndex === 0;
+                return n.parentId === parentId && n.levelIndex === colIdx;
+              })
+            : [];
+
+          const selectedNodeIdAtLevel = selectedPath[colIdx];
+
+          return (
+            <div
+              key={colIdx}
+              className="min-w-[280px] max-w-[320px] flex-1 bg-white rounded-3xl p-5 shadow-xl border border-gray-100 space-y-4 shrink-0"
+            >
+              {/* Column Header */}
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-[#0D47A1] truncate flex items-center gap-1.5">
+                    {colIdx === 0 ? (
+                      <Award size={15} className="text-[#FF9800] shrink-0" />
+                    ) : isLeaf ? (
+                      <Tag size={15} className="text-[#FF9800] shrink-0" />
+                    ) : (
+                      <Package size={15} className="text-[#FF9800] shrink-0" />
+                    )}
+                    <span className="truncate">
+                      {colIdx + 1}. {levelName} ({colNodes.length})
+                    </span>
+                  </h3>
+                  <button
+                    onClick={() => openRenameColumnModal(colIdx)}
+                    className="text-gray-300 hover:text-[#0D47A1] p-1 shrink-0 cursor-pointer"
+                    title={`Rename Column ${colIdx + 1}`}
+                  >
+                    <Pencil size={11} />
+                  </button>
+                  {colIdx > 0 && !isLeaf && numColumns > 2 && (
+                    <button
+                      onClick={() => handleRemoveColumn(colIdx)}
+                      className="text-gray-300 hover:text-red-500 p-1 shrink-0 cursor-pointer"
+                      title={`Remove Column ${colIdx + 1}`}
+                    >
+                      <Trash2 size={11} />
+                    </button>
                   )}
-                </label>
+                </div>
+
+                <button
+                  onClick={() => openAddNodeModal(colIdx)}
+                  disabled={colIdx > 0 && !parentId}
+                  className="p-1.5 bg-[#FF9800] text-white rounded-lg hover:bg-[#F57C00] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0"
+                  title={`Add ${levelName}`}
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+
+              {/* Column Item List */}
+              <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+                {colIdx > 0 && !parentId ? (
+                  <p className="text-xs text-gray-400 py-8 text-center">
+                    Select a {currentLevelNames[colIdx - 1]} first.
+                  </p>
+                ) : colNodes.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-8 text-center">
+                    No {levelName} added {parentNode ? `under ${parentNode.name}` : ""}. Click + to add.
+                  </p>
+                ) : (
+                  colNodes.map((item) => {
+                    const isSelected = selectedNodeIdAtLevel === item.id;
+
+                    // If leaf level, render specs & prices view
+                    if (isLeaf) {
+                      let parsedColors: string[] = [];
+                      try {
+                        parsedColors = typeof item.colors === "string" ? JSON.parse(item.colors) : item.colors || [];
+                      } catch {
+                        parsedColors = item.colors ? String(item.colors).split(",").map((c) => c.trim()) : [];
+                      }
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="p-3.5 rounded-2xl border border-gray-100 bg-gray-50/60 hover:bg-gray-50 space-y-2 transition-all"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-[#0D47A1]">
+                              {item.name}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => openEditNodeModal(item)}
+                                className="text-gray-300 hover:text-[#0D47A1] p-1 cursor-pointer"
+                                title="Edit Spec & Price"
+                              >
+                                <Pencil size={11} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteNode(item)}
+                                className="text-gray-300 hover:text-red-500 p-1 cursor-pointer"
+                                title="Delete Spec & Price"
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-xs font-bold text-[#0D47A1]">
+                            <span>₹{item.salePrice || item.price || 0}</span>
+                            {item.salePrice && item.price && item.salePrice < item.price && (
+                              <span className="text-[10px] text-gray-400 line-through">₹{item.price}</span>
+                            )}
+                          </div>
+
+                          {parsedColors.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {parsedColors.map((col, cIdx) => {
+                                const st = getColorStyles(col);
+                                return (
+                                  <span
+                                    key={cIdx}
+                                    style={{ backgroundColor: st.bg, color: st.text, borderColor: st.border }}
+                                    className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase border shadow-2xs"
+                                  >
+                                    {col}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    // Intermediate levels view
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => handleSelectNode(colIdx, item.id)}
+                        className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                          isSelected
+                            ? "border-[#0D47A1] bg-[#0D47A1]/5 shadow-sm"
+                            : "border-gray-100 hover:border-gray-300 bg-white"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.name} className="w-6 h-6 object-contain rounded-md" />
+                          ) : colIdx === 0 ? (
+                            <Award size={16} className="text-[#0D47A1] shrink-0" />
+                          ) : (
+                            <div className="w-2 h-2 rounded-full bg-[#0D47A1]/40 shrink-0" />
+                          )}
+                          <span className="text-xs font-bold text-[#0D47A1] truncate">
+                            {item.name}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-0.5">
+                          {colIdx === 0 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectNode(0, item.id);
+                                openGeneratorModal("selected");
+                              }}
+                              className="text-gray-300 hover:text-[#FF9800] p-1 cursor-pointer"
+                              title={`Generate individual products for ${item.name}`}
+                            >
+                              <Sparkles size={12} />
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditNodeModal(item);
+                            }}
+                            className="text-gray-300 hover:text-[#0D47A1] p-1 cursor-pointer"
+                            title="Edit"
+                          >
+                            <Pencil size={11} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteNode(item);
+                            }}
+                            className="text-gray-300 hover:text-red-500 p-1 cursor-pointer"
+                            title="Delete"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                          <ChevronRight size={14} className="text-gray-400" />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
-            <div className="flex gap-3">
-              <button type="button" onClick={closeModal} className="flex-1 py-2.5 bg-gray-100 text-xs font-bold text-gray-600 rounded-xl">Cancel</button>
-              <button type="submit" className="flex-1 py-2.5 bg-[#FF9800] text-xs font-bold text-white rounded-xl">
-                {editingId ? "Save Changes" : "Add Brand"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+          );
+        })}
 
-      {/* 2. Length Modal */}
-      {activeModal === "length" && selectedBrand && (
+        {/* Add Sub-Category Column Card */}
+        <div
+          onClick={handleAddColumn}
+          className="min-w-[220px] self-stretch border-2 border-dashed border-[#0D47A1]/20 hover:border-[#FF9800] rounded-3xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all hover:bg-amber-50/20 group"
+          title="Add another sub-category column level to this category"
+        >
+          <div className="p-3 bg-[#0D47A1]/5 group-hover:bg-[#FF9800]/10 text-[#0D47A1] group-hover:text-[#FF9800] rounded-2xl transition-colors mb-2">
+            <Plus size={20} />
+          </div>
+          <span className="text-xs font-black text-[#0D47A1] group-hover:text-[#FF9800]">
+            + Add Sub-Category Column
+          </span>
+          <span className="text-[10px] text-gray-400 mt-1">
+            Expand hierarchy depth
+          </span>
+        </div>
+      </div>
+
+      {/* ── MODALS ── */}
+
+      {/* 1. Category Modal (Add / Edit) */}
+      {categoryModalMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0D47A1]/50 backdrop-blur-sm">
-          <form onSubmit={handleSaveLength} className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-[#0D47A1]">
-              {editingId ? "Edit Length" : `Add Length to ${selectedBrand.name}`}
+          <form onSubmit={handleSaveCategory} className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+            <h3 className="text-lg font-black text-[#0D47A1]">
+              {categoryModalMode === "edit" ? "Edit Category & Hierarchy Levels" : "Create New Main Category"}
             </h3>
-            <div className="relative">
+
+            <div>
+              <label className="text-[10px] font-black uppercase text-gray-500">Category Name *</label>
               <input
                 type="text"
-                placeholder="e.g. 90, 180 (Coil), 200m, 100"
-                value={newLength}
-                onChange={(e) => setNewLength(e.target.value)}
+                placeholder="e.g. Electrical Pipes & Conduit, Lighting, Switches"
+                value={catNameInput}
+                onChange={(e) => setCatNameInput(e.target.value)}
                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
                 required
               />
             </div>
-            <div className="flex gap-3">
-              <button type="button" onClick={closeModal} className="flex-1 py-2.5 bg-gray-100 text-xs font-bold text-gray-600 rounded-xl">Cancel</button>
-              <button type="submit" className="flex-1 py-2.5 bg-[#FF9800] text-xs font-bold text-white rounded-xl">
-                {editingId ? "Save Changes" : "Add Length"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
-      {/* 3. Model Modal */}
-      {activeModal === "model" && selectedBrand && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0D47A1]/50 backdrop-blur-sm">
-          <form onSubmit={handleSaveModel} className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-[#0D47A1]">
-              {editingId ? "Edit Model" : `Add Model to ${selectedLength ? `${selectedLength.lengthInMeters}m` : selectedBrand.name}`}
-            </h3>
-            <input
-              type="text"
-              placeholder="Model / Type Name (e.g. Flame Retardant FR, FRLSH)"
-              value={newModelName}
-              onChange={(e) => setNewModelName(e.target.value)}
-              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
-              required
-            />
-            <textarea
-              placeholder="Short Description (optional)"
-              value={newModelDesc}
-              onChange={(e) => setNewModelDesc(e.target.value)}
-              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
-              rows={2}
-            />
-            <div className="flex gap-3">
-              <button type="button" onClick={closeModal} className="flex-1 py-2.5 bg-gray-100 text-xs font-bold text-gray-600 rounded-xl">Cancel</button>
-              <button type="submit" className="flex-1 py-2.5 bg-[#FF9800] text-xs font-bold text-white rounded-xl">
-                {editingId ? "Save Changes" : "Add Model"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* 4. Variation Modal (Thickness, Colors, Price) */}
-      {activeModal === "variation" && selectedBrand && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0D47A1]/50 backdrop-blur-sm">
-          <form onSubmit={handleSaveVariation} className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-[#0D47A1]">
-              {editingId ? "Edit Spec & Price" : `Add Spec & Price (${selectedModel ? selectedModel.name : selectedBrand.name})`}
-            </h3>
-            
-            <div>
-              <label className="text-[10px] font-black uppercase text-gray-500">Thickness / Gauge (optional)</label>
-              <input
-                type="text"
-                placeholder="e.g. 1.0 sq mm, 1.5 sq mm, 2.5 sq mm"
-                value={varThickness}
-                onChange={(e) => setVarThickness(e.target.value)}
-                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1] mb-2"
-              />
-              <div className="flex flex-wrap gap-1.5">
-                {["1.0 sq mm", "1.5 sq mm", "2.5 sq mm", "4.0 sq mm"].map((size) => (
-                  <button
-                    key={size}
-                    type="button"
-                    onClick={() => setVarThickness(size)}
-                    className={`text-[10px] px-2.5 py-1 rounded-full font-bold border transition-all cursor-pointer ${
-                      varThickness === size 
-                        ? "bg-[#FF9800] text-white border-[#FF9800] shadow-sm" 
-                        : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
-                    }`}
-                  >
-                    {size}
-                  </button>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-gray-500 flex items-center justify-between">
+                <span>Sub-Category Columns / Levels ({catLevelsInput.length})</span>
+                <button
+                  type="button"
+                  onClick={() => setCatLevelsInput([...catLevelsInput, `Level ${catLevelsInput.length + 1}`])}
+                  className="text-[#FF9800] hover:underline cursor-pointer"
+                >
+                  + Add Level
+                </button>
+              </label>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {catLevelsInput.map((lvl, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-gray-400 w-5 text-center">{idx + 1}.</span>
+                    <input
+                      type="text"
+                      value={lvl}
+                      onChange={(e) => {
+                        const next = [...catLevelsInput];
+                        next[idx] = e.target.value;
+                        setCatLevelsInput(next);
+                      }}
+                      placeholder={`Column ${idx + 1} Title`}
+                      className="flex-1 p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#0D47A1]"
+                      required
+                    />
+                    {catLevelsInput.length > 2 && (
+                      <button
+                        type="button"
+                        onClick={() => setCatLevelsInput(catLevelsInput.filter((_, i) => i !== idx))}
+                        className="p-2 text-gray-300 hover:text-red-500 cursor-pointer"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
 
-            <div>
-              <label className="text-[10px] font-black uppercase text-gray-500">Available Colors</label>
-              <div className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  placeholder="Add color (e.g. Red, Blue)"
-                  value={colorInput}
-                  onChange={(e) => setColorInput(e.target.value)}
-                  className="flex-1 p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#0D47A1]"
-                />
-                <button type="button" onClick={handleAddColorTag} className="px-3 bg-gray-200 hover:bg-gray-300 text-xs font-bold rounded-xl">+</button>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {varColors.map((c, idx) => {
-                  const style = getColorStyles(c);
-                  return (
-                    <span 
-                      key={idx} 
-                      style={{ backgroundColor: style.bg, color: style.text, borderColor: style.border }} 
-                      className="text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1.5 border shadow-xs"
-                    >
-                      {c}
-                      <button type="button" onClick={() => handleRemoveColorTag(c)} style={{ color: style.text }} className="opacity-70 hover:opacity-100 font-bold">×</button>
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] font-black uppercase text-gray-500">Regular Price (₹) *</label>
-                <input
-                  type="number"
-                  placeholder="e.g. 1500"
-                  value={varPrice}
-                  onChange={(e) => setVarPrice(e.target.value)}
-                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-black uppercase text-gray-500">Sale Price (₹)</label>
-                <input
-                  type="number"
-                  placeholder="e.g. 1350"
-                  value={varSalePrice}
-                  onChange={(e) => setVarSalePrice(e.target.value)}
-                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
-                />
-              </div>
-            </div>
-
             <div className="flex gap-3 pt-2">
-              <button type="button" onClick={closeModal} className="flex-1 py-2.5 bg-gray-100 text-xs font-bold text-gray-600 rounded-xl">Cancel</button>
-              <button type="submit" className="flex-1 py-2.5 bg-[#FF9800] text-xs font-bold text-white rounded-xl">
-                {editingId ? "Save Changes" : "Save Specification"}
+              <button
+                type="button"
+                onClick={() => setCategoryModalMode(null)}
+                className="flex-1 py-2.5 bg-gray-100 text-xs font-bold text-gray-600 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-2.5 bg-[#FF9800] text-xs font-black text-white rounded-xl shadow-md cursor-pointer"
+              >
+                {categoryModalMode === "edit" ? "Save Changes" : "Create Category"}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* 5. COMBINATIONS TO INDIVIDUAL PRODUCTS GENERATOR MODAL */}
+      {/* 2. Column Rename Modal */}
+      {renamingColIdx !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0D47A1]/50 backdrop-blur-sm">
+          <form onSubmit={handleSaveColumnRename} className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
+            <h3 className="text-base font-black text-[#0D47A1]">
+              Rename Column {renamingColIdx + 1}
+            </h3>
+            <p className="text-xs text-gray-500">
+              Customize the title of this sub-category level for <span className="font-bold text-[#0D47A1]">{activeCategory?.name}</span>.
+            </p>
+            <input
+              type="text"
+              value={renamingColValue}
+              onChange={(e) => setRenamingColValue(e.target.value)}
+              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
+              required
+              autoFocus
+            />
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setRenamingColIdx(null)}
+                className="flex-1 py-2 bg-gray-100 text-xs font-bold text-gray-600 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-2 bg-[#FF9800] text-xs font-black text-white rounded-xl shadow-md cursor-pointer"
+              >
+                Save Name
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* 3. Node Modal (Intermediate / Leaf Spec) */}
+      {nodeModalConfig && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0D47A1]/50 backdrop-blur-sm">
+          <form onSubmit={handleSaveNode} className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-black text-[#0D47A1]">
+              {nodeModalConfig.editingNode
+                ? `Edit ${currentLevelNames[nodeModalConfig.levelIndex] || "Item"}`
+                : `Add ${currentLevelNames[nodeModalConfig.levelIndex] || "Item"}`}
+            </h3>
+
+            <div>
+              <label className="text-[10px] font-black uppercase text-gray-500">
+                {nodeModalConfig.isLeaf ? "Specification / Size / Gauge *" : `${currentLevelNames[nodeModalConfig.levelIndex]} Name *`}
+              </label>
+              <input
+                type="text"
+                placeholder={nodeModalConfig.isLeaf ? "e.g. 2.5 SQMM, 1/2 inch (15mm), 10A 1-Way" : "e.g. Polycab, 90 metres, CPVC Pro, FR"}
+                value={nodeNameInput}
+                onChange={(e) => setNodeNameInput(e.target.value)}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
+                required
+              />
+            </div>
+
+            {/* If root level (brands), allow image upload */}
+            {nodeModalConfig.levelIndex === 0 && (
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-500">Logo / Image URL (optional)</label>
+                <input
+                  type="text"
+                  placeholder="https://..."
+                  value={nodeImageInput}
+                  onChange={(e) => setNodeImageInput(e.target.value)}
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#0D47A1]"
+                />
+              </div>
+            )}
+
+            {/* If leaf level: colors, prices, stock */}
+            {nodeModalConfig.isLeaf && (
+              <>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500">Available Colors</label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      placeholder="Add color (e.g. Red, Blue, White)"
+                      value={colorTagInput}
+                      onChange={(e) => setColorTagInput(e.target.value)}
+                      className="flex-1 p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#0D47A1]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddColorTag}
+                      className="px-3.5 bg-gray-200 hover:bg-gray-300 text-xs font-bold rounded-xl cursor-pointer"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {nodeColors.map((c, idx) => {
+                      const st = getColorStyles(c);
+                      return (
+                        <span
+                          key={idx}
+                          style={{ backgroundColor: st.bg, color: st.text, borderColor: st.border }}
+                          className="text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1.5 border shadow-2xs"
+                        >
+                          {c}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveColorTag(c)}
+                            style={{ color: st.text }}
+                            className="opacity-70 hover:opacity-100 font-bold cursor-pointer"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-gray-500">Regular Price (₹) *</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 1500"
+                      value={nodePriceInput}
+                      onChange={(e) => setNodePriceInput(e.target.value)}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-gray-500">Sale Price (₹)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 1350"
+                      value={nodeSalePriceInput}
+                      onChange={(e) => setNodeSalePriceInput(e.target.value)}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500">Initial Stock</label>
+                  <input
+                    type="number"
+                    placeholder="100"
+                    value={nodeStockInput}
+                    onChange={(e) => setNodeStockInput(e.target.value)}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-[#0D47A1]"
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setNodeModalConfig(null)}
+                className="flex-1 py-2.5 bg-gray-100 text-xs font-bold text-gray-600 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-2.5 bg-[#FF9800] text-xs font-black text-white rounded-xl shadow-md cursor-pointer"
+              >
+                {nodeModalConfig.editingNode ? "Save Changes" : "Add Item"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* 4. Combination to Products Review Modal */}
       {isGeneratorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-[#0D47A1]/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl max-w-6xl w-full h-[90vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden">
@@ -1475,7 +1460,7 @@ export default function MasterCatalogPage() {
                       </span>
                     </h2>
                     <p className="text-white/70 text-xs mt-0.5">
-                      Every combination will be created as its own individual product row in your Products list with individual pricing &amp; SKU.
+                      Every path in your {activeCategory?.name} hierarchy will be created as its own individual product row in the Products list.
                     </p>
                   </div>
                 </div>
@@ -1490,7 +1475,6 @@ export default function MasterCatalogPage() {
 
             {/* Controls Bar */}
             <div className="p-4 bg-gray-50/80 border-b border-gray-200/80 space-y-3">
-              {/* Scope & Naming Controls */}
               <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
                 {/* Scope selector */}
                 <div className="flex items-center gap-2">
@@ -1505,19 +1489,19 @@ export default function MasterCatalogPage() {
                           : "text-gray-600 hover:text-gray-900"
                       }`}
                     >
-                      All Brands in {selectedCategory} ({activeCategoryCombinations.length})
+                      Entire Category ({activeCategoryCombinations.length})
                     </button>
-                    {selectedBrand && (
+                    {selectedPath[0] && (
                       <button
                         type="button"
-                        onClick={() => openGeneratorModal("brand")}
+                        onClick={() => openGeneratorModal("selected")}
                         className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                          generatorScope === "brand"
+                          generatorScope === "selected"
                             ? "bg-white text-[#0D47A1] shadow-xs"
                             : "text-gray-600 hover:text-gray-900"
                         }`}
                       >
-                        Only {selectedBrand.name}
+                        Only Selected Brand
                       </button>
                     )}
                   </div>
@@ -1547,9 +1531,8 @@ export default function MasterCatalogPage() {
                 </div>
               </div>
 
-              {/* Global Product Fields & Bulk Price Adjuster */}
+              {/* Global Fields & Bulk Adjuster */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-1 border-t border-gray-200/50">
-                {/* Default Unit */}
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black uppercase text-gray-500 whitespace-nowrap">Unit:</span>
                   <select
@@ -1565,7 +1548,6 @@ export default function MasterCatalogPage() {
                   </select>
                 </div>
 
-                {/* Default HSN */}
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black uppercase text-gray-500 whitespace-nowrap">HSN:</span>
                   <input
@@ -1577,7 +1559,6 @@ export default function MasterCatalogPage() {
                   />
                 </div>
 
-                {/* Default GST */}
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black uppercase text-gray-500 whitespace-nowrap">GST %:</span>
                   <select
@@ -1593,7 +1574,6 @@ export default function MasterCatalogPage() {
                   </select>
                 </div>
 
-                {/* Bulk Price Adjuster */}
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-black uppercase text-gray-500 whitespace-nowrap">Bulk Price:</span>
                   <div className="flex items-center gap-1 flex-1">
@@ -1619,14 +1599,14 @@ export default function MasterCatalogPage() {
                 </div>
               </div>
 
-              {/* Filter & Search Bar */}
+              {/* Search & Select All */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                 <div className="flex items-center gap-2 flex-1 max-w-md">
                   <div className="relative w-full">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                       type="text"
-                      placeholder="Search by combination name, length, color, gauge..."
+                      placeholder="Search combinations by brand, name, size..."
                       value={generatorSearch}
                       onChange={(e) => setGeneratorSearch(e.target.value)}
                       className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-[#0D47A1] placeholder:text-gray-400"
@@ -1635,20 +1615,6 @@ export default function MasterCatalogPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  {/* Brand Filter */}
-                  <select
-                    value={generatorBrandFilter}
-                    onChange={(e) => setGeneratorBrandFilter(e.target.value)}
-                    className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-[#0D47A1]"
-                  >
-                    <option value="all">All Brands ({filteredBrands.length})</option>
-                    {filteredBrands.map((b) => (
-                      <option key={b.id} value={b.name}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-
                   <button
                     type="button"
                     onClick={() => toggleSelectAllGenerated(true)}
@@ -1705,7 +1671,7 @@ export default function MasterCatalogPage() {
                   <AlertTriangle size={36} className="mx-auto text-amber-500 opacity-60" />
                   <p className="text-sm font-bold text-gray-500">No combinations found matching your filters.</p>
                   <p className="text-xs text-gray-400">
-                    Make sure lengths, models, and variation specs (price &amp; colors) are configured in the 4 columns.
+                    Ensure sub-category items and leaf specs (price &amp; colors) are configured across the columns.
                   </p>
                 </div>
               ) : (
@@ -1722,7 +1688,7 @@ export default function MasterCatalogPage() {
                       </th>
                       <th className="py-2.5 px-2 w-10 text-center">#</th>
                       <th className="py-2.5 px-3">Individual Product Name</th>
-                      <th className="py-2.5 px-3">Hierarchy Breakdown</th>
+                      <th className="py-2.5 px-3">Hierarchy Path</th>
                       <th className="py-2.5 px-3 w-32">MRP (₹)</th>
                       <th className="py-2.5 px-3 w-32">Sale Price (₹)</th>
                       <th className="py-2.5 px-3 w-24 text-center">Stock</th>
@@ -1759,24 +1725,18 @@ export default function MasterCatalogPage() {
                           </td>
                           <td className="py-2.5 px-3">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="text-[10px] font-extrabold bg-[#0D47A1]/10 text-[#0D47A1] px-2 py-0.5 rounded-md">
-                                {row.brand}
-                              </span>
-                              {row.length && (
-                                <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-md">
-                                  {row.length}
+                              {row.pathNames.map((pName, pIdx) => (
+                                <span
+                                  key={pIdx}
+                                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                                    pIdx === 0
+                                      ? "bg-[#0D47A1]/10 text-[#0D47A1] font-extrabold"
+                                      : "bg-gray-100 text-gray-700"
+                                  }`}
+                                >
+                                  {pName}
                                 </span>
-                              )}
-                              {row.model && row.model !== "Default" && (
-                                <span className="text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded-md">
-                                  {row.model}
-                                </span>
-                              )}
-                              {row.thickness && (
-                                <span className="text-[10px] font-bold bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-md">
-                                  {row.thickness}
-                                </span>
-                              )}
+                              ))}
                               {row.color && colorStyle && (
                                 <span
                                   style={{ backgroundColor: colorStyle.bg, color: colorStyle.text, borderColor: colorStyle.border }}

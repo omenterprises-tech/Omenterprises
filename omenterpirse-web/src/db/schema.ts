@@ -150,6 +150,25 @@ export const categories = sqliteTable("categories", {
   displayOrder: integer("display_order").notNull().default(0),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
   tagline: text("tagline"),
+  levelNames: text("level_names"), // JSON array of custom column names, e.g. ["Brands", "Lengths", "Models", "Specs & Prices"]
+});
+
+export const catalogNodes = sqliteTable("catalog_nodes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  categoryId: integer("category_id").notNull().references(() => categories.id, { onDelete: "cascade" }),
+  parentId: integer("parent_id"),
+  levelIndex: integer("level_index").notNull().default(0),
+  name: text("name").notNull(),
+  imageUrl: text("image_url"),
+  description: text("description"),
+  price: real("price"),
+  salePrice: real("sale_price"),
+  stock: integer("stock").default(100),
+  colors: text("colors"),
+  specKey: text("spec_key"),
+  displayOrder: integer("display_order").notNull().default(0),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
 });
 
 export const brands = sqliteTable("brands", {
