@@ -12,6 +12,7 @@ import {
   Loader2,
   CheckCircle2,
   Copy,
+  FolderTree,
 } from "lucide-react";
 import ProductModal from "@/components/crm/ProductModal";
 
@@ -81,11 +82,31 @@ export default function CrmProductsPage() {
       (p) =>
         p.name?.toLowerCase().includes(q) ||
         p.category?.toLowerCase().includes(q) ||
-        p.description?.toLowerCase().includes(q) ||
         p.hsn?.toLowerCase().includes(q) ||
         p.unit?.toLowerCase().includes(q)
     );
   }, [products, searchQuery]);
+
+  // Group products by main category and sort each group alphabetically by product name
+  const groupedProducts = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const prod of filteredProducts) {
+      const cat = (prod.category || "General").trim() || "General";
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(prod);
+    }
+
+    const sortedCategories = Object.keys(map).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" })
+    );
+
+    return sortedCategories.map((category) => ({
+      category,
+      products: [...map[category]].sort((a, b) =>
+        (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" })
+      ),
+    }));
+  }, [filteredProducts]);
 
   const openAddProduct = () => {
     setEditingProduct(null);
@@ -273,65 +294,90 @@ export default function CrmProductsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {filteredProducts.map((prod) => (
-                    <tr key={prod.id} className="hover:bg-gray-50/60 transition-colors">
-                      <td className="py-4 font-bold text-gray-900 text-xs sm:text-sm">
-                        <div>{prod.name}</div>
-                        {prod.unit && (
-                          <div className="text-[11px] text-gray-400 font-normal mt-0.5">
-                            Unit: {prod.unit}
+                  {groupedProducts.map((group) => (
+                    <React.Fragment key={group.category}>
+                      {/* Main Category Header Row */}
+                      <tr className="bg-slate-50/90 border-t-2 border-b border-slate-200/80">
+                        <td colSpan={4} className="py-2.5 px-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-brand"></span>
+                              <span className="text-xs font-black uppercase tracking-wider text-gray-900 font-inter">
+                                {group.category}
+                              </span>
+                              <span className="text-[10px] font-bold text-gray-500 bg-white px-2.5 py-0.5 rounded-full border border-gray-200">
+                                {group.products.length} {group.products.length === 1 ? "Product" : "Products"}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
+                              Sorted A → Z
+                            </span>
                           </div>
-                        )}
-                      </td>
-                      <td className="py-4 text-xs">
-                        {prod.hsn ? (
-                          <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 font-semibold border border-gray-200">
-                            {prod.hsn}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 font-normal">—</span>
-                        )}
-                      </td>
-                      <td className="py-4 font-bold text-gray-900 text-xs sm:text-sm">
-                        <div>
-                          ₹{Number(prod.basePrice).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                          {prod.unit ? <span className="text-gray-500 text-xs font-normal"> / {prod.unit}</span> : ""}
-                        </div>
-                        {prod.gst !== null && prod.gst !== undefined && (
-                          <div className="text-[11px] text-gray-400 font-normal">
-                            GST: {prod.gst}%
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-4 text-right">
-                        <div className="flex items-center justify-end space-x-1.5">
-                          <button
-                            type="button"
-                            onClick={() => openDuplicateAsVariant(prod)}
-                            className="p-1.5 text-gray-400 hover:text-brand hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                            title="Duplicate as new variant (keeps common brand & category details)"
-                          >
-                            <Copy size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openEditProduct(prod)}
-                            className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                            title="Edit product"
-                          >
-                            <Edit3 size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteProduct(prod.id, prod.name)}
-                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                            title="Delete product"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
+
+                      {/* Products under Main Category */}
+                      {group.products.map((prod) => (
+                        <tr key={prod.id} className="hover:bg-gray-50/60 transition-colors">
+                          <td className="py-4 font-bold text-gray-900 text-xs sm:text-sm pl-4">
+                            <div>{prod.name}</div>
+                            {prod.unit && (
+                              <div className="text-[11px] text-gray-400 font-normal mt-0.5">
+                                Unit: {prod.unit}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-4 text-xs">
+                            {prod.hsn ? (
+                              <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 font-semibold border border-gray-200">
+                                {prod.hsn}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 font-normal">—</span>
+                            )}
+                          </td>
+                          <td className="py-4 font-bold text-gray-900 text-xs sm:text-sm">
+                            <div>
+                              ₹{Number(prod.basePrice).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              {prod.unit ? <span className="text-gray-500 text-xs font-normal"> / {prod.unit}</span> : ""}
+                            </div>
+                            {prod.gst !== null && prod.gst !== undefined && (
+                              <div className="text-[11px] text-gray-400 font-normal">
+                                GST: {prod.gst}%
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-4 text-right pr-4">
+                            <div className="flex items-center justify-end space-x-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openDuplicateAsVariant(prod)}
+                                className="p-1.5 text-gray-400 hover:text-brand hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                title="Duplicate as new variant (keeps common brand & category details)"
+                              >
+                                <Copy size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openEditProduct(prod)}
+                                className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                title="Edit product"
+                              >
+                                <Edit3 size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteProduct(prod.id, prod.name)}
+                                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Delete product"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

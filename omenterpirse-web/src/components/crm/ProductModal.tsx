@@ -952,14 +952,19 @@ export default function ProductModal({
     });
   }, [activeCombinations, nameOrder, batchBasePrice]);
 
-  // Filter combinations based on search query
+  // Filter combinations based on search query and sort alphabetically
   const filteredCombinations = useMemo(() => {
-    if (!matrixSearch.trim()) return activeCombinations;
-    const q = matrixSearch.toLowerCase().trim();
-    return activeCombinations.filter(
-      (r) =>
-        r.name.toLowerCase().includes(q) ||
-        r.hierarchy.some((h) => h.toLowerCase().includes(q))
+    let list = activeCombinations;
+    if (matrixSearch.trim()) {
+      const q = matrixSearch.toLowerCase().trim();
+      list = activeCombinations.filter(
+        (r) =>
+          r.name.toLowerCase().includes(q) ||
+          r.hierarchy.some((h) => h.toLowerCase().includes(q))
+      );
+    }
+    return [...list].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
     );
   }, [activeCombinations, matrixSearch]);
 

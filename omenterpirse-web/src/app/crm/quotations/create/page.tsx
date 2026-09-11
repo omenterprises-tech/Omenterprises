@@ -346,6 +346,27 @@ function MakeQuotationContent() {
     );
   }, [allProducts, productSearch]);
 
+  // Group products by main category and sort alphabetically by product name
+  const groupedProducts = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const prod of filteredProducts) {
+      const cat = (prod.category || "General").trim() || "General";
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(prod);
+    }
+
+    const sortedCategories = Object.keys(map).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" })
+    );
+
+    return sortedCategories.map((category) => ({
+      category,
+      products: [...map[category]].sort((a, b) =>
+        (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" })
+      ),
+    }));
+  }, [filteredProducts]);
+
   // Product Selection Handlers
   const openProductConfigurator = (prod: any, editIndex: number | null = null) => {
     setCurrentProductObj(prod);
@@ -839,50 +860,62 @@ function MakeQuotationContent() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredProducts.map((prod) => (
-                <div
-                  key={prod.id}
-                  onClick={() => openProductConfigurator(prod)}
-                  className="p-5 rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 hover:border-brand/60 hover:bg-blue-50/20 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
-                          {prod.name}
-                        </h4>
-                        {prod.category && (
-                          <span className="inline-block mt-1 text-[11px] font-bold px-2 py-0.5 bg-gray-100 text-gray-700 rounded-md">
-                            {prod.category}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <span className="text-base font-black text-brand">
-                          ₹{Number(prod.basePrice || prod.price || 0).toLocaleString("en-IN")}
-                        </span>
-                        <span className="text-[10px] text-gray-500 block uppercase">
-                          per {prod.unit || "COILS"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {prod.description && (
-                      <p className="text-xs text-gray-600 line-clamp-2 pt-1">{prod.description}</p>
-                    )}
-
-                    <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
-                      <div className="flex items-center space-x-3">
-                        {prod.hsn && prod.hsn.trim() !== "-" && <span>HSN: {prod.hsn}</span>}
-                        {prod.gst !== undefined && prod.gst !== null && prod.gst > 0 && (
-                          <span>GST: {prod.gst}%</span>
-                        )}
-                      </div>
-                      <span className="text-xs font-bold text-brand group-hover:underline ml-auto">
-                        Select & Configure →
+            <div className="space-y-6">
+              {groupedProducts.map((group) => (
+                <div key={group.category} className="space-y-3">
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-brand"></span>
+                      <h3 className="text-xs font-black uppercase tracking-wider text-gray-900 font-inter">
+                        {group.category}
+                      </h3>
+                      <span className="text-[10px] font-bold text-gray-500 bg-white px-2 py-0.5 rounded-full border border-gray-200">
+                        {group.products.length} {group.products.length === 1 ? "Product" : "Products"}
                       </span>
                     </div>
+                    <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
+                      Sorted A → Z
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {group.products.map((prod) => (
+                      <div
+                        key={prod.id}
+                        onClick={() => openProductConfigurator(prod)}
+                        className="p-5 rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 hover:border-brand/60 hover:bg-blue-50/20 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
+                                {prod.name}
+                              </h4>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-base font-black text-brand">
+                                ₹{Number(prod.basePrice || prod.price || 0).toLocaleString("en-IN")}
+                              </span>
+                              <span className="text-[10px] text-gray-500 block uppercase">
+                                per {prod.unit || "COILS"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
+                            <div className="flex items-center space-x-3">
+                              {prod.hsn && prod.hsn.trim() !== "-" && <span>HSN: {prod.hsn}</span>}
+                              {prod.gst !== undefined && prod.gst !== null && prod.gst > 0 && (
+                                <span>GST: {prod.gst}%</span>
+                              )}
+                            </div>
+                            <span className="text-xs font-bold text-brand group-hover:underline ml-auto">
+                              Select & Configure →
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
