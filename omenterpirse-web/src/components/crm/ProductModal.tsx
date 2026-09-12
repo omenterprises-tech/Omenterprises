@@ -1531,7 +1531,7 @@ export default function ProductModal({
                       className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-brand hover:text-brand-hover bg-brand/5 hover:bg-brand/10 rounded-xl transition-colors cursor-pointer"
                     >
                       <Plus size={14} />
-                      <span>+ Add Sub-Category Level</span>
+                      <span>Add Sub-Category Level</span>
                     </button>
                   </div>
 
@@ -1867,7 +1867,7 @@ export default function ProductModal({
                       className="px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer shrink-0"
                     >
                       <Plus size={14} />
-                      <span>+ Add</span>
+                      <span>Add</span>
                     </button>
                   </div>
 
@@ -1904,7 +1904,7 @@ export default function ProductModal({
                         No sub-categories yet in &quot;{activeDrillDownNode.name || "Main Category"}&quot;
                       </p>
                       <p className="text-[11px] text-gray-400 mt-1 max-w-sm mx-auto">
-                        Type sub-categories above (e.g. 180 mts, 90 mts) and click &quot;+ Add&quot; or select from Suggestions to begin building your catalog.
+                        Type sub-categories above (e.g. 180 mts, 90 mts) and click &quot;Add&quot; or select from Suggestions to begin building your catalog.
                       </p>
                     </div>
                   ) : (
