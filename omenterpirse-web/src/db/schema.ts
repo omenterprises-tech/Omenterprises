@@ -34,6 +34,8 @@ export const products = sqliteTable("products", {
   gst: real("gst"),
   unit: text("unit"),
   hsn: text("hsn"),
+  businessId: integer("business_id").references(() => crmBusinesses.id, { onDelete: "cascade" }),
+  createdByUserId: integer("created_by_user_id").references(() => crmUsers.id, { onDelete: "set null" }),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
 });
 

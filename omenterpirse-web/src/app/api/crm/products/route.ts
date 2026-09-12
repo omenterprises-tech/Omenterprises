@@ -2,23 +2,62 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { products } from "@/db/schema";
 import { getCrmSession } from "@/lib/crmAuth";
-import { desc, eq } from "drizzle-orm";
+import { resolveBusinessAndRole } from "@/lib/crmBusinessResolver";
+import { desc, eq, and, sql } from "drizzle-orm";
+
+let hasEnsuredSchema = false;
+
+async function ensureProductsSchema() {
+  if (hasEnsuredSchema) return;
+  try {
+    const tableInfo: any = await db.all(sql`PRAGMA table_info(products)`);
+    const colNames = Array.isArray(tableInfo) ? tableInfo.map((c: any) => c.name) : [];
+
+    if (!colNames.includes("business_id")) {
+      await db.run(
+        sql`ALTER TABLE products ADD COLUMN business_id INTEGER REFERENCES crm_businesses(id) ON DELETE CASCADE`
+      );
+      // Migrate legacy products that have no business_id to the earliest registered CRM business
+      await db.run(
+        sql`UPDATE products SET business_id = (SELECT id FROM crm_businesses ORDER BY id ASC LIMIT 1) WHERE business_id IS NULL`
+      );
+    }
+
+    if (!colNames.includes("created_by_user_id")) {
+      await db.run(
+        sql`ALTER TABLE products ADD COLUMN created_by_user_id INTEGER REFERENCES crm_users(id) ON DELETE SET NULL`
+      );
+    }
+
+    hasEnsuredSchema = true;
+  } catch (err) {
+    console.error("ensureProductsSchema error:", err);
+  }
+}
 
 export async function GET() {
   try {
+    await ensureProductsSchema();
+
     const session = await getCrmSession();
     if (!session) {
       return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
     }
 
-    const allProducts = await db
+    const { business } = await resolveBusinessAndRole(session.userId);
+    if (!business) {
+      return NextResponse.json({ success: false, error: "Business not found." }, { status: 404 });
+    }
+
+    const businessProducts = await db
       .select()
       .from(products)
+      .where(eq(products.businessId, business.id))
       .orderBy(desc(products.id));
 
     return NextResponse.json({
       success: true,
-      products: allProducts,
+      products: businessProducts,
     });
   } catch (error: any) {
     console.error("Fetch products error:", error);
@@ -31,9 +70,16 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    await ensureProductsSchema();
+
     const session = await getCrmSession();
     if (!session) {
       return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+    }
+
+    const { business } = await resolveBusinessAndRole(session.userId);
+    if (!business) {
+      return NextResponse.json({ success: false, error: "Business not found." }, { status: 404 });
     }
 
     const body = await request.json();
@@ -86,6 +132,8 @@ export async function POST(request: Request) {
               ? specifications
               : JSON.stringify(specifications)
             : null,
+          businessId: business.id,
+          createdByUserId: session.userId,
           createdAt: now,
         });
       }
@@ -134,6 +182,8 @@ export async function POST(request: Request) {
             ? specifications
             : JSON.stringify(specifications)
           : null,
+        businessId: business.id,
+        createdByUserId: session.userId,
         createdAt: new Date().toISOString(),
       })
       .returning();
@@ -153,9 +203,16 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    await ensureProductsSchema();
+
     const session = await getCrmSession();
     if (!session) {
       return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+    }
+
+    const { business } = await resolveBusinessAndRole(session.userId);
+    if (!business) {
+      return NextResponse.json({ success: false, error: "Business not found." }, { status: 404 });
     }
 
     const body = await request.json();
@@ -198,11 +255,11 @@ export async function PUT(request: Request) {
             : JSON.stringify(specifications)
           : null,
       })
-      .where(eq(products.id, parseInt(id, 10)))
+      .where(and(eq(products.id, parseInt(id, 10)), eq(products.businessId, business.id)))
       .returning();
 
     if (!updated.length) {
-      return NextResponse.json({ success: false, error: "Product not found." }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Product not found or unauthorized." }, { status: 404 });
     }
 
     return NextResponse.json({
@@ -220,9 +277,16 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    await ensureProductsSchema();
+
     const session = await getCrmSession();
     if (!session) {
       return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+    }
+
+    const { business } = await resolveBusinessAndRole(session.userId);
+    if (!business) {
+      return NextResponse.json({ success: false, error: "Business not found." }, { status: 404 });
     }
 
     const url = new URL(request.url);
@@ -231,7 +295,15 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: "Product ID is required." }, { status: 400 });
     }
 
-    await db.delete(products).where(eq(products.id, parseInt(idParam, 10)));
+    const deleted = await db
+      .delete(products)
+      .where(and(eq(products.id, parseInt(idParam, 10)), eq(products.businessId, business.id)))
+      .returning();
+
+    if (!deleted.length) {
+      return NextResponse.json({ success: false, error: "Product not found or unauthorized." }, { status: 404 });
+    }
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Delete product error:", error);
