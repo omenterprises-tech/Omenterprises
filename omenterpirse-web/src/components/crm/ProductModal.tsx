@@ -1877,9 +1877,7 @@ export default function ProductModal({
                       Suggestions:
                     </span>
                     {[
-                      { label: "Wires & Pipes", val: "wires, pipes" },
                       { label: "Lengths", val: "180 mts, 90 mts" },
-                      { label: "Grades", val: "fr, frls" },
                       { label: "Wire Sizes", val: "1.0 sqmm, 1.5 sqmm, 2.5 sqmm, 4.0 sqmm" },
                       { label: "Colors", val: "red, blue, green, yellow, black" },
                       { label: "Pipe Sizes", val: "20mm, 25mm, 32mm" },
@@ -1906,7 +1904,7 @@ export default function ProductModal({
                         No sub-categories yet in &quot;{activeDrillDownNode.name || "Main Category"}&quot;
                       </p>
                       <p className="text-[11px] text-gray-400 mt-1 max-w-sm mx-auto">
-                        Type sub-categories above (e.g. wires, pipes) and click &quot;+ Add&quot; or select from Suggestions to begin building your catalog.
+                        Type sub-categories above (e.g. 180 mts, 90 mts) and click &quot;+ Add&quot; or select from Suggestions to begin building your catalog.
                       </p>
                     </div>
                   ) : (
