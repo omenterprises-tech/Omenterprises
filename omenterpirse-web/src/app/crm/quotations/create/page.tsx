@@ -18,11 +18,31 @@ import {
   AlertCircle,
   Calculator,
   Building2,
+  ChevronRight,
+  FolderTree,
+  Layers,
 } from "lucide-react";
 import CustomerModal from "@/components/crm/CustomerModal";
 import ProductModal from "@/components/crm/ProductModal";
 import { formatDateWithPattern, formatDisplayDate } from "@/lib/crmCurrencyData";
 import { alphabeticalCompare } from "@/lib/utils";
+
+// Helper to safely extract full category hierarchy path from product
+function getProductHierarchy(prod: any): string[] {
+  try {
+    let specs = prod.specifications;
+    if (typeof specs === "string") {
+      specs = JSON.parse(specs);
+    }
+    if (specs && Array.isArray(specs.hierarchy) && specs.hierarchy.length > 0) {
+      const clean = specs.hierarchy.map((h: any) => String(h).trim()).filter(Boolean);
+      if (clean.length > 0) return clean;
+    }
+  } catch (e) {}
+
+  const cat = (prod.category || "General").trim() || "General";
+  return [cat];
+}
 
 interface QuotationItem {
   id: string;
@@ -77,6 +97,7 @@ function MakeQuotationContent() {
   const [isProductSelectOpen, setIsProductSelectOpen] = useState(false);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [productSearch, setProductSearch] = useState("");
+  const [productCategoryPath, setProductCategoryPath] = useState<string[]>([]);
 
   // Product Configurator Modal
   const [isConfiguringProduct, setIsConfiguringProduct] = useState(false);
@@ -335,45 +356,105 @@ function MakeQuotationContent() {
     );
   }, [customers, customerSearch]);
 
-  // Filtered products sorted alphabetically
-  const filteredProducts = useMemo(() => {
-    let list = allProducts;
-    if (productSearch.trim()) {
-      const q = productSearch.toLowerCase().trim();
-      list = allProducts.filter(
-        (p) =>
-          p.name?.toLowerCase().includes(q) ||
-          p.category?.toLowerCase().includes(q) ||
-          p.description?.toLowerCase().includes(q)
-      );
+  // 1. All products matching the current category drill-down path
+  const currentLevelProducts = useMemo(() => {
+    if (productCategoryPath.length === 0) return allProducts;
+    return allProducts.filter((prod) => {
+      const hier = getProductHierarchy(prod);
+      if (hier.length < productCategoryPath.length) return false;
+      for (let i = 0; i < productCategoryPath.length; i++) {
+        if (hier[i].toLowerCase() !== productCategoryPath[i].toLowerCase()) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [allProducts, productCategoryPath]);
+
+  // 2. Next-level sub-category groups and leaf products for drill-down navigation
+  const { subCategoryGroups, leafProducts } = useMemo(() => {
+    const depth = productCategoryPath.length;
+    const subCatMap: Record<string, any[]> = {};
+    const directLeaves: any[] = [];
+
+    for (const prod of currentLevelProducts) {
+      const hier = getProductHierarchy(prod);
+      if (hier.length <= depth) {
+        directLeaves.push(prod);
+      } else {
+        const nextSegment = hier[depth];
+        if (!subCatMap[nextSegment]) {
+          subCatMap[nextSegment] = [];
+        }
+        subCatMap[nextSegment].push(prod);
+      }
     }
-    return [...list].sort((a, b) =>
-      alphabeticalCompare(a.name || "", b.name || "")
-    );
+
+    const groups: Array<{
+      name: string;
+      count: number;
+      products: any[];
+    }> = [];
+
+    const finalLeaves = [...directLeaves];
+
+    for (const [name, prods] of Object.entries(subCatMap)) {
+      if (depth === 0) {
+        // Main categories level: always display as category cards
+        groups.push({
+          name,
+          count: prods.length,
+          products: prods,
+        });
+      } else {
+        // Check if any product in this group has deeper hierarchy levels beyond depth + 1
+        const hasDeeper = prods.some((p) => getProductHierarchy(p).length > depth + 1);
+        if (hasDeeper) {
+          groups.push({
+            name,
+            count: prods.length,
+            products: prods,
+          });
+        } else {
+          // Hierarchy has ended for this branch! Each product is a selectable final leaf
+          for (const p of prods) {
+            if (!finalLeaves.some((fl) => fl.id === p.id)) {
+              finalLeaves.push(p);
+            }
+          }
+        }
+      }
+    }
+
+    groups.sort((a, b) => alphabeticalCompare(a.name, b.name));
+    finalLeaves.sort((a, b) => alphabeticalCompare(a.name || "", b.name || ""));
+
+    return { subCategoryGroups: groups, leafProducts: finalLeaves };
+  }, [currentLevelProducts, productCategoryPath]);
+
+  // 3. Search results across all products when productSearch is active
+  const searchResults = useMemo(() => {
+    if (!productSearch.trim()) return [];
+    const q = productSearch.toLowerCase().trim();
+    return allProducts
+      .filter((p) => {
+        const hier = getProductHierarchy(p);
+        const hierMatch = hier.some((h) => h.toLowerCase().includes(q));
+        const nameMatch = p.name?.toLowerCase().includes(q);
+        const catMatch = p.category?.toLowerCase().includes(q);
+        const descMatch = p.description?.toLowerCase().includes(q);
+        return hierMatch || nameMatch || catMatch || descMatch;
+      })
+      .sort((a, b) => alphabeticalCompare(a.name || "", b.name || ""));
   }, [allProducts, productSearch]);
 
-  // Group products by main category and sort alphabetically by product name (A → Z)
-  const groupedProducts = useMemo(() => {
-    const map: Record<string, any[]> = {};
-    for (const prod of filteredProducts) {
-      const cat = (prod.category || "General").trim() || "General";
-      if (!map[cat]) map[cat] = [];
-      map[cat].push(prod);
-    }
-
-    const sortedCategories = Object.keys(map).sort((a, b) =>
-      alphabeticalCompare(a, b)
-    );
-
-    return sortedCategories.map((category) => ({
-      category,
-      products: [...map[category]].sort((a, b) =>
-        alphabeticalCompare(a.name || "", b.name || "")
-      ),
-    }));
-  }, [filteredProducts]);
-
   // Product Selection Handlers
+  const openProductSelection = () => {
+    setProductCategoryPath([]);
+    setProductSearch("");
+    setIsProductSelectOpen(true);
+  };
+
   const openProductConfigurator = (prod: any, editIndex: number | null = null) => {
     setCurrentProductObj(prod);
     setEditingItemIndex(editIndex);
@@ -840,20 +921,18 @@ function MakeQuotationContent() {
             </div>
           </div>
 
-          {/* Products Grid */}
-          {filteredProducts.length === 0 ? (
+          {/* Catalog Empty State */}
+          {allProducts.length === 0 ? (
             <div className="bg-white rounded-3xl p-12 border border-gray-200/80 text-center space-y-4 shadow-xs">
               <div className="w-14 h-14 rounded-2xl bg-brand/10 text-brand flex items-center justify-center mx-auto">
                 <Package size={28} />
               </div>
               <div>
                 <h3 className="text-base font-bold text-gray-900">
-                  {productSearch ? "No matching products found" : "No products registered in catalog"}
+                  No products registered in catalog
                 </h3>
                 <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
-                  {productSearch
-                    ? `No product matches "${productSearch}". Try another keyword or create a new product.`
-                    : "Add your first commercial product to build quotations effortlessly."}
+                  Add your first commercial product to build quotations effortlessly.
                 </p>
               </div>
               <button
@@ -865,41 +944,75 @@ function MakeQuotationContent() {
                 <span>Add Product</span>
               </button>
             </div>
-          ) : (
-            <div className="space-y-6">
-              {groupedProducts.map((group) => (
-                <div key={group.category} className="space-y-3">
-                  <div className="flex items-center justify-between px-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-brand"></span>
-                      <h3 className="text-xs font-black uppercase tracking-wider text-gray-900 font-inter">
-                        {group.category}
-                      </h3>
-                      <span className="text-[10px] font-bold text-gray-500 bg-white px-2 py-0.5 rounded-full border border-gray-200">
-                        {group.products.length} {group.products.length === 1 ? "Product" : "Products"}
-                      </span>
-                    </div>
-                  </div>
+          ) : productSearch.trim() ? (
+            /* Search Results View */
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-brand"></span>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-gray-900 font-inter">
+                    Search Results
+                  </h3>
+                  <span className="text-[10px] font-bold text-gray-500 bg-white px-2 py-0.5 rounded-full border border-gray-200">
+                    {searchResults.length} {searchResults.length === 1 ? "Product" : "Products"} found
+                  </span>
+                </div>
+              </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {group.products.map((prod) => (
+              {searchResults.length === 0 ? (
+                <div className="bg-white rounded-3xl p-12 border border-gray-200/80 text-center space-y-3 shadow-xs">
+                  <div className="w-12 h-12 rounded-2xl bg-gray-100 text-gray-400 flex items-center justify-center mx-auto">
+                    <Search size={22} />
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-900">
+                    No products match &ldquo;{productSearch}&rdquo;
+                  </h3>
+                  <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                    Try searching with another keyword or clear the search bar.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setProductSearch("")}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                  >
+                    Clear Search
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {searchResults.map((prod) => {
+                    const hier = getProductHierarchy(prod);
+                    return (
                       <div
                         key={prod.id}
                         onClick={() => openProductConfigurator(prod)}
-                        className="p-5 rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 hover:border-brand/60 hover:bg-blue-50/20 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                        className="p-5 rounded-2xl sm:rounded-3xl bg-white border border-gray-200/90 hover:border-brand hover:bg-blue-50/10 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
                       >
                         <div className="space-y-2">
+                          {hier.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1 text-[11px] text-gray-500 font-medium">
+                              {hier.map((step, sIdx) => (
+                                <React.Fragment key={sIdx}>
+                                  {sIdx > 0 && <span className="text-gray-300">›</span>}
+                                  <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-md text-[10px]">
+                                    {step}
+                                  </span>
+                                </React.Fragment>
+                              ))}
+                            </div>
+                          )}
+
                           <div className="flex items-start justify-between gap-3">
-                            <div>
+                            <div className="min-w-0">
                               <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
                                 {prod.name}
                               </h4>
                             </div>
-                            <div className="text-right">
+                            <div className="text-right shrink-0">
                               <span className="text-base font-black text-brand">
                                 ₹{Number(prod.basePrice || prod.price || 0).toLocaleString("en-IN")}
                               </span>
-                              <span className="text-[10px] text-gray-500 block uppercase">
+                              <span className="text-[10px] text-gray-500 block uppercase font-bold">
                                 per {prod.unit || "COILS"}
                               </span>
                             </div>
@@ -912,16 +1025,207 @@ function MakeQuotationContent() {
                                 <span>GST: {prod.gst}%</span>
                               )}
                             </div>
-                            <span className="text-xs font-bold text-brand group-hover:underline ml-auto">
-                              Select & Configure →
+                            <span className="text-xs font-bold text-brand group-hover:underline inline-flex items-center space-x-1">
+                              <span>Select & Configure</span>
+                              <ChevronRight size={14} />
                             </span>
                           </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Hierarchical Card Drill-Down View */
+            <div className="space-y-6">
+              {/* Breadcrumb Navigation Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl p-3 sm:p-4 border border-gray-200/80 shadow-xs">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  {productCategoryPath.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setProductCategoryPath((prev) => prev.slice(0, -1))}
+                      className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer mr-1"
+                      title="Go back one level"
+                    >
+                      <ArrowLeft size={14} />
+                      <span>Back</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setProductCategoryPath([])}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      productCategoryPath.length === 0
+                        ? "bg-brand text-white shadow-xs"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    All Categories
+                  </button>
+
+                  {productCategoryPath.map((cat, idx) => {
+                    const isCurrent = idx === productCategoryPath.length - 1;
+                    return (
+                      <React.Fragment key={idx}>
+                        <ChevronRight size={14} className="text-gray-400 shrink-0" />
+                        <button
+                          type="button"
+                          onClick={() => setProductCategoryPath(productCategoryPath.slice(0, idx + 1))}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            isCurrent
+                              ? "bg-brand text-white shadow-xs"
+                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+
+                <div className="text-xs text-gray-500 font-medium">
+                  {currentLevelProducts.length} {currentLevelProducts.length === 1 ? "Product" : "Products"} available
+                </div>
+              </div>
+
+              {/* 1. Next-Level Category / Sub-Category Cards */}
+              {subCategoryGroups.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2 px-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-brand"></span>
+                    <h3 className="text-xs font-black uppercase tracking-wider text-gray-900 font-inter">
+                      {productCategoryPath.length === 0
+                        ? "Main Categories"
+                        : `Sub-Categories in ${productCategoryPath[productCategoryPath.length - 1]}`}
+                    </h3>
+                    <span className="text-[10px] font-bold text-gray-500 bg-white px-2 py-0.5 rounded-full border border-gray-200">
+                      {subCategoryGroups.length}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {subCategoryGroups.map((group) => (
+                      <div
+                        key={group.name}
+                        onClick={() => setProductCategoryPath([...productCategoryPath, group.name])}
+                        className="p-5 rounded-2xl sm:rounded-3xl bg-white border border-gray-200/90 hover:border-brand hover:shadow-md transition-all cursor-pointer group flex items-center justify-between"
+                      >
+                        <div className="flex items-center space-x-3.5 min-w-0">
+                          <div className="w-11 h-11 rounded-2xl bg-brand/10 text-brand flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-brand group-hover:text-white transition-all shadow-xs">
+                            {productCategoryPath.length === 0 ? <Layers size={20} /> : <FolderTree size={20} />}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors truncate">
+                              {group.name}
+                            </h4>
+                            <p className="text-xs text-gray-500 font-medium mt-0.5">
+                              {group.count} {group.count === 1 ? "product" : "products"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="w-8 h-8 rounded-xl bg-gray-50 group-hover:bg-brand/10 text-gray-400 group-hover:text-brand flex items-center justify-center transition-colors shrink-0">
+                          <ChevronRight size={16} />
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* 2. Leaf Products / Final Level Cards */}
+              {leafProducts.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2 px-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <h3 className="text-xs font-black uppercase tracking-wider text-gray-900 font-inter">
+                      {subCategoryGroups.length > 0 ? "Products / Variants" : "Select Product"}
+                    </h3>
+                    <span className="text-[10px] font-bold text-gray-500 bg-white px-2 py-0.5 rounded-full border border-gray-200">
+                      {leafProducts.length} {leafProducts.length === 1 ? "Product" : "Products"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {leafProducts.map((prod) => {
+                      const hier = getProductHierarchy(prod);
+                      const leafLabel = hier.length > 0 ? hier[hier.length - 1] : prod.name;
+
+                      return (
+                        <div
+                          key={prod.id}
+                          onClick={() => openProductConfigurator(prod)}
+                          className="p-5 rounded-2xl sm:rounded-3xl bg-white border border-gray-200/90 hover:border-brand hover:bg-blue-50/10 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
+                                  {leafLabel}
+                                </h4>
+                                {prod.name && prod.name !== leafLabel && (
+                                  <p className="text-xs text-gray-500 line-clamp-1 mt-0.5 font-medium">
+                                    {prod.name}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className="text-base font-black text-brand">
+                                  ₹{Number(prod.basePrice || prod.price || 0).toLocaleString("en-IN")}
+                                </span>
+                                <span className="text-[10px] text-gray-500 block uppercase font-bold">
+                                  per {prod.unit || "COILS"}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
+                              <div className="flex items-center space-x-3">
+                                {prod.hsn && prod.hsn.trim() !== "-" && <span>HSN: {prod.hsn}</span>}
+                                {prod.gst !== undefined && prod.gst !== null && prod.gst > 0 && (
+                                  <span>GST: {prod.gst}%</span>
+                                )}
+                              </div>
+                              <span className="text-xs font-bold text-brand group-hover:underline inline-flex items-center space-x-1">
+                                <span>Select & Configure</span>
+                                <ChevronRight size={14} />
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty Category State */}
+              {subCategoryGroups.length === 0 && leafProducts.length === 0 && (
+                <div className="bg-white rounded-3xl p-12 border border-gray-200/80 text-center space-y-4 shadow-xs">
+                  <div className="w-14 h-14 rounded-2xl bg-brand/10 text-brand flex items-center justify-center mx-auto">
+                    <Package size={28} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900">
+                      No products found in this category
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                      There are no products configured under &ldquo;{productCategoryPath.join(" > ")}&rdquo;.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setProductCategoryPath([])}
+                    className="inline-flex items-center space-x-1.5 px-5 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow-md cursor-pointer transition-all"
+                  >
+                    <span>Back to All Categories</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </main>
@@ -1272,7 +1576,7 @@ function MakeQuotationContent() {
         {/* ---------------- 2. PRODUCTS CARD ---------------- */}
         {selectedItems.length === 0 ? (
           <div
-            onClick={() => setIsProductSelectOpen(true)}
+            onClick={openProductSelection}
             className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs hover:border-brand/50 hover:shadow-sm cursor-pointer transition-all flex items-center justify-between group"
           >
             <div className="flex items-center space-x-3.5">
@@ -1307,7 +1611,7 @@ function MakeQuotationContent() {
 
               <button
                 type="button"
-                onClick={() => setIsProductSelectOpen(true)}
+                onClick={openProductSelection}
                 className="w-8 h-8 rounded-full bg-gray-100 hover:bg-brand hover:text-white text-gray-700 flex items-center justify-center transition-all cursor-pointer shadow-xs"
                 title="Add More Products"
               >
@@ -1425,7 +1729,7 @@ function MakeQuotationContent() {
                   <div className="flex justify-end">
                     <button
                       type="button"
-                      onClick={() => setIsProductSelectOpen(true)}
+                      onClick={openProductSelection}
                       className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl border border-gray-200 hover:border-brand text-brand hover:bg-brand/5 text-xs font-bold transition-all cursor-pointer"
                     >
                       <Plus size={14} />
