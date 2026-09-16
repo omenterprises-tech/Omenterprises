@@ -19,6 +19,17 @@ export const otpVerifications = sqliteTable("otp_verifications", {
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
 });
 
+export const adminUsers = sqliteTable("admin_users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  email: text("email").notNull().unique(),
+  fullName: text("full_name"),
+  passwordHash: text("password_hash").notNull(),
+  salt: text("salt").notNull(),
+  role: text("role").default("superadmin"),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
+  lastLoginAt: text("last_login_at"),
+});
+
 
 export const products = sqliteTable("products", {
   id: integer("id").primaryKey({ autoIncrement: true }),

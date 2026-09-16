@@ -20,11 +20,10 @@ export default function AdminLogin() {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/otp", {
+      const res = await fetch("/api/admin/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          action: "admin_login", 
           email: email.trim(), 
           password 
         }),

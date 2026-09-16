@@ -403,6 +403,16 @@ export default function CrmEntryPage() {
             </form>
           )}
         </div>
+
+        <div className="mt-6 text-center">
+          <a
+            href="/"
+            className="text-xs text-gray-500 hover:text-brand font-semibold transition-colors inline-flex items-center space-x-1"
+          >
+            <span>Customer shopping on OM Enterprises? Visit Main Storefront</span>
+            <span aria-hidden="true">&rarr;</span>
+          </a>
+        </div>
       </div>
     </div>
   );

@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, User, Loader2, Mail, Lock, Eye, EyeOff, Phone } from "lucide-react";
+import { ArrowLeft, User, Loader2, Mail, Phone, KeyRound, CheckCircle2, ArrowRight, RefreshCw } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 
@@ -13,21 +13,31 @@ function LoginForm() {
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const [mounted, setMounted] = useState(false);
-  const [step, setStep] = useState<"login" | "register">("login");
+  const [step, setStep] = useState<"email" | "otp" | "register">("email");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [otp, setOtp] = useState("");
   const [fullName, setFullName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [resendCountdown, setResendCountdown] = useState(0);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const handleEmailLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Countdown timer for OTP resend
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCountdown]);
+
+  // Step 1: Send OTP to Email
+  const handleSendOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       setError("Please enter a valid email address.");
@@ -38,35 +48,81 @@ function LoginForm() {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/email-login", {
+      const res = await fetch("/api/auth/otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: cleanEmail, password: password.trim() }),
+        body: JSON.stringify({ action: "send", email: cleanEmail }),
       });
       const data = await res.json();
       if (data.success) {
-        if (data.isNewUser) {
-          setStep("register");
-        } else {
-          const targetUrl = data.redirectTo || callbackUrl || "/";
-          router.push(targetUrl);
-          router.refresh();
-        }
+        setStep("otp");
+        setResendCountdown(30);
       } else {
-        throw new Error(data.error || "Login failed. Please check your credentials.");
+        throw new Error(data.error || "Failed to send verification code. Please try again.");
       }
     } catch (err: any) {
-      console.error("Login Error:", err);
-      setError(err.message || "Failed to log in. Please try again.");
+      console.error("Send OTP Error:", err);
+      setError(err.message || "Failed to send verification code.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
+  // Step 2: Verify OTP
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim()) {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanOtp = otp.trim().replace(/\D/g, "");
+
+    if (!cleanOtp || cleanOtp.length !== 6) {
+      setError("Please enter the 6-digit verification code.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/auth/otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "verify", email: cleanEmail, otp: cleanOtp }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        if (data.isNewUser) {
+          // Advance to Step 3: ask for Name & Mobile Number
+          setStep("register");
+        } else {
+          // Existing customer logged in successfully
+          router.push(callbackUrl);
+          router.refresh();
+        }
+      } else {
+        throw new Error(data.error || "Invalid or expired verification code.");
+      }
+    } catch (err: any) {
+      console.error("Verify OTP Error:", err);
+      setError(err.message || "Invalid verification code.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 3: Complete Profile for New User
+  const handleCompleteProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = fullName.trim();
+    const cleanPhone = phoneNumber.trim().replace(/\D/g, "");
+
+    if (!cleanName) {
       setError("Full Name is required.");
+      return;
+    }
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      setError("Please enter a valid 10-digit mobile number.");
       return;
     }
 
@@ -78,9 +134,9 @@ function LoginForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fullName: fullName.trim(),
-          email: email.trim().toLowerCase(),
-          phoneNumber: phoneNumber.trim() || undefined,
+          fullName: cleanName,
+          email: cleanEmail,
+          phoneNumber: cleanPhone,
         }),
       });
       const data = await res.json();
@@ -92,6 +148,7 @@ function LoginForm() {
         setError(data.error || "Failed to complete registration.");
       }
     } catch (err: any) {
+      console.error("Complete Profile Error:", err);
       setError("Failed to complete profile registration.");
     } finally {
       setLoading(false);
@@ -108,37 +165,39 @@ function LoginForm() {
 
   return (
     <div className="h-screen w-full bg-white flex flex-col md:flex-row font-inter selection:bg-brand-accent/30 overflow-hidden">
-      {/* Left Side: Image (Hidden on mobile) */}
+      {/* Left Side: Industrial Showcase (Hidden on mobile) */}
       <div className="hidden md:block w-1/2 relative bg-brand-light h-full">
         <img 
           src="/images/industrial_login_bg.png" 
           alt="OM Enterprises Industrial Solutions" 
           className="absolute inset-0 w-full h-full object-cover shadow-2xl"
         />
-        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="absolute inset-0 bg-black/15"></div>
         
-        {/* Decorative branding on image */}
+        {/* Branding on image */}
         <div className="absolute inset-0 flex flex-col justify-center items-center p-12 text-white text-center z-10">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1 }}
           >
-            <p className="text-xl font-medium opacity-90 drop-shadow-lg tracking-[0.2em] uppercase">Premium Industrial & Electrical Solutions</p>
+            <p className="text-xl font-medium opacity-90 drop-shadow-lg tracking-[0.2em] uppercase">
+              Premium Industrial & Electrical Solutions
+            </p>
           </motion.div>
         </div>
         
-        {/* Artistic overlay */}
         <div className="absolute inset-0 bg-gradient-to-tr from-brand/40 to-transparent mix-blend-multiply"></div>
       </div>
 
-      {/* Right Side: Form */}
-      <div className="w-full md:w-1/2 h-full flex flex-col justify-center items-center p-8 md:p-16 relative bg-white overflow-y-auto no-scrollbar">
-        <div className="w-full max-w-md animate-in fade-in slide-in-from-right-4 duration-700">
+      {/* Right Side: Auth Flow */}
+      <div className="w-full md:w-1/2 h-full flex flex-col justify-center items-center p-6 sm:p-10 md:p-14 relative bg-white overflow-y-auto no-scrollbar">
+        <div className="w-full max-w-md animate-in fade-in slide-in-from-right-4 duration-500">
 
-          <div className="text-center mb-10">
-            <div className="mb-6 flex justify-center">
-              <div className="relative w-20 h-20 overflow-hidden rounded-full border-2 border-brand/10 shadow-lg flex-shrink-0">
+          {/* Logo & Header */}
+          <div className="text-center mb-8">
+            <div className="mb-4 flex justify-center">
+              <div className="relative w-16 h-16 sm:w-20 sm:h-20 overflow-hidden rounded-full border-2 border-brand/10 shadow-md flex-shrink-0">
                 <Image
                   src="/images/logo.png"
                   alt="Om Enterprises Logo"
@@ -147,32 +206,37 @@ function LoginForm() {
                 />
               </div>
             </div>
-            <h2 className="text-3xl font-playfair font-bold text-brand mb-2">
-              {step === "register" ? "Create Account" : "Sign In"}
+
+            <h2 className="text-2xl sm:text-3xl font-playfair font-bold text-brand mb-1.5">
+              {step === "email" && "Customer Sign In"}
+              {step === "otp" && "Verify Your Email"}
+              {step === "register" && "Complete Your Profile"}
             </h2>
-            <div className="px-4">
-              <p className="text-brand/60 text-xs leading-relaxed font-medium">
-                {step === "login" && "Enter your email address to access your account."}
-                {step === "register" && "Welcome! Enter your details to complete your profile."}
-              </p>
-            </div>
+
+            <p className="text-brand/60 text-xs leading-relaxed font-medium">
+              {step === "email" && "Enter your email to receive a secure login code via OTP."}
+              {step === "otp" && `We've sent a 6-digit verification code to ${email}.`}
+              {step === "register" && "Welcome to OM Enterprises! Please provide your name and mobile number."}
+            </p>
           </div>
 
+          {/* Error Message */}
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-500 text-xs font-bold rounded-2xl text-center flex items-center justify-center space-x-3 shadow-sm animate-in zoom-in-95">
-              <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0"></div>
-              <span className="uppercase tracking-wider">{error}</span>
+            <div className="mb-5 p-3.5 bg-red-50 border border-red-100 text-red-600 text-xs font-bold rounded-2xl text-center flex items-center justify-center space-x-2 shadow-xs animate-in zoom-in-95">
+              <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0"></div>
+              <span>{error}</span>
             </div>
           )}
 
-          {/* PHASE 1: Email & Password Login */}
-          {step === "login" && (
-            <form onSubmit={handleEmailLogin} className="space-y-5">
-              {/* Email Address */}
-              <div className="space-y-2">
-                <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.25em] ml-2">Email Address</label>
+          {/* ================= STEP 1: Enter Email ================= */}
+          {step === "email" && (
+            <form onSubmit={handleSendOtp} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-brand/50 uppercase tracking-[0.2em] ml-1">
+                  Email Address
+                </label>
                 <div className="relative group">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 flex items-center pr-3">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center pr-3 pointer-events-none">
                     <Mail size={18} className="text-[#FF9800]" />
                   </div>
                   <input 
@@ -184,83 +248,162 @@ function LoginForm() {
                     }}
                     placeholder="name@example.com" 
                     autoComplete="email"
-                    className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/40 focus:bg-white focus:shadow-[0_0_30px_rgba(255,152,0,0.12)] rounded-2xl py-4 pl-14 pr-5 text-brand font-semibold text-sm placeholder:text-brand/20 transition-all outline-none"
+                    autoFocus
                     required
+                    className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/50 focus:bg-white focus:shadow-[0_0_25px_rgba(255,152,0,0.12)] rounded-2xl py-3.5 pl-12 pr-4 text-brand font-semibold text-sm placeholder:text-brand/25 transition-all outline-none"
                   />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between ml-2">
-                  <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.25em]">Password</label>
-                  <span className="text-[10px] text-gray-400 font-medium">Required for CRM & team</span>
-                </div>
-                <div className="relative group">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 flex items-center pr-3">
-                    <Lock size={18} className="text-[#FF9800]" />
-                  </div>
-                  <input 
-                    type={showPassword ? "text" : "password"} 
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (error) setError("");
-                    }}
-                    placeholder="••••••••" 
-                    autoComplete="current-password"
-                    className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/40 focus:bg-white focus:shadow-[0_0_30px_rgba(255,152,0,0.12)] rounded-2xl py-4 pl-14 pr-12 text-brand font-semibold text-sm placeholder:text-brand/20 transition-all outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand transition-colors p-1"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
                 </div>
               </div>
 
               <button 
                 type="submit" 
                 disabled={loading || !email.trim()} 
-                className="w-full bg-[#0D47A1] text-[#FF9800] font-black uppercase tracking-[0.2em] text-xs py-4.5 rounded-2xl shadow-xl hover:bg-[#FF9800] hover:text-white hover:shadow-[0_20px_40px_rgba(255,152,0,0.15)] disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.98] flex justify-center items-center space-x-3 mt-4"
+                className="w-full bg-[#0D47A1] hover:bg-[#FF9800] text-white font-black uppercase tracking-[0.2em] text-xs py-4 rounded-2xl shadow-lg hover:shadow-xl active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex justify-center items-center space-x-2 mt-3 cursor-pointer"
               >
                 {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Sending Code...</span>
+                  </>
                 ) : (
-                  <span>Sign In</span>
+                  <>
+                    <span>Send Verification Code</span>
+                    <ArrowRight size={15} />
+                  </>
                 )}
               </button>
 
-              <div className="pt-4 text-center">
+              <div className="pt-4 text-center border-t border-gray-100 mt-6">
                 <Link
                   href="/crm"
                   className="text-xs text-brand/60 hover:text-[#0D47A1] font-semibold transition-colors inline-flex items-center space-x-1"
                 >
-                  <span>Business owner? Go to CRM Portal</span>
+                  <span>Business owner or team member? Go to CRM Portal</span>
                   <span aria-hidden="true">&rarr;</span>
                 </Link>
               </div>
             </form>
           )}
 
-          {/* PHASE 2: Register Details */}
-          {step === "register" && (
-            <form onSubmit={handleRegister} className="space-y-5">
-              <div className="space-y-2">
-                <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.25em] ml-2">Email Address (Account)</label>
-                <div className="relative bg-gray-50 border border-gray-200 rounded-2xl py-4 px-5">
-                  <span className="text-brand/70 font-semibold text-sm">{email}</span>
+          {/* ================= STEP 2: Enter OTP ================= */}
+          {step === "otp" && (
+            <form onSubmit={handleVerifyOtp} className="space-y-5">
+              <div className="bg-brand/5 rounded-2xl p-3.5 flex items-center justify-between border border-brand/10 text-xs">
+                <div className="flex items-center space-x-2.5 truncate">
+                  <Mail size={16} className="text-brand shrink-0" />
+                  <span className="font-semibold text-brand truncate">{email}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep("email");
+                    setOtp("");
+                    setError("");
+                  }}
+                  className="text-xs font-bold text-[#FF9800] hover:underline cursor-pointer shrink-0 ml-2"
+                >
+                  Change
+                </button>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-brand/50 uppercase tracking-[0.2em] ml-1">
+                  6-Digit Verification Code
+                </label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center pr-3 pointer-events-none">
+                    <KeyRound size={18} className="text-[#FF9800]" />
+                  </div>
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={otp}
+                    onChange={(e) => {
+                      setOtp(e.target.value.replace(/\D/g, ""));
+                      if (error) setError("");
+                    }}
+                    placeholder="123456" 
+                    autoFocus
+                    required
+                    className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/50 focus:bg-white focus:shadow-[0_0_25px_rgba(255,152,0,0.12)] rounded-2xl py-3.5 pl-12 pr-4 text-brand font-black tracking-[0.35em] text-center text-lg placeholder:tracking-normal placeholder:font-normal placeholder:text-brand/25 transition-all outline-none font-mono"
+                  />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.25em] ml-2">Full Name</label>
-                <div className="relative">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2">
-                    <User className="text-[#FF9800]" size={18} />
+              <button 
+                type="submit" 
+                disabled={loading || otp.trim().length !== 6} 
+                className="w-full bg-[#0D47A1] hover:bg-[#FF9800] text-white font-black uppercase tracking-[0.2em] text-xs py-4 rounded-2xl shadow-lg hover:shadow-xl active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex justify-center items-center space-x-2 cursor-pointer"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Verifying...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Verify & Sign In</span>
+                    <ArrowRight size={15} />
+                  </>
+                )}
+              </button>
+
+              {/* Resend OTP Button */}
+              <div className="flex items-center justify-between pt-2 px-1 text-xs text-gray-500 font-medium">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep("email");
+                    setOtp("");
+                    setError("");
+                  }}
+                  className="hover:text-brand transition-colors inline-flex items-center space-x-1"
+                >
+                  <ArrowLeft size={13} />
+                  <span>Back</span>
+                </button>
+
+                <div>
+                  {resendCountdown > 0 ? (
+                    <span className="text-gray-400">Resend in {resendCountdown}s</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSendOtp()}
+                      disabled={loading}
+                      className="text-[#FF9800] hover:text-[#F57C00] font-bold inline-flex items-center space-x-1 cursor-pointer"
+                    >
+                      <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
+                      <span>Resend Code</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </form>
+          )}
+
+          {/* ================= STEP 3: Complete Profile (New User) ================= */}
+          {step === "register" && (
+            <form onSubmit={handleCompleteProfile} className="space-y-4">
+              <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center justify-between text-xs text-emerald-800">
+                <div className="flex items-center space-x-2 truncate">
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                  <span className="font-semibold truncate">{email}</span>
+                </div>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wider">
+                  Verified
+                </span>
+              </div>
+
+              {/* Full Name */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-brand/50 uppercase tracking-[0.2em] ml-1">
+                  Full Name <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center pr-3 pointer-events-none">
+                    <User size={18} className="text-[#FF9800]" />
                   </div>
                   <input 
                     type="text" 
@@ -269,56 +412,54 @@ function LoginForm() {
                       setFullName(e.target.value);
                       if (error) setError("");
                     }}
-                    placeholder="e.g. John Doe" 
-                    className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/40 focus:bg-white focus:shadow-[0_0_30px_rgba(255,152,0,0.12)] rounded-2xl py-4 pl-14 pr-5 text-brand font-semibold text-sm transition-all outline-none"
+                    placeholder="e.g. Ramesh Patel" 
+                    autoFocus
                     required
+                    className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/50 focus:bg-white focus:shadow-[0_0_25px_rgba(255,152,0,0.12)] rounded-2xl py-3.5 pl-12 pr-4 text-brand font-semibold text-sm placeholder:text-brand/25 transition-all outline-none"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-[10px] font-black text-brand/40 uppercase tracking-[0.25em] ml-2">Mobile Number (Optional)</label>
-                <div className="relative">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2">
-                    <Phone className="text-[#FF9800]" size={18} />
+              {/* Mobile Number */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-brand/50 uppercase tracking-[0.2em] ml-1">
+                  Mobile Number (10 Digits) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center pr-3 pointer-events-none">
+                    <Phone size={18} className="text-[#FF9800]" />
                   </div>
                   <input 
                     type="tel" 
-                    value={phoneNumber}
                     maxLength={10}
+                    value={phoneNumber}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, "").slice(0, 10);
-                      setPhoneNumber(val);
+                      setPhoneNumber(e.target.value.replace(/\D/g, ""));
                       if (error) setError("");
                     }}
-                    placeholder="10-digit mobile number" 
-                    className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/40 focus:bg-white focus:shadow-[0_0_30px_rgba(255,152,0,0.12)] rounded-2xl py-4 pl-14 pr-5 text-brand font-semibold text-sm transition-all outline-none"
+                    placeholder="9876543210" 
+                    required
+                    className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/50 focus:bg-white focus:shadow-[0_0_25px_rgba(255,152,0,0.12)] rounded-2xl py-3.5 pl-12 pr-4 text-brand font-semibold text-sm placeholder:text-brand/25 transition-all outline-none"
                   />
                 </div>
               </div>
 
               <button 
                 type="submit" 
-                disabled={loading || !fullName.trim()} 
-                className="w-full bg-[#0D47A1] text-[#FF9800] font-black uppercase tracking-[0.2em] text-xs py-4.5 rounded-2xl shadow-xl hover:bg-[#FF9800] hover:text-white hover:shadow-[0_20px_40px_rgba(255,152,0,0.15)] disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.98] flex justify-center items-center space-x-3 mt-4"
+                disabled={loading || !fullName.trim() || phoneNumber.replace(/\D/g, "").length !== 10} 
+                className="w-full bg-[#FF9800] hover:bg-[#F57C00] text-white font-black uppercase tracking-[0.2em] text-xs py-4 rounded-2xl shadow-lg hover:shadow-xl active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex justify-center items-center space-x-2 mt-3 cursor-pointer"
               >
                 {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Saving Profile...</span>
+                  </>
                 ) : (
-                  <span>Complete Registration</span>
+                  <>
+                    <span>Complete & Start Shopping</span>
+                    <ArrowRight size={15} />
+                  </>
                 )}
-              </button>
-
-              <button 
-                type="button"
-                onClick={() => {
-                  setStep("login");
-                  setError("");
-                }}
-                className="w-full flex items-center justify-center space-x-2 text-xs font-bold text-brand/50 hover:text-[#FF9800] py-2 transition-all"
-              >
-                <ArrowLeft size={14} />
-                <span>Use different email</span>
               </button>
             </form>
           )}
@@ -331,11 +472,13 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="h-screen w-full bg-white flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#0D47A1]" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="h-screen w-full bg-white flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#0D47A1]" />
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

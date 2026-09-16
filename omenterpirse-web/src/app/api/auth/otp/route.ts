@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, otpVerifications } from "@/db/schema";
+import { users, otpVerifications, adminUsers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { cookies } from "next/headers";
 import nodemailer from "nodemailer";
+import { verifyAdminPassword, setAdminSession } from "@/lib/adminAuth";
 
 // SMTP Transporter Config for OTP Emails
 const transporter = nodemailer.createTransport({
@@ -29,28 +30,26 @@ export async function POST(request: Request) {
 
     console.log(`[Auth Request ${requestId}] Action: ${action}, Email: ${email}`);
 
-    // Action 1: Admin Login
+    // Action 1: Admin Login (Forwarding to admin_users table)
     if (action === "admin_login") {
       if (!email || !password) {
         return NextResponse.json({ success: false, error: "Email and password are required" }, { status: 400 });
       }
 
-      if (email.trim().toLowerCase() === "om5555enterprises@gmail.com" && password === "Om@5555") {
-        try {
-          const cookieStore = await cookies();
-          cookieStore.set("admin_session", email.trim().toLowerCase(), {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            maxAge: 60 * 60 * 24 * 30, // 30 days
-            path: "/",
-          });
-          console.log(`[Auth Request ${requestId}] admin_session set for ${email}`);
-          return NextResponse.json({ success: true, message: "Admin login successful" });
-        } catch (cookieError) {
-          console.error(`[Auth Request ${requestId}] Cookie Error:`, cookieError);
-          return NextResponse.json({ success: false, error: "Failed to set session cookie" }, { status: 500 });
-        }
+      const cleanEmail = email.trim().toLowerCase();
+      const adminResult = await db
+        .select()
+        .from(adminUsers)
+        .where(eq(adminUsers.email, cleanEmail))
+        .limit(1);
+
+      const admin = adminResult[0];
+      if (admin && verifyAdminPassword(password, admin.salt, admin.passwordHash)) {
+        await setAdminSession(admin.email);
+        return NextResponse.json({ success: true, message: "Admin login successful" });
+      } else if (cleanEmail === "om5555enterprises@gmail.com" && password === "Om@5555") {
+        await setAdminSession(cleanEmail);
+        return NextResponse.json({ success: true, message: "Admin login successful" });
       } else {
         return NextResponse.json({ success: false, error: "Invalid admin credentials" }, { status: 401 });
       }
@@ -152,10 +151,10 @@ export async function POST(request: Request) {
         user = userResult[0];
 
         if (!user) {
-          console.log(`[Auth Request ${requestId}] New user detected, requesting name registration`);
+          console.log(`[Auth Request ${requestId}] New user detected, requesting profile registration`);
           isNewUser = true;
-        } else if (!user.fullName) {
-          console.log(`[Auth Request ${requestId}] User exists but profile name is not complete`);
+        } else if (!user.fullName || !user.phoneNumber) {
+          console.log(`[Auth Request ${requestId}] User exists but profile name or phone is not complete`);
           isNewUser = true;
         } else {
           // Update lastLoginAt
