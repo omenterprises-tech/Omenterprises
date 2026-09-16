@@ -272,16 +272,6 @@ function LoginForm() {
                   </>
                 )}
               </button>
-
-              <div className="pt-4 text-center border-t border-gray-100 mt-6">
-                <Link
-                  href="/crm"
-                  className="text-xs text-brand/60 hover:text-[#0D47A1] font-semibold transition-colors inline-flex items-center space-x-1"
-                >
-                  <span>Business owner or team member? Go to CRM Portal</span>
-                  <span aria-hidden="true">&rarr;</span>
-                </Link>
-              </div>
             </form>
           )}
 
