@@ -1242,9 +1242,8 @@ function MakeQuotationContent() {
           onProductsCreated={(newProds: any[]) => {
             setAllProducts((prev) => [...newProds, ...prev]);
             setIsAddProductOpen(false);
-            if (newProds && newProds.length > 0) {
-              openProductConfigurator(newProds[0]);
-            }
+            setProductCategoryPath([]);
+            setProductSearch("");
           }}
         />
       </div>
