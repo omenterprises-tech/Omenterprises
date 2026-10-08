@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { crmQuotations } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray, and } from "drizzle-orm";
 import { getCrmSession } from "@/lib/crmAuth";
 import { resolveBusinessAndRole } from "@/lib/crmBusinessResolver";
 import { formatDisplayDate } from "@/lib/crmCurrencyData";
@@ -137,3 +137,54 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await getCrmSession();
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+    }
+
+    const { business, role } = await resolveBusinessAndRole(session.userId);
+    if (!business) {
+      return NextResponse.json({ success: false, error: "Business not found." }, { status: 404 });
+    }
+
+    if (role !== "Owner" && role !== "Admin" && role !== "Manager") {
+      return NextResponse.json({ success: false, error: "Permission denied." }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { ids } = body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ success: false, error: "No quotation IDs provided." }, { status: 400 });
+    }
+
+    const numericIds = ids
+      .map((id: any) => parseInt(id, 10))
+      .filter((id: number) => !isNaN(id));
+
+    if (numericIds.length === 0) {
+      return NextResponse.json({ success: false, error: "Invalid quotation IDs." }, { status: 400 });
+    }
+
+    await db
+      .delete(crmQuotations)
+      .where(
+        and(
+          inArray(crmQuotations.id, numericIds),
+          eq(crmQuotations.businessId, business.id)
+        )
+      );
+
+    return NextResponse.json({ success: true, count: numericIds.length });
+  } catch (error: any) {
+    console.error("Bulk delete quotations error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to delete quotations." },
+      { status: 500 }
+    );
+  }
+}
+

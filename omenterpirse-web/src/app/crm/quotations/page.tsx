@@ -31,6 +31,10 @@ export default function CrmQuotationsListPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [dateFilter, setDateFilter] = useState("");
 
+  // Bulk Selection
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
   // View / Print Modal
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedQuotation, setSelectedQuotation] = useState<any | null>(null);
@@ -121,6 +125,66 @@ export default function CrmQuotationsListPage() {
     });
   }, [quotations, searchQuery, statusFilter, dateFilter]);
 
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const allFilteredSelected =
+    filteredQuotations.length > 0 &&
+    filteredQuotations.every((q) => selectedIds.includes(q.id));
+
+  const someFilteredSelected =
+    filteredQuotations.some((q) => selectedIds.includes(q.id));
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      const filteredIdSet = new Set(filteredQuotations.map((q) => q.id));
+      setSelectedIds((prev) => prev.filter((id) => !filteredIdSet.has(id)));
+    } else {
+      const filteredIdSet = new Set(filteredQuotations.map((q) => q.id));
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...filteredIdSet])));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    const count = selectedIds.length;
+    if (
+      !confirm(
+        `Are you sure you want to delete ${count} selected quotation${
+          count > 1 ? "s" : ""
+        }? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setIsBulkDeleting(true);
+    try {
+      const res = await fetch("/api/crm/quotations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setQuotations((prev) => prev.filter((q) => !selectedIds.includes(q.id)));
+        setSelectedIds([]);
+        showToast(
+          `Successfully deleted ${count} quotation${count > 1 ? "s" : ""}.`
+        );
+      } else {
+        alert(data.error || "Failed to delete selected quotations.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to delete selected quotations.");
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   const handleDeleteQuotation = async (qId: number, qNum: string) => {
     if (!confirm(`Are you sure you want to delete quotation "${qNum}"?`)) return;
     try {
@@ -128,6 +192,7 @@ export default function CrmQuotationsListPage() {
       const data = await res.json();
       if (data.success) {
         setQuotations((prev) => prev.filter((q) => q.id !== qId));
+        setSelectedIds((prev) => prev.filter((id) => id !== qId));
         showToast("Quotation deleted successfully.");
       } else {
         alert(data.error || "Failed to delete quotation.");
@@ -344,6 +409,65 @@ export default function CrmQuotationsListPage() {
             </div>
           </div>
 
+          {/* Bulk Selection Bar */}
+          {selectedIds.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-blue-50/90 border border-blue-200/90 px-4 py-3 rounded-2xl shadow-xs">
+              <div className="flex flex-wrap items-center gap-2.5 text-xs text-blue-900 font-medium">
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">
+                  {selectedIds.length}
+                </span>
+                <span>
+                  <strong>{selectedIds.length}</strong> quotation
+                  {selectedIds.length > 1 ? "s" : ""} selected
+                </span>
+                <span className="text-blue-300">•</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  className="text-brand hover:underline font-semibold cursor-pointer"
+                >
+                  Clear selection
+                </button>
+                {filteredQuotations.length > selectedIds.length && (
+                  <>
+                    <span className="text-blue-300">•</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const filteredIdSet = new Set(filteredQuotations.map((q) => q.id));
+                        setSelectedIds((prev) => Array.from(new Set([...prev, ...filteredIdSet])));
+                      }}
+                      className="text-brand hover:underline font-semibold cursor-pointer"
+                    >
+                      Select all {filteredQuotations.length} filtered
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isBulkDeleting}
+                  onClick={handleBulkDelete}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isBulkDeleting ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={13} />
+                      <span>Delete Selected ({selectedIds.length})</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Quotations Table */}
           {filteredQuotations.length === 0 ? (
             <div className="py-16 flex flex-col items-center justify-center text-center space-y-3">
@@ -369,6 +493,7 @@ export default function CrmQuotationsListPage() {
                     setSearchQuery("");
                     setStatusFilter("All");
                     setDateFilter("");
+                    setSelectedIds([]);
                   }}
                   className="mt-2 px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold transition-all cursor-pointer"
                 >
@@ -389,6 +514,21 @@ export default function CrmQuotationsListPage() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                    <th className="pb-3 pl-3 pr-2 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        checked={allFilteredSelected}
+                        ref={(input) => {
+                          if (input) {
+                            input.indeterminate =
+                              someFilteredSelected && !allFilteredSelected;
+                          }
+                        }}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand/30 cursor-pointer accent-blue-600"
+                        title={allFilteredSelected ? "Deselect all" : "Select all"}
+                      />
+                    </th>
                     <th className="pb-3">Quotation #</th>
                     <th className="pb-3">Date</th>
                     <th className="pb-3">Customer</th>
@@ -399,14 +539,35 @@ export default function CrmQuotationsListPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {filteredQuotations.map((q) => (
-                    <tr key={q.id} className="hover:bg-gray-50/60 transition-colors">
-                      <td
-                        onClick={() => router.push(`/crm/quotations/${q.id}`)}
-                        className="py-4 font-bold text-brand hover:underline text-xs sm:text-sm cursor-pointer"
+                  {filteredQuotations.map((q) => {
+                    const isSelected = selectedIds.includes(q.id);
+                    return (
+                      <tr
+                        key={q.id}
+                        className={`transition-colors ${
+                          isSelected
+                            ? "bg-blue-50/50 hover:bg-blue-50/80"
+                            : "hover:bg-gray-50/60"
+                        }`}
                       >
-                        {q.quotationNumber}
-                      </td>
+                        <td
+                          className="py-4 pl-3 pr-2 w-10 text-center"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelect(q.id)}
+                            className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand/30 cursor-pointer accent-blue-600"
+                            title="Select quotation"
+                          />
+                        </td>
+                        <td
+                          onClick={() => router.push(`/crm/quotations/${q.id}`)}
+                          className="py-4 font-bold text-brand hover:underline text-xs sm:text-sm cursor-pointer"
+                        >
+                          {q.quotationNumber}
+                        </td>
                       <td className="py-4 text-xs text-gray-500">
                         {formatDisplayDate(q.quotationDate, business?.dateFormat)}
                       </td>
@@ -499,7 +660,8 @@ export default function CrmQuotationsListPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
