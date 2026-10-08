@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders, users } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { cookies } from "next/headers";
 
 export async function PATCH(
@@ -17,11 +17,20 @@ export async function PATCH(
   }
 
   try {
+    const cleanDigits = phoneNumber.replace(/\D/g, "");
+    const cleanPhone = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : "";
+
     // Find user using plain select (no relational API needed)
     const userRows = await db
       .select()
       .from(users)
-      .where(eq(users.email, phoneNumber))
+      .where(
+        or(
+          eq(users.email, phoneNumber),
+          eq(users.phoneNumber, phoneNumber),
+          ...(cleanPhone ? [eq(users.phoneNumber, cleanPhone)] : [])
+        )
+      )
       .limit(1);
 
     if (!userRows.length) {

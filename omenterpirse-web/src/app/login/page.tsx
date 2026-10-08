@@ -2,8 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import Image from "next/image";
-import Link from "next/link";
-import { ArrowLeft, User, Loader2, Mail, Phone, KeyRound, CheckCircle2, ArrowRight, RefreshCw } from "lucide-react";
+import { User, Loader2, Phone, ArrowRight, ArrowLeft } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 
@@ -13,114 +12,21 @@ function LoginForm() {
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const [mounted, setMounted] = useState(false);
-  const [step, setStep] = useState<"email" | "otp" | "register">("email");
-  const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [step, setStep] = useState<"phone" | "name">("phone");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [resendCountdown, setResendCountdown] = useState(0);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Countdown timer for OTP resend
-  useEffect(() => {
-    if (resendCountdown <= 0) return;
-    const timer = setInterval(() => {
-      setResendCountdown((prev) => prev - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [resendCountdown]);
-
-  // Step 1: Send OTP to Email
-  const handleSendOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      setError("Please enter a valid email address.");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      const res = await fetch("/api/auth/otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send", email: cleanEmail }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setStep("otp");
-        setResendCountdown(30);
-      } else {
-        throw new Error(data.error || "Failed to send verification code. Please try again.");
-      }
-    } catch (err: any) {
-      console.error("Send OTP Error:", err);
-      setError(err.message || "Failed to send verification code.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Step 2: Verify OTP
-  const handleVerifyOtp = async (e: React.FormEvent) => {
+  // Step 1: Submit Mobile Number -> Check if existing or new
+  const handlePhoneSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanOtp = otp.trim().replace(/\D/g, "");
-
-    if (!cleanOtp || cleanOtp.length !== 6) {
-      setError("Please enter the 6-digit verification code.");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      const res = await fetch("/api/auth/otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "verify", email: cleanEmail, otp: cleanOtp }),
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        if (data.isNewUser) {
-          // Advance to Step 3: ask for Name & Mobile Number
-          setStep("register");
-        } else {
-          // Existing customer logged in successfully
-          router.push(callbackUrl);
-          router.refresh();
-        }
-      } else {
-        throw new Error(data.error || "Invalid or expired verification code.");
-      }
-    } catch (err: any) {
-      console.error("Verify OTP Error:", err);
-      setError(err.message || "Invalid verification code.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Step 3: Complete Profile for New User
-  const handleCompleteProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanName = fullName.trim();
     const cleanPhone = phoneNumber.trim().replace(/\D/g, "");
 
-    if (!cleanName) {
-      setError("Full Name is required.");
-      return;
-    }
     if (!cleanPhone || cleanPhone.length !== 10) {
       setError("Please enter a valid 10-digit mobile number.");
       return;
@@ -130,26 +36,68 @@ function LoginForm() {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/sync", {
+      const res = await fetch("/api/auth/phone-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber: cleanPhone }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        if (data.isNewUser) {
+          // New user: ask for their name
+          setStep("name");
+        } else {
+          // Existing user: direct login without any OTPs!
+          router.push(callbackUrl);
+          router.refresh();
+        }
+      } else {
+        throw new Error(data.error || "Unable to proceed with login.");
+      }
+    } catch (err: any) {
+      console.error("Phone Login Error:", err);
+      setError(err.message || "Failed to proceed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2: New User -> Submit Name to complete registration and login directly
+  const handleNameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPhone = phoneNumber.trim().replace(/\D/g, "");
+    const cleanName = fullName.trim();
+
+    if (!cleanName) {
+      setError("Please enter your name.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/auth/phone-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fullName: cleanName,
-          email: cleanEmail,
           phoneNumber: cleanPhone,
+          fullName: cleanName,
         }),
       });
       const data = await res.json();
 
       if (data.success) {
+        // Registered and logged in directly without any OTPs!
         router.push(callbackUrl);
         router.refresh();
       } else {
-        setError(data.error || "Failed to complete registration.");
+        throw new Error(data.error || "Failed to complete registration.");
       }
     } catch (err: any) {
-      console.error("Complete Profile Error:", err);
-      setError("Failed to complete profile registration.");
+      console.error("Name Registration Error:", err);
+      setError(err.message || "Failed to complete sign in. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -208,15 +156,13 @@ function LoginForm() {
             </div>
 
             <h2 className="text-2xl sm:text-3xl font-playfair font-bold text-brand mb-1.5">
-              {step === "email" && "Customer Sign In"}
-              {step === "otp" && "Verify Your Email"}
-              {step === "register" && "Complete Your Profile"}
+              {step === "phone" ? "Customer Sign In" : "Welcome to OM Enterprises!"}
             </h2>
 
             <p className="text-brand/60 text-xs leading-relaxed font-medium">
-              {step === "email" && "Enter your email to receive a secure login code via OTP."}
-              {step === "otp" && `We've sent a 6-digit verification code to ${email}.`}
-              {step === "register" && "Welcome to OM Enterprises! Please provide your name and mobile number."}
+              {step === "phone"
+                ? "Enter your 10-digit mobile number to continue."
+                : "Please enter your name to complete your profile."}
             </p>
           </div>
 
@@ -228,46 +174,50 @@ function LoginForm() {
             </div>
           )}
 
-          {/* ================= STEP 1: Enter Email ================= */}
-          {step === "email" && (
-            <form onSubmit={handleSendOtp} className="space-y-4">
+          {/* ================= STEP 1: Enter Mobile Number ================= */}
+          {step === "phone" && (
+            <form onSubmit={handlePhoneSubmit} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-black text-brand/50 uppercase tracking-[0.2em] ml-1">
-                  Email Address
+                  Mobile Number
                 </label>
-                <div className="relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center pr-3 pointer-events-none">
-                    <Mail size={18} className="text-[#FF9800]" />
+                <div className="relative group flex items-center">
+                  {/* +91 Country Indicator */}
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center space-x-1.5 text-brand/70 font-bold text-sm pointer-events-none pr-2 border-r border-brand/15">
+                    <Phone size={16} className="text-[#FF9800]" />
+                    <span>+91</span>
                   </div>
                   <input 
-                    type="email" 
-                    value={email}
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={phoneNumber}
                     onChange={(e) => {
-                      setEmail(e.target.value);
+                      setPhoneNumber(e.target.value.replace(/\D/g, ""));
                       if (error) setError("");
                     }}
-                    placeholder="name@example.com" 
-                    autoComplete="email"
+                    placeholder="9876543210" 
+                    autoComplete="tel"
                     autoFocus
                     required
-                    className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/50 focus:bg-white focus:shadow-[0_0_25px_rgba(255,152,0,0.12)] rounded-2xl py-3.5 pl-12 pr-4 text-brand font-semibold text-sm placeholder:text-brand/25 transition-all outline-none"
+                    className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/50 focus:bg-white focus:shadow-[0_0_25px_rgba(255,152,0,0.12)] rounded-2xl py-3.5 pl-20 pr-4 text-brand font-semibold text-sm placeholder:text-brand/25 transition-all outline-none"
                   />
                 </div>
               </div>
 
               <button 
                 type="submit" 
-                disabled={loading || !email.trim()} 
+                disabled={loading || phoneNumber.trim().length !== 10} 
                 className="w-full bg-[#0D47A1] hover:bg-[#FF9800] text-white font-black uppercase tracking-[0.2em] text-xs py-4 rounded-2xl shadow-lg hover:shadow-xl active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex justify-center items-center space-x-2 mt-3 cursor-pointer"
               >
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Sending Code...</span>
+                    <span>Checking...</span>
                   </>
                 ) : (
                   <>
-                    <span>Send Verification Code</span>
+                    <span>Continue</span>
                     <ArrowRight size={15} />
                   </>
                 )}
@@ -275,115 +225,26 @@ function LoginForm() {
             </form>
           )}
 
-          {/* ================= STEP 2: Enter OTP ================= */}
-          {step === "otp" && (
-            <form onSubmit={handleVerifyOtp} className="space-y-5">
-              <div className="bg-brand/5 rounded-2xl p-3.5 flex items-center justify-between border border-brand/10 text-xs">
-                <div className="flex items-center space-x-2.5 truncate">
-                  <Mail size={16} className="text-brand shrink-0" />
-                  <span className="font-semibold text-brand truncate">{email}</span>
+          {/* ================= STEP 2: Enter Name (New User Only) ================= */}
+          {step === "name" && (
+            <form onSubmit={handleNameSubmit} className="space-y-4">
+              {/* Display Phone Number with Change option */}
+              <div className="bg-brand/5 border border-brand/10 rounded-2xl p-3.5 flex items-center justify-between text-xs text-brand">
+                <div className="flex items-center space-x-2">
+                  <Phone size={15} className="text-[#FF9800]" />
+                  <span className="font-semibold">+91 {phoneNumber}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
-                    setStep("email");
-                    setOtp("");
+                    setStep("phone");
                     setError("");
                   }}
-                  className="text-xs font-bold text-[#FF9800] hover:underline cursor-pointer shrink-0 ml-2"
+                  className="text-xs font-bold text-[#FF9800] hover:underline cursor-pointer flex items-center space-x-1"
                 >
-                  Change
+                  <ArrowLeft size={12} />
+                  <span>Change Number</span>
                 </button>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-black text-brand/50 uppercase tracking-[0.2em] ml-1">
-                  6-Digit Verification Code
-                </label>
-                <div className="relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center pr-3 pointer-events-none">
-                    <KeyRound size={18} className="text-[#FF9800]" />
-                  </div>
-                  <input 
-                    type="text" 
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={otp}
-                    onChange={(e) => {
-                      setOtp(e.target.value.replace(/\D/g, ""));
-                      if (error) setError("");
-                    }}
-                    placeholder="123456" 
-                    autoFocus
-                    required
-                    className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/50 focus:bg-white focus:shadow-[0_0_25px_rgba(255,152,0,0.12)] rounded-2xl py-3.5 pl-12 pr-4 text-brand font-black tracking-[0.35em] text-center text-lg placeholder:tracking-normal placeholder:font-normal placeholder:text-brand/25 transition-all outline-none font-mono"
-                  />
-                </div>
-              </div>
-
-              <button 
-                type="submit" 
-                disabled={loading || otp.trim().length !== 6} 
-                className="w-full bg-[#0D47A1] hover:bg-[#FF9800] text-white font-black uppercase tracking-[0.2em] text-xs py-4 rounded-2xl shadow-lg hover:shadow-xl active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex justify-center items-center space-x-2 cursor-pointer"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Verifying...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Verify & Sign In</span>
-                    <ArrowRight size={15} />
-                  </>
-                )}
-              </button>
-
-              {/* Resend OTP Button */}
-              <div className="flex items-center justify-between pt-2 px-1 text-xs text-gray-500 font-medium">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStep("email");
-                    setOtp("");
-                    setError("");
-                  }}
-                  className="hover:text-brand transition-colors inline-flex items-center space-x-1"
-                >
-                  <ArrowLeft size={13} />
-                  <span>Back</span>
-                </button>
-
-                <div>
-                  {resendCountdown > 0 ? (
-                    <span className="text-gray-400">Resend in {resendCountdown}s</span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleSendOtp()}
-                      disabled={loading}
-                      className="text-[#FF9800] hover:text-[#F57C00] font-bold inline-flex items-center space-x-1 cursor-pointer"
-                    >
-                      <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-                      <span>Resend Code</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </form>
-          )}
-
-          {/* ================= STEP 3: Complete Profile (New User) ================= */}
-          {step === "register" && (
-            <form onSubmit={handleCompleteProfile} className="space-y-4">
-              <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center justify-between text-xs text-emerald-800">
-                <div className="flex items-center space-x-2 truncate">
-                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                  <span className="font-semibold truncate">{email}</span>
-                </div>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wider">
-                  Verified
-                </span>
               </div>
 
               {/* Full Name */}
@@ -410,39 +271,15 @@ function LoginForm() {
                 </div>
               </div>
 
-              {/* Mobile Number */}
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-black text-brand/50 uppercase tracking-[0.2em] ml-1">
-                  Mobile Number (10 Digits) <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center pr-3 pointer-events-none">
-                    <Phone size={18} className="text-[#FF9800]" />
-                  </div>
-                  <input 
-                    type="tel" 
-                    maxLength={10}
-                    value={phoneNumber}
-                    onChange={(e) => {
-                      setPhoneNumber(e.target.value.replace(/\D/g, ""));
-                      if (error) setError("");
-                    }}
-                    placeholder="9876543210" 
-                    required
-                    className="w-full bg-brand/5 border-2 border-transparent focus:border-[#FF9800]/50 focus:bg-white focus:shadow-[0_0_25px_rgba(255,152,0,0.12)] rounded-2xl py-3.5 pl-12 pr-4 text-brand font-semibold text-sm placeholder:text-brand/25 transition-all outline-none"
-                  />
-                </div>
-              </div>
-
               <button 
                 type="submit" 
-                disabled={loading || !fullName.trim() || phoneNumber.replace(/\D/g, "").length !== 10} 
-                className="w-full bg-[#FF9800] hover:bg-[#F57C00] text-white font-black uppercase tracking-[0.2em] text-xs py-4 rounded-2xl shadow-lg hover:shadow-xl active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex justify-center items-center space-x-2 mt-3 cursor-pointer"
+                disabled={loading || !fullName.trim()} 
+                className="w-full bg-[#0D47A1] hover:bg-[#FF9800] text-white font-black uppercase tracking-[0.2em] text-xs py-4 rounded-2xl shadow-lg hover:shadow-xl active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex justify-center items-center space-x-2 mt-3 cursor-pointer"
               >
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Saving Profile...</span>
+                    <span>Signing in...</span>
                   </>
                 ) : (
                   <>

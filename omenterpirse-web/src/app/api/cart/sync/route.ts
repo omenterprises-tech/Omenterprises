@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { cartItems, users, products } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { cookies } from "next/headers";
 
 export async function POST(request: Request) {
@@ -13,7 +13,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const userResult = await db.select().from(users).where(eq(users.email, phone)).limit(1);
+    const cleanDigits = phone.replace(/\D/g, "");
+    const cleanPhone = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : "";
+
+    const userResult = await db.select().from(users).where(
+      or(
+        eq(users.email, phone),
+        eq(users.phoneNumber, phone),
+        ...(cleanPhone ? [eq(users.phoneNumber, cleanPhone)] : [])
+      )
+    ).limit(1);
     const user = userResult[0];
 
     if (!user) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders, orderItems, users, productVariations, brandVariations, products } from "@/db/schema";
 import { cookies } from "next/headers";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import crypto from "crypto";
 import Razorpay from "razorpay";
 import nodemailer from "nodemailer";
@@ -66,7 +66,16 @@ export async function POST(req: Request) {
     }
 
     // Find user
-    const userRows = await db.select().from(users).where(eq(users.email, phoneNumber)).limit(1);
+    const cleanDigits = phoneNumber.replace(/\D/g, "");
+    const cleanPhone = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : "";
+
+    const userRows = await db.select().from(users).where(
+      or(
+        eq(users.email, phoneNumber),
+        eq(users.phoneNumber, phoneNumber),
+        ...(cleanPhone ? [eq(users.phoneNumber, cleanPhone)] : [])
+      )
+    ).limit(1);
     if (!userRows.length) {
       return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
     }

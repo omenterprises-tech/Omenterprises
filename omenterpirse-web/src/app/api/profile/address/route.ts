@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { cookies } from "next/headers";
 
 // Helper: get user by phone from cookie
@@ -10,7 +10,16 @@ async function getUserFromCookie() {
   const phoneNumber = cookieStore.get("auth_session")?.value;
   if (!phoneNumber) return { user: null, phoneNumber: null };
 
-  const rows = await db.select().from(users).where(eq(users.email, phoneNumber)).limit(1);
+  const cleanDigits = phoneNumber.replace(/\D/g, "");
+  const cleanPhone = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : "";
+
+  const rows = await db.select().from(users).where(
+    or(
+      eq(users.email, phoneNumber),
+      eq(users.phoneNumber, phoneNumber),
+      ...(cleanPhone ? [eq(users.phoneNumber, cleanPhone)] : [])
+    )
+  ).limit(1);
   return { user: rows[0] ?? null, phoneNumber };
 }
 

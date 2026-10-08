@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders, orderItems, products, users } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, or } from "drizzle-orm";
 import { cookies } from "next/headers";
 
 export async function GET() {
@@ -14,7 +14,16 @@ export async function GET() {
     }
 
     // Find user
-    const userRows = await db.select().from(users).where(eq(users.email, phoneNumber)).limit(1);
+    const cleanDigits = phoneNumber.replace(/\D/g, "");
+    const cleanPhone = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : "";
+
+    const userRows = await db.select().from(users).where(
+      or(
+        eq(users.email, phoneNumber),
+        eq(users.phoneNumber, phoneNumber),
+        ...(cleanPhone ? [eq(users.phoneNumber, cleanPhone)] : [])
+      )
+    ).limit(1);
     if (!userRows.length) {
       return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
     }
