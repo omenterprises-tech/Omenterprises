@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   Filter,
   ChevronDown,
+  Calendar,
+  X,
 } from "lucide-react";
 import { ViewQuotationModal } from "@/components/crm/QuotationModal";
 import { formatDisplayDate } from "@/lib/crmCurrencyData";
@@ -27,6 +29,7 @@ export default function CrmQuotationsListPage() {
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [dateFilter, setDateFilter] = useState("");
 
   // View / Print Modal
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -76,7 +79,29 @@ export default function CrmQuotationsListPage() {
     init();
   }, [router]);
 
-  // Filtered quotations
+  // Normalize any date string to YYYY-MM-DD for reliable comparison
+  const toYmd = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return "";
+    const s = String(dateStr).trim();
+    const ymdMatch = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (ymdMatch) {
+      return `${ymdMatch[1]}-${ymdMatch[2].padStart(2, "0")}-${ymdMatch[3].padStart(2, "0")}`;
+    }
+    const dmyMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+    if (dmyMatch) {
+      return `${dmyMatch[3]}-${dmyMatch[2].padStart(2, "0")}-${dmyMatch[1].padStart(2, "0")}`;
+    }
+    const parsed = new Date(s);
+    if (!isNaN(parsed.getTime())) {
+      const y = parsed.getFullYear();
+      const m = String(parsed.getMonth() + 1).padStart(2, "0");
+      const d = String(parsed.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+    return "";
+  };
+
+  // Filtered quotations by status, search term, and date
   const filteredQuotations = useMemo(() => {
     return quotations.filter((q) => {
       const matchesStatus = statusFilter === "All" || q.status === statusFilter;
@@ -86,9 +111,15 @@ export default function CrmQuotationsListPage() {
         q.quotationNumber?.toLowerCase().includes(term) ||
         q.customerName?.toLowerCase().includes(term) ||
         q.createdByName?.toLowerCase().includes(term);
-      return matchesStatus && matchesSearch;
+
+      const matchesDate =
+        !dateFilter ||
+        toYmd(q.quotationDate) === dateFilter ||
+        toYmd(q.createdAt) === dateFilter;
+
+      return matchesStatus && matchesSearch && matchesDate;
     });
-  }, [quotations, searchQuery, statusFilter]);
+  }, [quotations, searchQuery, statusFilter, dateFilter]);
 
   const handleDeleteQuotation = async (qId: number, qNum: string) => {
     if (!confirm(`Are you sure you want to delete quotation "${qNum}"?`)) return;
@@ -246,7 +277,7 @@ export default function CrmQuotationsListPage() {
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap">
               {/* Status Filter Pills */}
               <div className="flex items-center bg-gray-100 p-1 rounded-xl text-xs font-medium">
                 {["All", "Sent", "Accepted", "Declined", "Draft"].map((st) => (
@@ -263,6 +294,37 @@ export default function CrmQuotationsListPage() {
                     {st}
                   </button>
                 ))}
+              </div>
+
+              {/* Date Filter with Calendar symbol */}
+              <div className="relative flex items-center">
+                <Calendar
+                  size={15}
+                  className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${
+                    dateFilter ? "text-brand" : "text-gray-400"
+                  }`}
+                />
+                <input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className={`w-full sm:w-auto pl-8.5 pr-8 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all cursor-pointer ${
+                    dateFilter
+                      ? "bg-blue-50/60 border-brand/50 text-brand font-semibold shadow-xs"
+                      : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                  title="Filter by quotation date"
+                />
+                {dateFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setDateFilter("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 p-1 rounded-md hover:bg-gray-100 cursor-pointer"
+                    title="Clear date filter"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
               </div>
 
               {/* Search Bar */}
@@ -290,23 +352,37 @@ export default function CrmQuotationsListPage() {
               </div>
               <div>
                 <h4 className="text-sm font-bold text-gray-800">
-                  {searchQuery || statusFilter !== "All"
+                  {searchQuery || statusFilter !== "All" || dateFilter
                     ? "No Matching Quotations"
                     : "No Quotations Generated Yet"}
                 </h4>
                 <p className="text-xs text-gray-500 mt-1 max-w-sm">
-                  {searchQuery || statusFilter !== "All"
-                    ? "No records matched your query. Try resetting your filter."
+                  {searchQuery || statusFilter !== "All" || dateFilter
+                    ? "No records matched your filters. Try adjusting or clearing your date, status, or search query."
                     : "Create professional client quotations with branded logo, line items, and digital signatures."}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => router.push("/crm/quotations/create")}
-                className="mt-2 px-4 py-2 rounded-xl bg-brand text-white text-xs font-bold shadow hover:bg-brand-hover transition-all cursor-pointer"
-              >
-                + Draft First Quotation
-              </button>
+              {searchQuery || statusFilter !== "All" || dateFilter ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setStatusFilter("All");
+                    setDateFilter("");
+                  }}
+                  className="mt-2 px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold transition-all cursor-pointer"
+                >
+                  Clear All Filters
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => router.push("/crm/quotations/create")}
+                  className="mt-2 px-4 py-2 rounded-xl bg-brand text-white text-xs font-bold shadow hover:bg-brand-hover transition-all cursor-pointer"
+                >
+                  + Draft First Quotation
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
