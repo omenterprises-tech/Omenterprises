@@ -3,9 +3,11 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Zap, Lock, Mail, User, Phone, Eye, EyeOff, ArrowRight, Loader2, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
+import { useCrmSessionStore } from "@/store/useCrmSessionStore";
 
 export default function CrmEntryPage() {
   const router = useRouter();
+  const setSession = useCrmSessionStore((s) => s.setSession);
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
@@ -26,11 +28,17 @@ export default function CrmEntryPage() {
   const [registerError, setRegisterError] = useState("");
 
   useEffect(() => {
+    router.prefetch("/crm/dashboard");
+    router.prefetch("/crm/onboarding");
+
     async function checkAuth() {
       try {
         const res = await fetch("/api/crm/auth/session");
         const data = await res.json();
         if (data.authenticated) {
+          if (data.user && data.business) {
+            setSession(data.user, data.business);
+          }
           if (data.isOnboardingCompleted) {
             router.replace("/crm/dashboard");
           } else {
@@ -45,7 +53,7 @@ export default function CrmEntryPage() {
       }
     }
     checkAuth();
-  }, [router]);
+  }, [router, setSession]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +77,10 @@ export default function CrmEntryPage() {
         setLoginError(data.error || "Invalid credentials.");
         setLoginLoading(false);
         return;
+      }
+
+      if (data.user && data.business) {
+        setSession(data.user, data.business);
       }
 
       if (data.isOnboardingCompleted) {

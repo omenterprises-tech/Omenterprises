@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useCrmSessionStore } from "@/store/useCrmSessionStore";
 import {
   Users,
   ArrowLeft,
@@ -20,12 +22,19 @@ import {
 
 export default function CrmTeamsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [business, setBusiness] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const storeUser = useCrmSessionStore((s) => s.user);
+  const storeBusiness = useCrmSessionStore((s) => s.business);
+  const fetchSession = useCrmSessionStore((s) => s.fetchSession);
+
+  const [user, setUser] = useState<any>(storeUser);
+  const [business, setBusiness] = useState<any>(storeBusiness);
+  const [isLoadingSession, setIsLoadingSession] = useState(!storeUser);
+  const [isLoadingTeam, setIsLoadingTeam] = useState(true);
 
   // Permission: only owner can manage team
-  const [canManageTeam, setCanManageTeam] = useState(false);
+  const [canManageTeam, setCanManageTeam] = useState(
+    Boolean(storeUser?.isOwner ?? (storeUser?.role === "Owner"))
+  );
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
   // Add Member Modal State
@@ -74,30 +83,44 @@ export default function CrmTeamsPage() {
   };
 
   useEffect(() => {
+    router.prefetch("/crm/dashboard");
+
     async function init() {
       try {
-        const res = await fetch("/api/crm/auth/session");
-        const data = await res.json();
-        if (!data.authenticated) {
+        const [sessionData, teamData] = await Promise.all([
+          fetchSession(),
+          fetch("/api/crm/team").then((r) => r.json()).catch(() => ({ success: false })),
+        ]);
+
+        if (!sessionData.authenticated) {
           router.replace("/crm");
           return;
         }
-        if (!data.isOnboardingCompleted) {
+        if (!sessionData.isOnboardingCompleted) {
           router.replace("/crm/onboarding");
           return;
         }
-        setUser(data.user);
-        setBusiness(data.business);
-        setCanManageTeam(Boolean(data.user?.isOwner ?? (data.user?.role === "Owner")));
-        await loadTeam();
+        setUser(sessionData.user);
+        setBusiness(sessionData.business);
+        setCanManageTeam(
+          Boolean(sessionData.user?.isOwner ?? (sessionData.user?.role === "Owner"))
+        );
+
+        if (teamData?.success && teamData.members) {
+          setTeamMembers(teamData.members);
+          if (typeof teamData.canManageTeam === "boolean") {
+            setCanManageTeam(teamData.canManageTeam);
+          }
+        }
       } catch (err) {
-        console.error("Failed to load CRM session:", err);
+        console.error("Failed to load CRM session or team:", err);
       } finally {
-        setIsLoading(false);
+        setIsLoadingSession(false);
+        setIsLoadingTeam(false);
       }
     }
     init();
-  }, [router]);
+  }, [router, fetchSession]);
 
   // Open Add Member Modal
   const openAddModal = () => {
@@ -220,7 +243,7 @@ export default function CrmTeamsPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoadingSession && !user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
         <Loader2 className="w-10 h-10 text-brand animate-spin mb-4" />
@@ -238,14 +261,14 @@ export default function CrmTeamsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={() => router.push("/crm/dashboard")}
+              <Link
+                href="/crm/dashboard"
+                prefetch={true}
                 className="p-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors cursor-pointer mr-1"
                 title="Back to Dashboard"
               >
                 <ArrowLeft size={18} />
-              </button>
+              </Link>
               <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-md">
                 <Users size={18} />
               </div>
@@ -265,13 +288,13 @@ export default function CrmTeamsPage() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={() => router.push("/crm/dashboard")}
+              <Link
+                href="/crm/dashboard"
+                prefetch={true}
                 className="px-3.5 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-100 text-xs font-bold text-gray-700 transition-colors cursor-pointer"
               >
                 ← Back to Dashboard
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -330,7 +353,13 @@ export default function CrmTeamsPage() {
           </div>
 
           {/* Members Table */}
-          <div className="overflow-x-auto">
+          {isLoadingTeam ? (
+            <div className="py-20 flex flex-col items-center justify-center text-center space-y-3">
+              <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
+              <p className="text-xs text-gray-500 font-medium">Loading team directory...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-400">
@@ -418,6 +447,7 @@ export default function CrmTeamsPage() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
       </main>
 

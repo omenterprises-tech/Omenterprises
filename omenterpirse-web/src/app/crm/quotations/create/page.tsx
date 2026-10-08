@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useCrmSessionStore } from "@/store/useCrmSessionStore";
 import {
   ArrowLeft,
   Plus,
@@ -73,9 +75,13 @@ function MakeQuotationContent() {
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
 
-  const [user, setUser] = useState<any>(null);
-  const [business, setBusiness] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const storeUser = useCrmSessionStore((s) => s.user);
+  const storeBusiness = useCrmSessionStore((s) => s.business);
+  const fetchSession = useCrmSessionStore((s) => s.fetchSession);
+
+  const [user, setUser] = useState<any>(storeUser);
+  const [business, setBusiness] = useState<any>(storeBusiness);
+  const [isLoading, setIsLoading] = useState(!storeUser);
 
   // Top info
   const [quotationNo, setQuotationNo] = useState("-");
@@ -133,44 +139,48 @@ function MakeQuotationContent() {
 
   // Load initial data
   useEffect(() => {
+    router.prefetch("/crm/quotations");
+    router.prefetch("/crm/dashboard");
+
     async function init() {
       try {
-        const res = await fetch("/api/crm/auth/session");
-        const data = await res.json();
-        if (!data.authenticated) {
+        const [sessionData, custRes, prodRes, termsRes, qRes] = await Promise.all([
+          fetchSession(),
+          fetch("/api/crm/customers").then((r) => r.json()).catch(() => ({ success: false })),
+          fetch("/api/crm/products").then((r) => r.json()).catch(() => ({ success: false })),
+          fetch("/api/crm/terms").then((r) => r.json()).catch(() => ({ success: false })),
+          editId
+            ? fetch(`/api/crm/quotations/${editId}`).then((r) => r.json()).catch(() => ({ success: false }))
+            : Promise.resolve(null),
+        ]);
+
+        if (!sessionData.authenticated) {
           router.replace("/crm");
           return;
         }
-        if (!data.isOnboardingCompleted) {
+        if (!sessionData.isOnboardingCompleted) {
           router.replace("/crm/onboarding");
           return;
         }
-        setUser(data.user);
-        setBusiness(data.business);
-        if (!editId && data.business?.dateFormat) {
-          setQuotationDate(formatDateWithPattern(data.business.dateFormat, new Date()));
+        setUser(sessionData.user);
+        setBusiness(sessionData.business);
+        if (!editId && sessionData.business?.dateFormat) {
+          setQuotationDate(formatDateWithPattern(sessionData.business.dateFormat, new Date()));
         }
 
-        // Fetch customers, products, terms
-        const [custRes, prodRes, termsRes] = await Promise.all([
-          fetch("/api/crm/customers").then((r) => r.json()),
-          fetch("/api/crm/products").then((r) => r.json()),
-          fetch("/api/crm/terms").then((r) => r.json()),
-        ]);
-
-        if (custRes.success && custRes.customers) {
+        if (custRes?.success && custRes.customers) {
           setCustomers(custRes.customers);
         }
-        if (prodRes.success && prodRes.products) {
+        if (prodRes?.success && prodRes.products) {
           setAllProducts(prodRes.products);
         }
 
         // Initialize terms list
         let initialTermsText = "";
-        if (termsRes.success && termsRes.terms) {
+        if (termsRes?.success && termsRes.terms) {
           initialTermsText = termsRes.terms;
-        } else if (data.business?.otherInfo) {
-          initialTermsText = data.business.otherInfo;
+        } else if (sessionData.business?.otherInfo) {
+          initialTermsText = sessionData.business.otherInfo;
         }
 
         const lines = initialTermsText
@@ -192,13 +202,11 @@ function MakeQuotationContent() {
         setSelectedTermIds([]);
 
         // Load existing quotation if in edit mode
-        if (editId) {
-          const qRes = await fetch(`/api/crm/quotations/${editId}`).then((r) => r.json());
-          if (qRes.success && qRes.quotation) {
-            const q = qRes.quotation;
-            setQuotationNo(q.quotationNumber || "-");
-            if (q.quotationDate) setQuotationDate(formatDisplayDate(q.quotationDate, data.business?.dateFormat));
-            if (q.notes) setOtherInfo(q.notes);
+        if (editId && qRes && qRes.success && qRes.quotation) {
+          const q = qRes.quotation;
+          setQuotationNo(q.quotationNumber || "-");
+          if (q.quotationDate) setQuotationDate(formatDisplayDate(q.quotationDate, sessionData.business?.dateFormat));
+          if (q.notes) setOtherInfo(q.notes);
 
             setSelectedCustomer({
               id: q.customerId,
@@ -292,7 +300,6 @@ function MakeQuotationContent() {
               }
             }
           }
-        }
       } catch (err) {
         console.error("Failed to load quotation editor data:", err);
       } finally {
@@ -670,7 +677,7 @@ function MakeQuotationContent() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !business) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
         <Loader2 className="w-10 h-10 text-brand animate-spin mb-4" />
@@ -1409,14 +1416,14 @@ function MakeQuotationContent() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={() => router.push(editId ? `/crm/quotations/${editId}` : "/crm/dashboard")}
+              <Link
+                href={editId ? `/crm/quotations/${editId}` : "/crm/dashboard"}
+                prefetch={true}
                 className="p-2 rounded-xl text-gray-500 hover:text-brand hover:bg-brand/5 transition-colors cursor-pointer mr-1"
                 title={editId ? "Back to Quotation Detail" : "Back to Dashboard"}
               >
                 <ArrowLeft size={20} />
-              </button>
+              </Link>
               <div>
                 <div className="flex items-center space-x-2">
                   <h1 className="text-lg font-bold text-gray-900 tracking-tight">
@@ -1433,13 +1440,13 @@ function MakeQuotationContent() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={() => router.push("/crm/quotations")}
+              <Link
+                href="/crm/quotations"
+                prefetch={true}
                 className="hidden sm:inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors cursor-pointer"
               >
                 Quotation Ledger
-              </button>
+              </Link>
             </div>
           </div>
         </div>

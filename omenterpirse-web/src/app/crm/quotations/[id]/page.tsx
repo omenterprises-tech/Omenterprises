@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useCrmSessionStore } from "@/store/useCrmSessionStore";
 import {
   ArrowLeft,
   Share2,
@@ -51,8 +53,9 @@ export default function QuotationDetailPage({
   const resolvedParams = use(params);
   const quotationId = resolvedParams.id;
 
+  const storeBusiness = useCrmSessionStore((s) => s.business);
   const [quotation, setQuotation] = useState<any | null>(null);
-  const [business, setBusiness] = useState<any | null>(null);
+  const [business, setBusiness] = useState<any | null>(storeBusiness);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -105,8 +108,9 @@ export default function QuotationDetailPage({
   };
 
   useEffect(() => {
+    router.prefetch("/crm/quotations");
     loadQuotation();
-  }, [quotationId]);
+  }, [quotationId, router]);
 
   // Parse items safely
   let items: QuotationItem[] = [];
@@ -567,13 +571,13 @@ export default function QuotationDetailPage({
         <AlertCircle className="w-12 h-12 text-rose-500 mb-3" />
         <h3 className="text-lg font-bold text-gray-900 mb-1">Quotation Not Found</h3>
         <p className="text-xs text-gray-500 max-w-sm mb-5">{error || "Unable to locate this quotation record."}</p>
-        <button
-          type="button"
-          onClick={() => router.push("/crm/quotations")}
-          className="px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow"
+        <Link
+          href="/crm/quotations"
+          prefetch={true}
+          className="px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold shadow inline-flex items-center"
         >
           Back to Quotation Ledger
-        </button>
+        </Link>
       </div>
     );
   }
@@ -678,14 +682,14 @@ export default function QuotationDetailPage({
           <div className="flex justify-between items-center h-16">
             {/* Left: Back & Title */}
             <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={() => router.push("/crm/quotations")}
+              <Link
+                href="/crm/quotations"
+                prefetch={true}
                 className="p-2 rounded-xl text-gray-500 hover:text-brand hover:bg-brand/5 transition-colors cursor-pointer mr-1"
                 title="Back to Quotation Ledger"
               >
                 <ArrowLeft size={20} />
-              </button>
+              </Link>
               <div>
                 <div className="flex items-center space-x-2.5">
                   <h1 className="text-lg font-bold text-gray-900 tracking-tight">

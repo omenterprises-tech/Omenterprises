@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowLeft,
   Loader2,
@@ -15,6 +16,10 @@ import {
 
 export default function AddProductPage() {
   const router = useRouter();
+
+  useEffect(() => {
+    router.prefetch("/crm/products");
+  }, [router]);
 
   // Hierarchical categories: Level 0 = Main Category (a), Level 1 = Sub-Category (b), Level 2 = Sub-Category (c)...
   const [categories, setCategories] = useState<string[]>(["", "", ""]);
@@ -134,14 +139,14 @@ export default function AddProductPage() {
       <div className="w-full max-w-xl min-h-screen bg-white flex flex-col shadow-xl">
         {/* Blue Theme Header */}
         <div className="bg-brand text-white px-5 py-4 flex items-center space-x-3 sticky top-0 z-30 shadow-xs">
-          <button
-            type="button"
-            onClick={() => router.push("/crm/products")}
+          <Link
+            href="/crm/products"
+            prefetch={true}
             className="p-1.5 rounded-full text-white/90 hover:text-white hover:bg-white/15 transition-colors cursor-pointer"
             title="Back to Products"
           >
             <ArrowLeft size={20} />
-          </button>
+          </Link>
           <div>
             <h1 className="text-base font-bold tracking-tight text-white">Add Product</h1>
             <p className="text-[11px] text-blue-100">Electrical Multi-Category Hierarchy</p>

@@ -2,11 +2,16 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowLeft, Loader2, AlertCircle, Contact, CheckCircle2 } from "lucide-react";
 import { INDIAN_STATES } from "@/lib/crmCategoriesData";
 
 export default function AddCustomerPage() {
   const router = useRouter();
+
+  useEffect(() => {
+    router.prefetch("/crm/customers");
+  }, [router]);
 
   const [name, setName] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -90,14 +95,14 @@ export default function AddCustomerPage() {
       <div className="w-full max-w-md min-h-screen bg-white flex flex-col shadow-xl">
         {/* Blue Theme Header */}
         <div className="bg-brand text-white px-5 py-4 flex items-center space-x-3 sticky top-0 z-30 shadow-xs">
-          <button
-            type="button"
-            onClick={() => router.push("/crm/customers")}
+          <Link
+            href="/crm/customers"
+            prefetch={true}
             className="p-1.5 rounded-full text-white/90 hover:text-white hover:bg-white/15 transition-colors cursor-pointer"
             title="Back to Customers"
           >
             <ArrowLeft size={20} />
-          </button>
+          </Link>
           <h1 className="text-base font-bold tracking-tight text-white">
             Add Customer
           </h1>

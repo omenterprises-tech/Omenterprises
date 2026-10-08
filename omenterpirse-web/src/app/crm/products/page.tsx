@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useCrmSessionStore } from "@/store/useCrmSessionStore";
 import {
   Package,
   ArrowLeft,
@@ -41,9 +43,14 @@ function getProductHierarchy(prod: any): string[] {
 
 export default function CrmProductsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [business, setBusiness] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const storeUser = useCrmSessionStore((s) => s.user);
+  const storeBusiness = useCrmSessionStore((s) => s.business);
+  const fetchSession = useCrmSessionStore((s) => s.fetchSession);
+
+  const [user, setUser] = useState<any>(storeUser);
+  const [business, setBusiness] = useState<any>(storeBusiness);
+  const [isLoadingSession, setIsLoadingSession] = useState(!storeUser);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
 
   // Products data & search
   const [products, setProducts] = useState<any[]>([]);
@@ -75,29 +82,38 @@ export default function CrmProductsPage() {
   };
 
   useEffect(() => {
+    router.prefetch("/crm/dashboard");
+
     async function init() {
       try {
-        const res = await fetch("/api/crm/auth/session");
-        const data = await res.json();
-        if (!data.authenticated) {
+        const [sessionData, prodData] = await Promise.all([
+          fetchSession(),
+          fetch("/api/crm/products").then((r) => r.json()).catch(() => ({ success: false })),
+        ]);
+
+        if (!sessionData.authenticated) {
           router.replace("/crm");
           return;
         }
-        if (!data.isOnboardingCompleted) {
+        if (!sessionData.isOnboardingCompleted) {
           router.replace("/crm/onboarding");
           return;
         }
-        setUser(data.user);
-        setBusiness(data.business);
-        await loadProducts();
+        setUser(sessionData.user);
+        setBusiness(sessionData.business);
+
+        if (prodData?.success && prodData.products) {
+          setProducts(prodData.products);
+        }
       } catch (err) {
-        console.error("Failed to load CRM session:", err);
+        console.error("Failed to load CRM session or products:", err);
       } finally {
-        setIsLoading(false);
+        setIsLoadingSession(false);
+        setIsLoadingProducts(false);
       }
     }
     init();
-  }, [router]);
+  }, [router, fetchSession]);
 
   // 1. All products matching the current category drill-down path
   const currentLevelProducts = useMemo(() => {
@@ -271,7 +287,7 @@ export default function CrmProductsPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoadingSession && !user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
         <Loader2 className="w-10 h-10 text-brand animate-spin mb-4" />
@@ -289,14 +305,14 @@ export default function CrmProductsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={() => router.push("/crm/dashboard")}
+              <Link
+                href="/crm/dashboard"
+                prefetch={true}
                 className="p-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors cursor-pointer mr-1"
                 title="Back to Dashboard"
               >
                 <ArrowLeft size={18} />
-              </button>
+              </Link>
               <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md">
                 <Package size={18} />
               </div>
@@ -316,13 +332,13 @@ export default function CrmProductsPage() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={() => router.push("/crm/dashboard")}
+              <Link
+                href="/crm/dashboard"
+                prefetch={true}
                 className="px-3.5 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-100 text-xs font-bold text-gray-700 transition-colors cursor-pointer"
               >
                 ← Back to Dashboard
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -421,7 +437,12 @@ export default function CrmProductsPage() {
           </div>
 
           {/* Catalog Content Area */}
-          {products.length === 0 ? (
+          {isLoadingProducts ? (
+            <div className="py-20 flex flex-col items-center justify-center text-center space-y-3">
+              <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+              <p className="text-xs text-gray-500 font-medium">Loading product catalog...</p>
+            </div>
+          ) : products.length === 0 ? (
             /* Catalog Empty State */
             <div className="py-16 flex flex-col items-center justify-center text-center space-y-3">
               <div className="w-16 h-16 rounded-2xl bg-amber-50/60 border border-amber-200/60 flex items-center justify-center text-amber-500">

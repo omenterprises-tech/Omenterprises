@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useCrmSessionStore } from "@/store/useCrmSessionStore";
 import {
   UserCheck,
   ArrowLeft,
@@ -21,9 +23,14 @@ import { CreateQuotationModal } from "@/components/crm/QuotationModal";
 
 export default function CrmCustomersPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [business, setBusiness] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const storeUser = useCrmSessionStore((s) => s.user);
+  const storeBusiness = useCrmSessionStore((s) => s.business);
+  const fetchSession = useCrmSessionStore((s) => s.fetchSession);
+
+  const [user, setUser] = useState<any>(storeUser);
+  const [business, setBusiness] = useState<any>(storeBusiness);
+  const [isLoadingSession, setIsLoadingSession] = useState(!storeUser);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
 
   // Customers data & search
   const [customers, setCustomers] = useState<any[]>([]);
@@ -57,14 +64,15 @@ export default function CrmCustomersPage() {
   };
 
   useEffect(() => {
+    router.prefetch("/crm/dashboard");
+
     async function init() {
       try {
-        const [sessionRes, custRes] = await Promise.all([
-          fetch("/api/crm/auth/session"),
-          fetch("/api/crm/customers"),
+        const [sessionData, custData] = await Promise.all([
+          fetchSession(),
+          fetch("/api/crm/customers").then((r) => r.json()).catch(() => ({ success: false })),
         ]);
 
-        const sessionData = await sessionRes.json();
         if (!sessionData.authenticated) {
           router.replace("/crm");
           return;
@@ -76,18 +84,18 @@ export default function CrmCustomersPage() {
         setUser(sessionData.user);
         setBusiness(sessionData.business);
 
-        const custData = await custRes.json();
-        if (custData.success && custData.customers) {
+        if (custData?.success && custData.customers) {
           setCustomers(custData.customers);
         }
       } catch (err) {
-        console.error("Failed to load CRM session:", err);
+        console.error("Failed to load CRM session or customers:", err);
       } finally {
-        setIsLoading(false);
+        setIsLoadingSession(false);
+        setIsLoadingCustomers(false);
       }
     }
     init();
-  }, [router]);
+  }, [router, fetchSession]);
 
   // Filtered customers
   const filteredCustomers = useMemo(() => {
@@ -132,7 +140,7 @@ export default function CrmCustomersPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoadingSession && !user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
         <Loader2 className="w-10 h-10 text-brand animate-spin mb-4" />
@@ -150,14 +158,14 @@ export default function CrmCustomersPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={() => router.push("/crm/dashboard")}
+              <Link
+                href="/crm/dashboard"
+                prefetch={true}
                 className="p-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors cursor-pointer mr-1"
                 title="Back to Dashboard"
               >
                 <ArrowLeft size={18} />
-              </button>
+              </Link>
               <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
                 <UserCheck size={18} />
               </div>
@@ -177,13 +185,13 @@ export default function CrmCustomersPage() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={() => router.push("/crm/dashboard")}
+              <Link
+                href="/crm/dashboard"
+                prefetch={true}
                 className="px-3.5 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-100 text-xs font-bold text-gray-700 transition-colors cursor-pointer"
               >
                 ← Back to Dashboard
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -242,7 +250,12 @@ export default function CrmCustomersPage() {
           </div>
 
           {/* Customers Table */}
-          {filteredCustomers.length === 0 ? (
+          {isLoadingCustomers ? (
+            <div className="py-20 flex flex-col items-center justify-center text-center space-y-3">
+              <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+              <p className="text-xs text-gray-500 font-medium">Loading customers...</p>
+            </div>
+          ) : filteredCustomers.length === 0 ? (
             <div className="py-16 flex flex-col items-center justify-center text-center space-y-3">
               <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
                 <UserCheck size={28} />

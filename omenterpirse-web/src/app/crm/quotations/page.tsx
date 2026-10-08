@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useCrmSessionStore } from "@/store/useCrmSessionStore";
 import {
   FileText,
   ArrowLeft,
@@ -21,10 +23,15 @@ import { formatDisplayDate } from "@/lib/crmCurrencyData";
 
 export default function CrmQuotationsListPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [business, setBusiness] = useState<any>(null);
+  const storeUser = useCrmSessionStore((s) => s.user);
+  const storeBusiness = useCrmSessionStore((s) => s.business);
+  const fetchSession = useCrmSessionStore((s) => s.fetchSession);
+
+  const [user, setUser] = useState<any>(storeUser);
+  const [business, setBusiness] = useState<any>(storeBusiness);
   const [quotations, setQuotations] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingSession, setIsLoadingSession] = useState(!storeUser);
+  const [isLoadingQuotes, setIsLoadingQuotes] = useState(true);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,15 +66,16 @@ export default function CrmQuotationsListPage() {
   };
 
   useEffect(() => {
+    router.prefetch("/crm/dashboard");
+    router.prefetch("/crm/quotations/create");
+
     async function init() {
       try {
-        // Fetch session and quotations concurrently in parallel
-        const [sessionRes, quotesRes] = await Promise.all([
-          fetch("/api/crm/auth/session"),
-          fetch("/api/crm/quotations"),
+        const [sessionData, quotesData] = await Promise.all([
+          fetchSession(),
+          fetch("/api/crm/quotations").then((r) => r.json()).catch(() => ({ success: false })),
         ]);
 
-        const sessionData = await sessionRes.json();
         if (!sessionData.authenticated) {
           router.replace("/crm");
           return;
@@ -79,18 +87,18 @@ export default function CrmQuotationsListPage() {
         setUser(sessionData.user);
         setBusiness(sessionData.business);
 
-        const quotesData = await quotesRes.json();
-        if (quotesData.success && quotesData.quotations) {
+        if (quotesData?.success && quotesData.quotations) {
           setQuotations(quotesData.quotations);
         }
       } catch (err) {
-        console.error("Failed to load CRM session:", err);
+        console.error("Failed to load CRM session or quotations:", err);
       } finally {
-        setIsLoading(false);
+        setIsLoadingSession(false);
+        setIsLoadingQuotes(false);
       }
     }
     init();
-  }, [router]);
+  }, [router, fetchSession]);
 
   // Normalize any date string to YYYY-MM-DD for reliable comparison
   const toYmd = (dateStr: string | null | undefined): string => {
@@ -277,7 +285,7 @@ export default function CrmQuotationsListPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoadingSession && !user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
         <Loader2 className="w-10 h-10 text-brand animate-spin mb-4" />
@@ -295,14 +303,14 @@ export default function CrmQuotationsListPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={() => router.push("/crm/dashboard")}
+              <Link
+                href="/crm/dashboard"
+                prefetch={true}
                 className="p-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors cursor-pointer mr-1"
                 title="Back to Dashboard"
               >
                 <ArrowLeft size={18} />
-              </button>
+              </Link>
               <div className="w-9 h-9 rounded-xl bg-brand text-white flex items-center justify-center shadow-md">
                 <FileText size={18} />
               </div>
@@ -322,21 +330,21 @@ export default function CrmQuotationsListPage() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={() => router.push("/crm/dashboard")}
+              <Link
+                href="/crm/dashboard"
+                prefetch={true}
                 className="px-3.5 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-100 text-xs font-bold text-gray-700 transition-colors cursor-pointer"
               >
                 ← Back to Dashboard
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push("/crm/quotations/create")}
+              </Link>
+              <Link
+                href="/crm/quotations/create"
+                prefetch={true}
                 className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold shadow transition-all cursor-pointer"
               >
                 <Plus size={14} />
                 <span>New Quotation</span>
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -493,7 +501,12 @@ export default function CrmQuotationsListPage() {
           )}
 
           {/* Quotations Table */}
-          {filteredQuotations.length === 0 ? (
+          {isLoadingQuotes ? (
+            <div className="py-20 flex flex-col items-center justify-center text-center space-y-3">
+              <Loader2 className="w-8 h-8 text-brand animate-spin" />
+              <p className="text-xs text-gray-500 font-medium">Fetching quotations...</p>
+            </div>
+          ) : filteredQuotations.length === 0 ? (
             <div className="py-16 flex flex-col items-center justify-center text-center space-y-3">
               <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-brand">
                 <FileText size={28} />
@@ -524,13 +537,13 @@ export default function CrmQuotationsListPage() {
                   Clear All Filters
                 </button>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => router.push("/crm/quotations/create")}
-                  className="mt-2 px-4 py-2 rounded-xl bg-brand text-white text-xs font-bold shadow hover:bg-brand-hover transition-all cursor-pointer"
+                <Link
+                  href="/crm/quotations/create"
+                  prefetch={true}
+                  className="mt-2 px-4 py-2 rounded-xl bg-brand text-white text-xs font-bold shadow hover:bg-brand-hover transition-all cursor-pointer inline-flex items-center space-x-1"
                 >
-                  + Draft First Quotation
-                </button>
+                  <span>+ Draft First Quotation</span>
+                </Link>
               )}
             </div>
           ) : (

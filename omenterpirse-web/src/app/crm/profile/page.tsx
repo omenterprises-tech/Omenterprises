@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useCrmSessionStore } from "@/store/useCrmSessionStore";
 import {
   ArrowLeft,
   Lightbulb,
@@ -20,46 +22,65 @@ import { INDIAN_STATES } from "@/lib/crmCategoriesData";
 
 export default function CrmManageProfilePage() {
   const router = useRouter();
+  const storeUser = useCrmSessionStore((s) => s.user);
+  const storeBusiness = useCrmSessionStore((s) => s.business);
+  const setSession = useCrmSessionStore((s) => s.setSession);
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!storeBusiness && !storeUser);
   const [isUpdating, setIsUpdating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [showTips, setShowTips] = useState(false);
 
-  const [canManageBusiness, setCanManageBusiness] = useState(true);
-  const [callerRole, setCallerRole] = useState("Owner");
+  const [canManageBusiness, setCanManageBusiness] = useState(
+    Boolean(storeUser?.isOwner ?? (storeUser?.role === "Owner"))
+  );
+  const [callerRole, setCallerRole] = useState(storeUser?.role || "Owner");
 
-  // Form Fields
-  const [businessName, setBusinessName] = useState("");
-  const [contactName, setContactName] = useState("");
-  const [email, setEmail] = useState("");
-  const [mobileNumber, setMobileNumber] = useState("");
-  const [addressLine1, setAddressLine1] = useState("");
-  const [addressLine2, setAddressLine2] = useState("");
-  const [addressLine3, setAddressLine3] = useState("");
-  const [otherInfo, setOtherInfo] = useState("");
-  const [businessCategory, setBusinessCategory] = useState("");
+  // Form Fields pre-populated from store if available
+  const [businessName, setBusinessName] = useState(storeBusiness?.businessName || "");
+  const [contactName, setContactName] = useState(
+    storeBusiness?.contactName || storeUser?.fullName || ""
+  );
+  const [email, setEmail] = useState(storeBusiness?.email || storeUser?.email || "");
+  const [mobileNumber, setMobileNumber] = useState(
+    storeBusiness?.mobileNumber || storeUser?.phoneNumber || ""
+  );
+  const [addressLine1, setAddressLine1] = useState(storeBusiness?.addressLine1 || "");
+  const [addressLine2, setAddressLine2] = useState(storeBusiness?.addressLine2 || "");
+  const [addressLine3, setAddressLine3] = useState(storeBusiness?.addressLine3 || "");
+  const [otherInfo, setOtherInfo] = useState(storeBusiness?.otherInfo || "");
+  const [businessCategory, setBusinessCategory] = useState(
+    storeBusiness?.businessCategory || ""
+  );
 
   // Tax Details
-  const [taxLabel, setTaxLabel] = useState("GSTIN");
-  const [taxNumber, setTaxNumber] = useState("");
-  const [selectedState, setSelectedState] = useState("");
+  const [taxLabel, setTaxLabel] = useState(storeBusiness?.taxLabel || "GSTIN");
+  const [taxNumber, setTaxNumber] = useState(storeBusiness?.taxNumber || "");
+  const [selectedState, setSelectedState] = useState(storeBusiness?.state || "");
 
   // Bank & Payment Details
-  const [bankAccountName, setBankAccountName] = useState("");
-  const [bankName, setBankName] = useState("");
-  const [bankAccountNo, setBankAccountNo] = useState("");
-  const [bankIfsc, setBankIfsc] = useState("");
-  const [bankAccountType, setBankAccountType] = useState("CURRENT ACCOUNT");
+  const [bankAccountName, setBankAccountName] = useState(
+    storeBusiness?.bankAccountName || storeBusiness?.businessName || ""
+  );
+  const [bankName, setBankName] = useState(storeBusiness?.bankName || "");
+  const [bankAccountNo, setBankAccountNo] = useState(storeBusiness?.bankAccountNo || "");
+  const [bankIfsc, setBankIfsc] = useState(storeBusiness?.bankIfsc || "");
+  const [bankAccountType, setBankAccountType] = useState(
+    storeBusiness?.bankAccountType || "CURRENT ACCOUNT"
+  );
 
   // Logo & Signature
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(storeBusiness?.logoUrl || null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
-  const [signatureType, setSignatureType] = useState<string | null>("draw");
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(
+    storeBusiness?.signatureUrl || null
+  );
+  const [signatureType, setSignatureType] = useState<string | null>(
+    storeBusiness?.signatureType || "draw"
+  );
   const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
 
   // Category Modal
@@ -67,6 +88,8 @@ export default function CrmManageProfilePage() {
 
   // Load existing profile
   useEffect(() => {
+    router.prefetch("/crm/dashboard");
+
     fetch("/api/crm/profile")
       .then((res) => {
         if (res.status === 401) {
@@ -104,6 +127,11 @@ export default function CrmManageProfilePage() {
           setLogoUrl(b.logoUrl || null);
           setSignatureUrl(b.signatureUrl || null);
           setSignatureType(b.signatureType || "draw");
+
+          // Keep store synchronized
+          if (data.user && data.business) {
+            setSession(data.user, data.business);
+          }
         }
       })
       .catch((err) => {
@@ -113,7 +141,7 @@ export default function CrmManageProfilePage() {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [router]);
+  }, [router, setSession]);
 
   // Handle Logo Upload
   const handleLogoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -216,7 +244,7 @@ export default function CrmManageProfilePage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !businessName && !contactName) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
         <Loader2 className="w-10 h-10 text-[#18181B] animate-spin mb-3" />
@@ -231,14 +259,14 @@ export default function CrmManageProfilePage() {
       <div className="w-full max-w-md bg-white min-h-screen flex flex-col shadow-xl">
         {/* ================= HEADER BAR (Images 3 & 4) ================= */}
         <header className="bg-[#18181B] text-white px-4 py-4 flex items-center justify-between sticky top-0 z-30 shadow-md">
-          <button
-            type="button"
-            onClick={() => router.push("/crm/dashboard")}
+          <Link
+            href="/crm/dashboard"
+            prefetch={true}
             className="p-2 -ml-1 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             title="Back to CRM Dashboard"
           >
             <ArrowLeft size={20} />
-          </button>
+          </Link>
 
           <h1 className="text-lg font-semibold tracking-wide text-white">
             Update Business Info

@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useCrmSessionStore } from "@/store/useCrmSessionStore";
 import {
   Building2,
   Users,
@@ -18,9 +20,15 @@ import {
 
 export default function CrmDashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [business, setBusiness] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const storeUser = useCrmSessionStore((s) => s.user);
+  const storeBusiness = useCrmSessionStore((s) => s.business);
+  const fetchSession = useCrmSessionStore((s) => s.fetchSession);
+  const clearSession = useCrmSessionStore((s) => s.clearSession);
+
+  const [user, setUser] = useState<any>(storeUser);
+  const [business, setBusiness] = useState<any>(storeBusiness);
+  // Don't block screen with spinner if user session is already in store
+  const [isLoading, setIsLoading] = useState(!storeUser);
 
   // Counts for dashboard badges
   const [quotationsCount, setQuotationsCount] = useState(0);
@@ -31,23 +39,32 @@ export default function CrmDashboardPage() {
   const canManageBusiness = Boolean(user?.isOwner ?? (user?.role === "Owner"));
 
   useEffect(() => {
+    // Background prefetch all CRM destination routes for instant navigation
+    router.prefetch("/crm/quotations");
+    router.prefetch("/crm/quotations/create");
+    router.prefetch("/crm/customers");
+    router.prefetch("/crm/products");
+    router.prefetch("/crm/teams");
+    router.prefetch("/crm/terms");
+    router.prefetch("/crm/business");
+
     async function loadData() {
       try {
-        const res = await fetch("/api/crm/auth/session");
-        const data = await res.json();
-        if (!data.authenticated) {
+        const sessionData = await fetchSession();
+        if (!sessionData.authenticated) {
           router.replace("/crm");
           return;
         }
-        if (!data.isOnboardingCompleted) {
+        if (!sessionData.isOnboardingCompleted) {
           router.replace("/crm/onboarding");
           return;
         }
 
-        setUser(data.user);
-        setBusiness(data.business);
+        setUser(sessionData.user);
+        setBusiness(sessionData.business);
+        setIsLoading(false);
 
-        // Fetch counts for summary badges
+        // Fetch counts for summary badges concurrently
         const [teamRes, quotesRes, custRes, prodRes] = await Promise.allSettled([
           fetch("/api/crm/team").then((r) => r.json()),
           fetch("/api/crm/quotations").then((r) => r.json()),
@@ -74,9 +91,10 @@ export default function CrmDashboardPage() {
       }
     }
     loadData();
-  }, [router]);
+  }, [router, fetchSession]);
 
   const handleLogout = async () => {
+    clearSession();
     try {
       await fetch("/api/crm/auth/logout", { method: "POST" });
     } catch (e) {
@@ -85,7 +103,7 @@ export default function CrmDashboardPage() {
     router.replace("/crm");
   };
 
-  if (isLoading) {
+  if (isLoading && !user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
         <Loader2 className="w-10 h-10 text-brand animate-spin mb-4" />
@@ -124,15 +142,15 @@ export default function CrmDashboardPage() {
 
             {/* User & Actions */}
             <div className="flex items-center space-x-3 sm:space-x-4">
-              <button
-                type="button"
-                onClick={() => router.push("/crm/business")}
+              <Link
+                href="/crm/business"
+                prefetch={true}
                 className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-100 border border-gray-200 transition-colors cursor-pointer"
                 title={canManageBusiness ? "Manage Business Profile" : "View Official Business Profile"}
               >
                 <Building2 size={14} className="text-brand" />
                 <span>{canManageBusiness ? "Manage Profile" : "View Profile"}</span>
-              </button>
+              </Link>
 
               <div className="hidden sm:flex flex-col text-right">
                 <div className="flex items-center justify-end space-x-1.5">
@@ -213,9 +231,9 @@ export default function CrmDashboardPage() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-3.5">
             {/* 1. Business */}
-            <button
-              type="button"
-              onClick={() => router.push("/crm/business")}
+            <Link
+              href="/crm/business"
+              prefetch={true}
               className="group text-left p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-brand/60 transition-all duration-200 cursor-pointer flex flex-col justify-between"
             >
               <div className="flex items-center justify-between mb-3">
@@ -234,12 +252,12 @@ export default function CrmDashboardPage() {
                   Profile & Branding
                 </p>
               </div>
-            </button>
+            </Link>
 
             {/* 2. Teams */}
-            <button
-              type="button"
-              onClick={() => router.push("/crm/teams")}
+            <Link
+              href="/crm/teams"
+              prefetch={true}
               className="group text-left p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-purple-500/60 transition-all duration-200 cursor-pointer flex flex-col justify-between"
             >
               <div className="flex items-center justify-between mb-3">
@@ -258,12 +276,12 @@ export default function CrmDashboardPage() {
                   Access & Roles
                 </p>
               </div>
-            </button>
+            </Link>
 
             {/* 3. Customers */}
-            <button
-              type="button"
-              onClick={() => router.push("/crm/customers")}
+            <Link
+              href="/crm/customers"
+              prefetch={true}
               className="group text-left p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-emerald-500/60 transition-all duration-200 cursor-pointer flex flex-col justify-between"
             >
               <div className="flex items-center justify-between mb-3">
@@ -282,12 +300,12 @@ export default function CrmDashboardPage() {
                   Client Directory
                 </p>
               </div>
-            </button>
+            </Link>
 
             {/* 4. Products */}
-            <button
-              type="button"
-              onClick={() => router.push("/crm/products")}
+            <Link
+              href="/crm/products"
+              prefetch={true}
               className="group text-left p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-amber-500/60 transition-all duration-200 cursor-pointer flex flex-col justify-between"
             >
               <div className="flex items-center justify-between mb-3">
@@ -306,12 +324,12 @@ export default function CrmDashboardPage() {
                   Items & Catalog
                 </p>
               </div>
-            </button>
+            </Link>
 
             {/* 5. Terms */}
-            <button
-              type="button"
-              onClick={() => router.push("/crm/terms")}
+            <Link
+              href="/crm/terms"
+              prefetch={true}
               className="group text-left p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-indigo-500/60 transition-all duration-200 cursor-pointer flex flex-col justify-between"
             >
               <div className="flex items-center justify-between mb-3">
@@ -330,7 +348,7 @@ export default function CrmDashboardPage() {
                   Rules & Policies
                 </p>
               </div>
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -345,9 +363,9 @@ export default function CrmDashboardPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 max-w-2xl">
             {/* 1. Quotation */}
-            <button
-              type="button"
-              onClick={() => router.push("/crm/quotations/create")}
+            <Link
+              href="/crm/quotations/create"
+              prefetch={true}
               className="group text-left p-4 rounded-2xl border border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-brand/50 transition-all duration-200 cursor-pointer flex items-center justify-between"
             >
               <div className="flex items-center space-x-3.5">
@@ -366,12 +384,12 @@ export default function CrmDashboardPage() {
               <span className="inline-flex items-center px-3 py-1 rounded-xl bg-brand/10 text-brand font-bold text-xs group-hover:bg-brand group-hover:text-white transition-all shrink-0">
                 + Create
               </span>
-            </button>
+            </Link>
 
             {/* 2. Quotation list */}
-            <button
-              type="button"
-              onClick={() => router.push("/crm/quotations")}
+            <Link
+              href="/crm/quotations"
+              prefetch={true}
               className="group text-left p-4 rounded-2xl border border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-brand/50 transition-all duration-200 cursor-pointer flex items-center justify-between"
             >
               <div className="flex items-center space-x-3.5">
@@ -390,7 +408,7 @@ export default function CrmDashboardPage() {
               <span className="inline-flex items-center px-3 py-1 rounded-xl bg-gray-100 text-gray-700 group-hover:bg-brand group-hover:text-white font-bold text-xs transition-all shrink-0">
                 View List
               </span>
-            </button>
+            </Link>
           </div>
         </div>
       </main>
