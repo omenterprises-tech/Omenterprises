@@ -37,7 +37,6 @@ export default function Navbar() {
   const [cartCount, setCartCount] = useState(0);
   const getTotalItems = useCartStore((state) => state.getTotalItems);
   const cartItems = useCartStore((state) => state.items);
-  const clearCart = useCartStore((state) => state.clearCart);
 
   useEffect(() => {
     if (pathname.startsWith("/admin") || pathname === "/login" || pathname.startsWith("/crm")) return;
@@ -91,10 +90,6 @@ export default function Navbar() {
           setUser(sessionData.user);
         } else if (sessionData) {
           setUser(null);
-          // If the user is logged out, ensure the cart is empty
-          if (cartItems.length > 0) {
-            clearCart();
-          }
         }
 
         // Fetch Collections (Carousel Names) - For all users
@@ -119,7 +114,7 @@ export default function Navbar() {
     };
 
     fetchData();
-  }, [pathname, cartItems.length, clearCart]);
+  }, [pathname]);
 
 
 
@@ -129,7 +124,6 @@ export default function Navbar() {
       const res = await fetch("/api/auth/logout", { method: "POST" });
       if (res.ok) {
         setUser(null);
-        clearCart();
         setIsLogoutModalOpen(false);
         router.push("/");
         router.refresh();
