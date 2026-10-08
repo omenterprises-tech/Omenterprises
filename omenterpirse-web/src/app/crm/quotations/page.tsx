@@ -529,9 +529,9 @@ export default function CrmQuotationsListPage() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                    <th className="pb-3 pl-3 pr-2 w-10 text-center">
+                    <th className="pb-3 pl-3 pr-2 w-28 text-left">
                       <label
-                        className="inline-flex items-center justify-center cursor-pointer p-1 rounded hover:bg-gray-100 transition-colors"
+                        className="inline-flex items-center gap-1.5 cursor-pointer group select-none"
                         title={allFilteredSelected ? "Deselect all visible quotations" : "Select all visible quotations"}
                       >
                         <input
@@ -541,9 +541,12 @@ export default function CrmQuotationsListPage() {
                           onChange={toggleSelectAll}
                           className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand/30 cursor-pointer accent-blue-600"
                         />
+                        <span className="text-[11px] font-bold text-gray-500 group-hover:text-brand uppercase tracking-wider whitespace-nowrap">
+                          Select All
+                        </span>
                       </label>
                     </th>
-                    <th className="pb-3">Quotation #</th>
+                    <th className="pb-3 pl-2">Quotation #</th>
                     <th className="pb-3">Date</th>
                     <th className="pb-3">Customer</th>
                     <th className="pb-3">Amount</th>
@@ -565,7 +568,7 @@ export default function CrmQuotationsListPage() {
                         }`}
                       >
                         <td
-                          className="py-4 pl-3 pr-2 w-10 text-center"
+                          className="py-4 pl-3 pr-2 w-28 text-left"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <label
@@ -582,7 +585,7 @@ export default function CrmQuotationsListPage() {
                         </td>
                         <td
                           onClick={() => router.push(`/crm/quotations/${q.id}`)}
-                          className="py-4 font-bold text-brand hover:underline text-xs sm:text-sm cursor-pointer"
+                          className="py-4 pl-2 font-bold text-brand hover:underline text-xs sm:text-sm cursor-pointer"
                         >
                           {q.quotationNumber}
                         </td>
