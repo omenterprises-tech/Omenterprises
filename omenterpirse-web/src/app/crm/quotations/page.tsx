@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   FileText,
@@ -125,26 +125,41 @@ export default function CrmQuotationsListPage() {
     });
   }, [quotations, searchQuery, statusFilter, dateFilter]);
 
-  const toggleSelect = (id: number) => {
+  const headerCheckboxRef = useRef<HTMLInputElement | null>(null);
+
+  const allFilteredSelected = useMemo(() => {
+    if (!filteredQuotations || filteredQuotations.length === 0) return false;
+    return filteredQuotations.every((q) => selectedIds.includes(Number(q.id)));
+  }, [filteredQuotations, selectedIds]);
+
+  const someFilteredSelected = useMemo(() => {
+    if (!filteredQuotations || filteredQuotations.length === 0) return false;
+    return filteredQuotations.some((q) => selectedIds.includes(Number(q.id)));
+  }, [filteredQuotations, selectedIds]);
+
+  useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate =
+        someFilteredSelected && !allFilteredSelected;
+    }
+  }, [someFilteredSelected, allFilteredSelected]);
+
+  const toggleSelect = (id: number | string) => {
+    const idNum = Number(id);
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(idNum) ? prev.filter((x) => x !== idNum) : [...prev, idNum]
     );
   };
 
-  const allFilteredSelected =
-    filteredQuotations.length > 0 &&
-    filteredQuotations.every((q) => selectedIds.includes(q.id));
-
-  const someFilteredSelected =
-    filteredQuotations.some((q) => selectedIds.includes(q.id));
-
   const toggleSelectAll = () => {
     if (allFilteredSelected) {
-      const filteredIdSet = new Set(filteredQuotations.map((q) => q.id));
-      setSelectedIds((prev) => prev.filter((id) => !filteredIdSet.has(id)));
+      // Deselect all visible/filtered quotations
+      const filteredIdSet = new Set(filteredQuotations.map((q) => Number(q.id)));
+      setSelectedIds((prev) => prev.filter((id) => !filteredIdSet.has(Number(id))));
     } else {
-      const filteredIdSet = new Set(filteredQuotations.map((q) => q.id));
-      setSelectedIds((prev) => Array.from(new Set([...prev, ...filteredIdSet])));
+      // Select all currently visible/filtered quotations
+      const visibleIds = filteredQuotations.map((q) => Number(q.id));
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
     }
   };
 
@@ -434,7 +449,7 @@ export default function CrmQuotationsListPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        const filteredIdSet = new Set(filteredQuotations.map((q) => q.id));
+                        const filteredIdSet = new Set(filteredQuotations.map((q) => Number(q.id)));
                         setSelectedIds((prev) => Array.from(new Set([...prev, ...filteredIdSet])));
                       }}
                       className="text-brand hover:underline font-semibold cursor-pointer"
@@ -515,19 +530,18 @@ export default function CrmQuotationsListPage() {
                 <thead>
                   <tr className="border-b border-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                     <th className="pb-3 pl-3 pr-2 w-10 text-center">
-                      <input
-                        type="checkbox"
-                        checked={allFilteredSelected}
-                        ref={(input) => {
-                          if (input) {
-                            input.indeterminate =
-                              someFilteredSelected && !allFilteredSelected;
-                          }
-                        }}
-                        onChange={toggleSelectAll}
-                        className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand/30 cursor-pointer accent-blue-600"
-                        title={allFilteredSelected ? "Deselect all" : "Select all"}
-                      />
+                      <label
+                        className="inline-flex items-center justify-center cursor-pointer p-1 rounded hover:bg-gray-100 transition-colors"
+                        title={allFilteredSelected ? "Deselect all visible quotations" : "Select all visible quotations"}
+                      >
+                        <input
+                          ref={headerCheckboxRef}
+                          type="checkbox"
+                          checked={allFilteredSelected}
+                          onChange={toggleSelectAll}
+                          className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand/30 cursor-pointer accent-blue-600"
+                        />
+                      </label>
                     </th>
                     <th className="pb-3">Quotation #</th>
                     <th className="pb-3">Date</th>
@@ -540,7 +554,7 @@ export default function CrmQuotationsListPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredQuotations.map((q) => {
-                    const isSelected = selectedIds.includes(q.id);
+                    const isSelected = selectedIds.includes(Number(q.id));
                     return (
                       <tr
                         key={q.id}
@@ -554,13 +568,17 @@ export default function CrmQuotationsListPage() {
                           className="py-4 pl-3 pr-2 w-10 text-center"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleSelect(q.id)}
-                            className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand/30 cursor-pointer accent-blue-600"
+                          <label
+                            className="inline-flex items-center justify-center cursor-pointer p-1 rounded hover:bg-gray-100 transition-colors"
                             title="Select quotation"
-                          />
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelect(q.id)}
+                              className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand/30 cursor-pointer accent-blue-600"
+                            />
+                          </label>
                         </td>
                         <td
                           onClick={() => router.push(`/crm/quotations/${q.id}`)}
