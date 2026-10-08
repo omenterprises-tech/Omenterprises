@@ -12,6 +12,7 @@ import {
   Loader2,
   CheckCircle2,
   Filter,
+  ChevronDown,
 } from "lucide-react";
 import { ViewQuotationModal } from "@/components/crm/QuotationModal";
 import { formatDisplayDate } from "@/lib/crmCurrencyData";
@@ -123,6 +124,36 @@ export default function CrmQuotationsListPage() {
       }
     } catch (err) {
       console.error("Failed to update status:", err);
+    }
+  };
+
+  const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
+
+  const handleDirectStatusChange = async (qId: number, newStatus: string) => {
+    const currentQ = quotations.find((q) => q.id === qId);
+    if (!currentQ || currentQ.status === newStatus) return;
+
+    setUpdatingStatusId(qId);
+    try {
+      const res = await fetch(`/api/crm/quotations/${qId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await res.json();
+      if (data.success && data.quotation) {
+        setQuotations((prev) =>
+          prev.map((q) => (q.id === qId ? { ...q, status: newStatus } : q))
+        );
+        showToast(`Quotation #${data.quotation.quotationNumber || currentQ.quotationNumber} marked as ${newStatus}.`);
+      } else {
+        alert(data.error || "Failed to update quotation status.");
+      }
+    } catch (err: any) {
+      console.error("Failed to update status:", err);
+      alert(err.message || "Failed to update status.");
+    } finally {
+      setUpdatingStatusId(null);
     }
   };
 
@@ -313,19 +344,57 @@ export default function CrmQuotationsListPage() {
                         ₹{Number(q.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-4">
-                        <span
-                          className={"inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold " + (
-                            q.status === "Accepted"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : q.status === "Sent"
-                              ? "bg-blue-50 text-blue-700 border border-blue-200"
-                              : q.status === "Declined"
-                              ? "bg-rose-50 text-rose-700 border border-rose-200"
-                              : "bg-amber-50 text-amber-700 border border-amber-200"
-                          )}
-                        >
-                          {q.status}
-                        </span>
+                        {updatingStatusId === q.id ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200 animate-pulse">
+                            <Loader2 size={12} className="animate-spin text-brand" />
+                            <span>Updating...</span>
+                          </span>
+                        ) : (
+                          <div className="relative inline-flex items-center group">
+                            <span
+                              className={`absolute left-2.5 w-2 h-2 rounded-full pointer-events-none ${
+                                q.status === "Accepted"
+                                  ? "bg-emerald-500"
+                                  : q.status === "Sent"
+                                  ? "bg-blue-500"
+                                  : q.status === "Declined"
+                                  ? "bg-rose-500"
+                                  : "bg-amber-500"
+                              }`}
+                            />
+                            <select
+                              value={q.status || "Draft"}
+                              onChange={(e) => handleDirectStatusChange(q.id, e.target.value)}
+                              className={`text-xs font-bold pl-6 pr-7 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/30 transition-all appearance-none ${
+                                q.status === "Accepted"
+                                  ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100/80"
+                                  : q.status === "Sent"
+                                  ? "bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100/80"
+                                  : q.status === "Declined"
+                                  ? "bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100/80"
+                                  : "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100/80"
+                              }`}
+                              title="Click to change status directly without opening quotation"
+                            >
+                              <option value="Draft">Draft</option>
+                              <option value="Sent">Sent</option>
+                              <option value="Accepted">Accepted</option>
+                              <option value="Declined">Declined</option>
+                            </select>
+                            <ChevronDown
+                              size={12}
+                              className={`absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity ${
+                                q.status === "Accepted"
+                                  ? "text-emerald-800"
+                                  : q.status === "Sent"
+                                  ? "text-blue-800"
+                                  : q.status === "Declined"
+                                  ? "text-rose-800"
+                                  : "text-amber-800"
+                              }`}
+                            />
+                          </div>
+                        )}
                       </td>
                       <td className="py-4">
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-900 border border-purple-100">
