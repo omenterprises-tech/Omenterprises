@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { crmUsers, crmBusinesses } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getCrmSession } from "@/lib/crmAuth";
+import { invalidateBusinessResolverCache } from "@/lib/crmBusinessResolver";
 
 export async function POST(request: Request) {
   try {
@@ -108,6 +109,8 @@ export async function POST(request: Request) {
       }
       throw lastErr;
     })();
+
+    invalidateBusinessResolverCache(session.userId);
 
     return NextResponse.json({
       success: true,

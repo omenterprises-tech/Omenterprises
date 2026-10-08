@@ -59,19 +59,27 @@ export default function CrmCustomersPage() {
   useEffect(() => {
     async function init() {
       try {
-        const res = await fetch("/api/crm/auth/session");
-        const data = await res.json();
-        if (!data.authenticated) {
+        const [sessionRes, custRes] = await Promise.all([
+          fetch("/api/crm/auth/session"),
+          fetch("/api/crm/customers"),
+        ]);
+
+        const sessionData = await sessionRes.json();
+        if (!sessionData.authenticated) {
           router.replace("/crm");
           return;
         }
-        if (!data.isOnboardingCompleted) {
+        if (!sessionData.isOnboardingCompleted) {
           router.replace("/crm/onboarding");
           return;
         }
-        setUser(data.user);
-        setBusiness(data.business);
-        await loadCustomers();
+        setUser(sessionData.user);
+        setBusiness(sessionData.business);
+
+        const custData = await custRes.json();
+        if (custData.success && custData.customers) {
+          setCustomers(custData.customers);
+        }
       } catch (err) {
         console.error("Failed to load CRM session:", err);
       } finally {

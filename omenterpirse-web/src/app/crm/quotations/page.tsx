@@ -61,19 +61,28 @@ export default function CrmQuotationsListPage() {
   useEffect(() => {
     async function init() {
       try {
-        const res = await fetch("/api/crm/auth/session");
-        const data = await res.json();
-        if (!data.authenticated) {
+        // Fetch session and quotations concurrently in parallel
+        const [sessionRes, quotesRes] = await Promise.all([
+          fetch("/api/crm/auth/session"),
+          fetch("/api/crm/quotations"),
+        ]);
+
+        const sessionData = await sessionRes.json();
+        if (!sessionData.authenticated) {
           router.replace("/crm");
           return;
         }
-        if (!data.isOnboardingCompleted) {
+        if (!sessionData.isOnboardingCompleted) {
           router.replace("/crm/onboarding");
           return;
         }
-        setUser(data.user);
-        setBusiness(data.business);
-        await loadQuotations();
+        setUser(sessionData.user);
+        setBusiness(sessionData.business);
+
+        const quotesData = await quotesRes.json();
+        if (quotesData.success && quotesData.quotations) {
+          setQuotations(quotesData.quotations);
+        }
       } catch (err) {
         console.error("Failed to load CRM session:", err);
       } finally {
