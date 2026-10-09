@@ -76,8 +76,11 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error("CRM Login error:", error);
+    const userMessage = error.message?.includes("Failed query")
+      ? "Database connection temporarily timed out. Please click Sign In again."
+      : (error.message || "Failed to log in.");
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to log in." },
+      { success: false, error: userMessage },
       { status: 500 }
     );
   }

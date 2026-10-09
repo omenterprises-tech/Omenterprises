@@ -7,6 +7,11 @@ import dns from "node:dns";
 // Prefer IPv4 DNS resolution first to avoid 10-second connection timeouts on Windows environments
 dns.setDefaultResultOrder("ipv4first");
 
+// Prevent Windows proxy / corporate / antivirus SSL inspection from failing cloud Turso connections
+if (typeof process !== "undefined" && process.env) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
 // Load environment variables from .env file
 dotenv.config();
 
