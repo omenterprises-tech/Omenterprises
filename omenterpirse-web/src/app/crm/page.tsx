@@ -36,8 +36,8 @@ export default function CrmEntryPage() {
         const res = await fetch("/api/crm/auth/session");
         const data = await res.json();
         if (data.authenticated) {
-          if (data.user && data.business) {
-            setSession(data.user, data.business);
+          if (data.user) {
+            setSession(data.user, data.business, data.isOnboardingCompleted);
           }
           if (data.isOnboardingCompleted) {
             router.replace("/crm/dashboard");
@@ -79,8 +79,8 @@ export default function CrmEntryPage() {
         return;
       }
 
-      if (data.user && data.business) {
-        setSession(data.user, data.business);
+      if (data.user) {
+        setSession(data.user, data.business, data.isOnboardingCompleted);
       }
 
       if (data.isOnboardingCompleted) {

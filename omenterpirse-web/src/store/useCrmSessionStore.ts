@@ -12,7 +12,7 @@ interface CrmSessionState {
     business?: any;
     isOnboardingCompleted?: boolean;
   }>;
-  setSession: (user: any, business: any) => void;
+  setSession: (user: any, business: any, isOnboardingCompleted?: boolean) => void;
   clearSession: () => void;
 }
 
@@ -85,12 +85,15 @@ export const useCrmSessionStore = create<CrmSessionState>((set, get) => ({
     return sessionFetchPromise;
   },
 
-  setSession: (user: any, business: any) => {
+  setSession: (user: any, business: any, isOnboardingCompleted?: boolean) => {
     set({
       user,
       business,
       isAuthenticated: true,
-      isOnboardingCompleted: true,
+      isOnboardingCompleted:
+        isOnboardingCompleted !== undefined
+          ? isOnboardingCompleted
+          : Boolean(business && (user?.isOnboardingCompleted ?? true)),
     });
   },
 

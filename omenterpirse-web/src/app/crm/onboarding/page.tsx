@@ -22,6 +22,7 @@ import SignaturePad from "@/components/crm/SignaturePad";
 import DateFormatModal from "@/components/crm/DateFormatModal";
 import CurrencyModal from "@/components/crm/CurrencyModal";
 import { formatDateWithPattern, CurrencyOption, CURRENCIES } from "@/lib/crmCurrencyData";
+import { useCrmSessionStore } from "@/store/useCrmSessionStore";
 
 export default function CrmOnboardingPage() {
   const router = useRouter();
@@ -280,6 +281,9 @@ export default function CrmOnboardingPage() {
         setIsSubmitting(false);
         return;
       }
+
+      // Refresh session store with newly created business & owner role
+      await useCrmSessionStore.getState().fetchSession(true);
 
       // Navigate to CRM dashboard
       router.push("/crm/dashboard");

@@ -79,12 +79,15 @@ export async function resolveBusinessAndRole(userId: number) {
     }
   }
 
+  // If the user has no team membership in crmTeamMembers, they registered directly as a business Owner!
+  // If they don't have a business record yet, they are an Owner pending onboarding setup.
+  const isOwner = membership.length === 0;
   const fallback = {
     business: null,
-    role: null,
+    role: isOwner ? "Owner" : "Staff",
     user,
-    isOwner: false,
-    canManageBusiness: false,
+    isOwner,
+    canManageBusiness: isOwner,
   };
   resolverCache.set(userId, { result: fallback, expiresAt: now + 5000 });
   return fallback;

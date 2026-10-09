@@ -67,8 +67,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      user: newUser,
+      user: {
+        ...newUser,
+        role: "Owner",
+        isOwner: true,
+        canManageBusiness: true,
+      },
       isOnboardingCompleted: false,
+      business: null,
     });
   } catch (error: any) {
     console.error("CRM Registration error:", error);

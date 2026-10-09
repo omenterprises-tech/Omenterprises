@@ -27,7 +27,7 @@ export async function GET() {
         email: user.email,
         fullName: user.fullName,
         phoneNumber: user.phoneNumber,
-        role: role || "Staff",
+        role: role || (isOwner ? "Owner" : "Staff"),
         isOwner,
         canManageBusiness,
       },

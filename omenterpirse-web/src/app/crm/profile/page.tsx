@@ -101,6 +101,10 @@ export default function CrmManageProfilePage() {
       .then((data) => {
         if (!data) return;
         if (data.success) {
+          if (!data.business) {
+            router.replace("/crm/onboarding");
+            return;
+          }
           const b = data.business || {};
           const u = data.user || {};
 
