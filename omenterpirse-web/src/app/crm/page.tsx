@@ -59,8 +59,13 @@ export default function CrmEntryPage() {
     e.preventDefault();
     setLoginError("");
 
-    if (!loginIdentifier.trim() || !loginPassword) {
-      setLoginError("Please enter your mobile number and password.");
+    const cleanPhone = loginIdentifier.replace(/\D/g, "");
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      setLoginError("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+    if (!loginPassword) {
+      setLoginError("Please enter your password.");
       return;
     }
 
@@ -70,8 +75,9 @@ export default function CrmEntryPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          identifier: loginIdentifier.trim(),
-          email: loginIdentifier.trim(),
+          identifier: cleanPhone,
+          phoneNumber: cleanPhone,
+          email: cleanPhone,
           password: loginPassword,
         }),
       });
@@ -230,9 +236,15 @@ export default function CrmEntryPage() {
                 <div className="relative">
                   <Phone size={17} className="absolute left-3.5 top-3.5 text-gray-400" />
                   <input
-                    type="text"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
                     value={loginIdentifier}
-                    onChange={(e) => setLoginIdentifier(e.target.value)}
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/\D/g, "");
+                      const phone = clean.length > 10 && clean.startsWith("91") ? clean.slice(2, 12) : clean.slice(0, 10);
+                      setLoginIdentifier(phone);
+                    }}
                     placeholder="Enter 10-digit mobile number"
                     required
                     autoComplete="username"
