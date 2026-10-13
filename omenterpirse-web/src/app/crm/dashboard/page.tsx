@@ -163,7 +163,13 @@ export default function CrmDashboardPage() {
                     </span>
                   )}
                 </div>
-                <span className="text-[11px] text-gray-500">{user?.email}</span>
+                <span className="text-[11px] text-gray-500">
+                  {user?.email && !user.email.endsWith("@omcrm.com") && !user.email.endsWith("@team.local")
+                    ? user.email
+                    : user?.phoneNumber
+                    ? `+91 ${user.phoneNumber}`
+                    : user?.email}
+                </span>
               </div>
 
               <button

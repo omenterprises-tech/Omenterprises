@@ -1,34 +1,58 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { crmUsers, crmBusinesses, crmTeamMembers } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { verifyPassword, setCrmSession } from "@/lib/crmAuth";
 import { resolveBusinessAndRole, invalidateBusinessResolverCache } from "@/lib/crmBusinessResolver";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password } = body;
+    const rawIdentifier = (body.identifier || body.email || body.mobileNumber || body.phoneNumber || "").toString().trim();
+    const password = body.password;
 
-    if (!email || !password) {
+    if (!rawIdentifier || !password) {
       return NextResponse.json(
-        { success: false, error: "Please enter both email and password." },
+        { success: false, error: "Please enter your email or mobile number, and password." },
         { status: 400 }
       );
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const isEmail = rawIdentifier.includes("@");
+    const cleanDigits = rawIdentifier.replace(/\D/g, "");
+    const phone10 = cleanDigits.slice(-10);
 
-    const userResult = await db
-      .select()
-      .from(crmUsers)
-      .where(eq(crmUsers.email, normalizedEmail))
-      .limit(1);
+    let userResult: any[] = [];
+
+    if (isEmail) {
+      userResult = await db
+        .select()
+        .from(crmUsers)
+        .where(eq(crmUsers.email, rawIdentifier.toLowerCase()))
+        .limit(1);
+    } else if (cleanDigits.length >= 10) {
+      userResult = await db
+        .select()
+        .from(crmUsers)
+        .where(
+          or(
+            eq(crmUsers.phoneNumber, phone10),
+            eq(crmUsers.email, rawIdentifier.toLowerCase())
+          )
+        )
+        .limit(1);
+    } else {
+      userResult = await db
+        .select()
+        .from(crmUsers)
+        .where(eq(crmUsers.email, rawIdentifier.toLowerCase()))
+        .limit(1);
+    }
 
     const user = userResult[0];
     if (!user) {
       return NextResponse.json(
-        { success: false, error: "Invalid email or password." },
+        { success: false, error: "Invalid email/mobile number or password." },
         { status: 401 }
       );
     }
@@ -36,7 +60,7 @@ export async function POST(request: Request) {
     const isValid = verifyPassword(password, user.salt, user.passwordHash);
     if (!isValid) {
       return NextResponse.json(
-        { success: false, error: "Invalid email or password." },
+        { success: false, error: "Invalid email/mobile number or password." },
         { status: 401 }
       );
     }

@@ -12,7 +12,7 @@ export default function CrmEntryPage() {
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   // Login form state
-  const [loginEmail, setLoginEmail] = useState("");
+  const [loginIdentifier, setLoginIdentifier] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
@@ -59,8 +59,8 @@ export default function CrmEntryPage() {
     e.preventDefault();
     setLoginError("");
 
-    if (!loginEmail.trim() || !loginPassword) {
-      setLoginError("Please enter both email and password.");
+    if (!loginIdentifier.trim() || !loginPassword) {
+      setLoginError("Please enter your email or mobile number, and password.");
       return;
     }
 
@@ -69,7 +69,11 @@ export default function CrmEntryPage() {
       const res = await fetch("/api/crm/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+        body: JSON.stringify({
+          identifier: loginIdentifier.trim(),
+          email: loginIdentifier.trim(),
+          password: loginPassword,
+        }),
       });
       const data = await res.json();
 
@@ -221,16 +225,17 @@ export default function CrmEntryPage() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
-                  Business Email Address
+                  Email or Mobile Number
                 </label>
                 <div className="relative">
-                  <Mail size={17} className="absolute left-3.5 top-3.5 text-gray-400" />
+                  <User size={17} className="absolute left-3.5 top-3.5 text-gray-400" />
                   <input
-                    type="email"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="name@company.com"
+                    type="text"
+                    value={loginIdentifier}
+                    onChange={(e) => setLoginIdentifier(e.target.value)}
+                    placeholder="Enter email or 10-digit mobile"
                     required
+                    autoComplete="username"
                     className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand text-sm transition-all"
                   />
                 </div>

@@ -116,30 +116,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Member full name is required." }, { status: 400 });
     }
 
-    if (!email || typeof email !== "string" || !/^[^s@]+@[^s@]+.[^s@]+$/.test(email.trim())) {
-      return NextResponse.json({ success: false, error: "Please provide a valid email address." }, { status: 400 });
+    const cleanPhone = (phoneNumber || "").toString().replace(/\D/g, "").slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      return NextResponse.json({ success: false, error: "Please provide a valid 10-digit mobile number." }, { status: 400 });
     }
 
     if (!password || typeof password !== "string" || password.length < 6) {
       return NextResponse.json({ success: false, error: "Password must be at least 6 characters." }, { status: 400 });
     }
 
-    const assignedRole = ["Admin", "Manager", "Staff"].includes(memberRole) ? memberRole : "Staff";
-    const normalizedEmail = email.trim().toLowerCase();
+    const assignedRole = ["Admin", "Manager", "Staff"].includes(memberRole) ? memberRole : "Manager";
 
-    // Check if user already exists
-    const existingUsers = await db
+    const normalizedEmail = (email && typeof email === "string" && email.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      ? email.trim().toLowerCase()
+      : null;
+
+    // Check if user already exists by mobile number or email
+    const existingByPhone = await db
       .select()
       .from(crmUsers)
-      .where(eq(crmUsers.email, normalizedEmail))
+      .where(eq(crmUsers.phoneNumber, cleanPhone))
       .limit(1);
 
+    const existingByEmail = normalizedEmail
+      ? await db.select().from(crmUsers).where(eq(crmUsers.email, normalizedEmail)).limit(1)
+      : [];
+
+    const existingUser = existingByPhone[0] || existingByEmail[0] || null;
     let memberUserId: number;
+    let finalEmail = normalizedEmail || `${cleanPhone}@omcrm.com`;
 
-    if (existingUsers.length > 0) {
-      memberUserId = existingUsers[0].id;
+    if (existingUser) {
+      memberUserId = existingUser.id;
+      finalEmail = existingUser.email;
 
-      // Check if already in this business team
+      // Check if already in this business team or is the primary owner
       const existingMember = await db
         .select()
         .from(crmTeamMembers)
@@ -153,41 +164,51 @@ export async function POST(request: Request) {
 
       if (existingMember.length > 0 || memberUserId === business.userId) {
         return NextResponse.json(
-          { success: false, error: "A team member with this email already belongs to your business." },
+          { success: false, error: "A team member with this mobile number already belongs to your business." },
           { status: 409 }
         );
       }
 
-      // Update their password if admin explicitly sets it
+      // Update password & name for this member
       const { salt, hash } = hashPassword(password);
       await db
         .update(crmUsers)
         .set({
           fullName: fullName.trim(),
+          phoneNumber: cleanPhone,
           passwordHash: hash,
           salt: salt,
           isOnboardingCompleted: true,
         })
         .where(eq(crmUsers.id, memberUserId));
     } else {
-      // Create new crm_user with email and password
-      const { salt, hash } = hashPassword(password);
-      const cleanPhone = (phoneNumber || "").toString().replace(/\D/g, "");
+      // Check if generated email is taken, add timestamp if needed for uniqueness
+      const emailTaken = await db
+        .select({ id: crmUsers.id })
+        .from(crmUsers)
+        .where(eq(crmUsers.email, finalEmail))
+        .limit(1);
 
+      if (emailTaken.length > 0) {
+        finalEmail = `${cleanPhone}_${Date.now()}@omcrm.com`;
+      }
+
+      const { salt, hash } = hashPassword(password);
       const createdUser = await db
         .insert(crmUsers)
         .values({
           fullName: fullName.trim(),
-          email: normalizedEmail,
-          phoneNumber: cleanPhone || "0000000000",
+          email: finalEmail,
+          phoneNumber: cleanPhone,
           passwordHash: hash,
           salt: salt,
           isOnboardingCompleted: true,
           createdAt: new Date().toISOString(),
         })
-        .returning({ id: crmUsers.id });
+        .returning({ id: crmUsers.id, email: crmUsers.email });
 
       memberUserId = createdUser[0].id;
+      finalEmail = createdUser[0].email;
     }
 
     // Insert into crm_team_members
@@ -208,7 +229,8 @@ export async function POST(request: Request) {
         id: newMemberRecord[0].id,
         userId: memberUserId,
         name: fullName.trim(),
-        email: normalizedEmail,
+        email: finalEmail,
+        phone: cleanPhone,
         role: assignedRole,
         status: "Active",
         isOwner: false,

@@ -161,6 +161,21 @@ export default function CrmTeamsPage() {
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddError("");
+
+    if (!inviteName.trim()) {
+      setAddError("Full name is required.");
+      return;
+    }
+    const cleanPhone = invitePhone.replace(/\D/g, "").slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      setAddError("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+    if (!invitePassword || invitePassword.length < 6) {
+      setAddError("Password must be at least 6 characters.");
+      return;
+    }
+
     setIsSubmittingAdd(true);
 
     try {
@@ -169,10 +184,9 @@ export default function CrmTeamsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fullName: inviteName.trim(),
-          email: inviteEmail.trim(),
+          phoneNumber: cleanPhone,
           password: invitePassword.trim(),
           role: inviteRole,
-          phoneNumber: invitePhone.trim() || undefined,
         }),
       });
 
@@ -364,7 +378,7 @@ export default function CrmTeamsPage() {
               <thead>
                 <tr className="border-b border-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                   <th className="pb-3">Member</th>
-                  <th className="pb-3">Email (Login ID)</th>
+                  <th className="pb-3">Login / Contact</th>
                   <th className="pb-3">Role</th>
                   <th className="pb-3">Status</th>
                   {canManageTeam && <th className="pb-3 text-right">Actions</th>}
@@ -388,7 +402,16 @@ export default function CrmTeamsPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 text-gray-600 text-xs sm:text-sm font-medium">{member.email}</td>
+                    <td className="py-4 text-gray-600 text-xs sm:text-sm font-medium">
+                      {member.phone && member.phone !== "0000000000" ? (
+                        <div className="font-semibold text-gray-900">{member.phone}</div>
+                      ) : null}
+                      {member.email && !member.email.endsWith("@omcrm.com") && !member.email.endsWith("@team.local") ? (
+                        <div className="text-[11px] text-gray-500">{member.email}</div>
+                      ) : (
+                        <div className="text-[11px] text-brand font-medium">Login via Mobile</div>
+                      )}
+                    </td>
                     <td className="py-4">
                       <span
                         className={"inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold " + (
@@ -514,18 +537,18 @@ export default function CrmTeamsPage() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Email Address (Login ID) *
+                  Mobile Number (Login ID) *
                 </label>
                 <input
-                  type="email"
-                  name="new_member_email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
+                  type="tel"
+                  name="new_member_phone"
+                  value={invitePhone}
+                  onChange={(e) => setInvitePhone(e.target.value)}
                   onFocus={() => setInputsUnlocked(true)}
                   onClick={() => setInputsUnlocked(true)}
-                  readOnly={!inputsUnlocked}
-                  placeholder="colleague@company.com"
-                  autoComplete="new-password"
+                  placeholder="10-digit mobile number"
+                  autoComplete="off"
+                  maxLength={10}
                   required
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
                 />
@@ -560,45 +583,26 @@ export default function CrmTeamsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                    Assigned Role
-                  </label>
-                  <select
-                    name="new_member_role"
-                    value={inviteRole}
-                    onChange={(e) => setInviteRole(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand bg-white cursor-pointer font-medium"
-                  >
-                    <option value="Manager">Manager</option>
-                    <option value="Admin">Admin</option>
-                    <option value="Staff">Staff</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                    Mobile <span className="text-gray-400 font-normal lowercase">(optional)</span>
-                  </label>
-                  <input
-                    type="tel"
-                    name="new_member_phone"
-                    value={invitePhone}
-                    onChange={(e) => setInvitePhone(e.target.value)}
-                    onFocus={() => setInputsUnlocked(true)}
-                    onClick={() => setInputsUnlocked(true)}
-                    placeholder="10-digit mobile"
-                    autoComplete="off"
-                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                  Assigned Role
+                </label>
+                <select
+                  name="new_member_role"
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand bg-white cursor-pointer font-medium"
+                >
+                  <option value="Manager">Manager</option>
+                  <option value="Staff">Staff</option>
+                  <option value="Admin">Admin</option>
+                </select>
               </div>
 
               <div className="p-3 bg-purple-50/60 border border-purple-100 rounded-xl text-xs text-purple-900 leading-relaxed flex items-start gap-2">
                 <CheckCircle2 size={15} className="text-purple-600 shrink-0 mt-0.5" />
                 <span>
-                  Colleagues can log in directly at <strong>/crm</strong> using this email and password.
+                  Team members can log in directly at <strong>/crm</strong> using their mobile number and password.
                 </span>
               </div>
 
