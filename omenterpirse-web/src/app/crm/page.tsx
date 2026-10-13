@@ -60,7 +60,7 @@ export default function CrmEntryPage() {
     setLoginError("");
 
     if (!loginIdentifier.trim() || !loginPassword) {
-      setLoginError("Please enter your email or mobile number, and password.");
+      setLoginError("Please enter your mobile number and password.");
       return;
     }
 
@@ -225,15 +225,15 @@ export default function CrmEntryPage() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
-                  Email or Mobile Number
+                  Mobile Number
                 </label>
                 <div className="relative">
-                  <User size={17} className="absolute left-3.5 top-3.5 text-gray-400" />
+                  <Phone size={17} className="absolute left-3.5 top-3.5 text-gray-400" />
                   <input
                     type="text"
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="Enter email or 10-digit mobile"
+                    placeholder="Enter 10-digit mobile number"
                     required
                     autoComplete="username"
                     className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand text-sm transition-all"
