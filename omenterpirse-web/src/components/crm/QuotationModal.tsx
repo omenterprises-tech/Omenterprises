@@ -665,23 +665,30 @@ export function ViewQuotationModal({
 
           {/* Items Table */}
           {(() => {
-            const hasAnyDiscount = parsedItems.some(
-              (it: any) => it.discountPercent !== undefined && Number(it.discountPercent) > 0
-            );
-
             return (
               <div className="overflow-x-auto border border-gray-200 rounded-2xl">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-100 border-b border-gray-200 font-bold uppercase tracking-wider text-gray-700">
+                  <thead className="bg-gray-100 border-b border-gray-200 font-bold uppercase tracking-wider text-gray-700 text-[10px]">
                     <tr>
-                      <th className="p-3 w-10 text-center">#</th>
-                      <th className="p-3">Item Description</th>
-                      <th className="p-3 text-center w-16">Qty</th>
-                      <th className="p-3 text-right w-24">Rate (₹)</th>
-                      {hasAnyDiscount && <th className="p-3 text-right w-24">Discount</th>}
-                      <th className="p-3 text-right w-24">Taxable (₹)</th>
-                      <th className="p-3 text-center w-16">Tax %</th>
-                      <th className="p-3 text-right w-28">Amount (₹)</th>
+                      <th className="p-2.5 w-8 text-center">
+                        <div>Sl</div>
+                        <div className="text-[9px] font-bold">No</div>
+                      </th>
+                      <th className="p-2.5">Description of Goods</th>
+                      <th className="p-2.5 text-center w-20">HSN/SAC</th>
+                      <th className="p-2.5 text-center w-14">
+                        <div>GST</div>
+                        <div className="text-[9px] font-bold">Rate</div>
+                      </th>
+                      <th className="p-2.5 text-center w-20">Quantity</th>
+                      <th className="p-2.5 text-right w-24">Rate (₹)</th>
+                      <th className="p-2.5 text-center w-14 lowercase font-bold">per</th>
+                      <th className="p-2.5 text-right w-16">Disc %</th>
+                      <th className="p-2.5 text-right w-24">
+                        <div>Landed</div>
+                        <div className="text-[9px] font-bold">Rate (₹)</div>
+                      </th>
+                      <th className="p-2.5 text-right w-28">Amount (₹)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -695,33 +702,33 @@ export function ViewQuotationModal({
                           : Math.round(((price * discPercent) / 100) * 100) / 100;
                       const effectiveUnitPrice = price - discPerUnit;
                       const taxableBase = Math.round((qty * effectiveUnitPrice) * 100) / 100;
+                      const unitName = it.unit || "COILS";
 
                       return (
                         <tr key={idx}>
-                          <td className="p-3 text-center text-gray-400">{idx + 1}</td>
-                          <td className="p-3 font-semibold text-gray-900">{it.name || it.description}</td>
-                          <td className="p-3 text-center font-medium">{qty}</td>
-                          <td className="p-3 text-right">
+                          <td className="p-2.5 text-center text-gray-400">{idx + 1}</td>
+                          <td className="p-2.5 font-semibold text-gray-900">{it.name || it.description}</td>
+                          <td className="p-2.5 text-center text-gray-600">
+                            {it.hsn && it.hsn.trim() !== "-" ? it.hsn.trim() : "-"}
+                          </td>
+                          <td className="p-2.5 text-center text-gray-700 font-semibold">{it.taxPercent || 0}%</td>
+                          <td className="p-2.5 text-center font-bold text-gray-800">
+                            {qty} <span className="text-[10px] text-gray-500 uppercase">{unitName}</span>
+                          </td>
+                          <td className="p-2.5 text-right">
                             ₹{price.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                           </td>
-                          {hasAnyDiscount && (
-                            <td className="p-3 text-right font-medium text-emerald-700">
-                              {discPercent > 0 ? (
-                                <div>
-                                  <span className="font-bold">{discPercent}%</span>
-                                  <span className="text-[10px] text-gray-500 block">(-₹{discPerUnit.toFixed(2)}/u)</span>
-                                </div>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
-                            </td>
-                          )}
-                          <td className="p-3 text-right font-semibold text-gray-800">
-                            ₹{taxableBase.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          <td className="p-2.5 text-center font-bold text-gray-700 uppercase text-[11px]">
+                            {unitName}
                           </td>
-                          <td className="p-3 text-center text-gray-500">{it.taxPercent || 0}%</td>
-                          <td className="p-3 text-right font-bold text-gray-900">
-                            ₹{Number(it.total).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          <td className="p-2.5 text-right font-semibold text-emerald-700">
+                            {discPercent > 0 ? `${discPercent}%` : "-"}
+                          </td>
+                          <td className="p-2.5 text-right font-semibold text-gray-900">
+                            ₹{effectiveUnitPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-2.5 text-right font-bold text-gray-900">
+                            ₹{taxableBase.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                           </td>
                         </tr>
                       );

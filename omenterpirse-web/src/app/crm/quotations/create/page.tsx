@@ -1696,29 +1696,35 @@ function MakeQuotationContent() {
             </div>
 
             {(() => {
-              const hasAnyHsn = selectedItems.some(
-                (item) => item.hsn && item.hsn.trim() !== "" && item.hsn.trim() !== "-"
-              );
-              const hasAnyDiscount = selectedItems.some(
-                (item) => (item.discountPercent || 0) > 0
-              );
+              const cgstAmount = Math.round((taxTotal / 2) * 100) / 100;
+              const sgstAmount = Math.round((taxTotal - cgstAmount) * 100) / 100;
 
               return (
                 <div className="space-y-3">
                   <div className="overflow-x-auto border border-gray-200 rounded-2xl">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-gray-50 border-b border-gray-200 font-extrabold text-gray-700 uppercase tracking-wider text-[11px]">
+                      <thead className="bg-gray-50 border-b border-gray-200 font-extrabold text-gray-700 uppercase tracking-wider text-[10px]">
                         <tr>
-                          <th className="p-3 text-center w-10">#</th>
-                          <th className="p-3">Item Description</th>
-                          {hasAnyHsn && <th className="p-3 text-center w-16">HSN</th>}
-                          <th className="p-3 text-center w-20">Qty</th>
-                          <th className="p-3 text-right w-24">Unit Price (₹)</th>
-                          {hasAnyDiscount && <th className="p-3 text-right w-24">Discount</th>}
-                          <th className="p-3 text-right w-28">Taxable (₹)</th>
-                          <th className="p-3 text-right w-24">GST</th>
-                          <th className="p-3 text-right w-28">Total (₹)</th>
-                          <th className="p-3 text-center w-16">Actions</th>
+                          <th className="py-2.5 px-2 text-center w-8">
+                            <div>Sl</div>
+                            <div className="text-[9px] font-bold">No</div>
+                          </th>
+                          <th className="py-2.5 px-3">Description of Goods</th>
+                          <th className="py-2.5 px-2 text-center w-20">HSN/SAC</th>
+                          <th className="py-2.5 px-1 text-center w-14">
+                            <div>GST</div>
+                            <div className="text-[9px] font-bold">Rate</div>
+                          </th>
+                          <th className="py-2.5 px-2 text-center w-20">Quantity</th>
+                          <th className="py-2.5 px-2 text-right w-24">Rate</th>
+                          <th className="py-2.5 px-1 text-center w-14 lowercase font-bold">per</th>
+                          <th className="py-2.5 px-1.5 text-right w-16">Disc %</th>
+                          <th className="py-2.5 px-2 text-right w-24">
+                            <div>Landed</div>
+                            <div className="text-[9px] font-bold">Rate</div>
+                          </th>
+                          <th className="py-2.5 px-3 text-right w-24">Amount</th>
+                          <th className="py-2.5 px-2 text-center w-16">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -1753,13 +1759,12 @@ function MakeQuotationContent() {
                           const effectiveUnitPrice = unitPrice - discPerUnit;
                           const taxableBase = Math.round((qty * effectiveUnitPrice) * 100) / 100;
                           const taxRate = Number(item.taxPercent) || 0;
-                          const gstAmount = Math.round(((taxableBase * taxRate) / 100) * 100) / 100;
-                          const rowTotal = Math.round((taxableBase + gstAmount) * 100) / 100;
+                          const unitName = item.unit || "COILS";
 
                           return (
                             <tr key={item.id} className="hover:bg-blue-50/30 transition-colors">
-                              <td className="p-3 text-center font-medium text-gray-400">{idx + 1}</td>
-                              <td className="p-3">
+                              <td className="py-2.5 px-2 text-center font-medium text-gray-400">{idx + 1}</td>
+                              <td className="py-2.5 px-3">
                                 <span className="font-bold text-gray-900 block">{displayName}</span>
                                 {cleanedDesc ? (
                                   <span className="text-[11px] text-gray-500 font-normal block mt-0.5">
@@ -1767,44 +1772,31 @@ function MakeQuotationContent() {
                                   </span>
                                 ) : null}
                               </td>
-                              {hasAnyHsn && (
-                                <td className="p-3 text-center text-gray-500">
-                                  {item.hsn && item.hsn.trim() !== "-" ? item.hsn.trim() : ""}
-                                </td>
-                              )}
-                              <td className="p-3 text-center font-bold text-gray-800">
-                                {item.quantity} <span className="text-[10px] text-gray-500 uppercase">{item.unit || "COILS"}</span>
+                              <td className="py-2.5 px-2 text-center text-gray-600 font-medium text-xs">
+                                {item.hsn && item.hsn.trim() !== "-" ? item.hsn.trim() : "-"}
                               </td>
-                              <td className="p-3 text-right font-medium text-gray-800">
+                              <td className="py-2.5 px-1 text-center font-semibold text-gray-700 text-xs">
+                                {taxRate}%
+                              </td>
+                              <td className="py-2.5 px-2 text-center font-bold text-gray-800">
+                                {qty} <span className="text-[10px] text-gray-500 uppercase">{unitName}</span>
+                              </td>
+                              <td className="py-2.5 px-2 text-right font-medium text-gray-800">
                                 ₹{unitPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                               </td>
-                              {hasAnyDiscount && (
-                                <td className="p-3 text-right font-medium text-emerald-700">
-                                  {discPercent > 0 ? (
-                                    <div>
-                                      <span className="font-bold">{discPercent}%</span>
-                                      <span className="text-[10px] text-gray-500 font-normal block">
-                                        -₹{discPerUnit.toFixed(2)}/u
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <span className="text-gray-400">-</span>
-                                  )}
-                                </td>
-                              )}
-                              <td className="p-3 text-right font-medium text-gray-800">
+                              <td className="py-2.5 px-1 text-center font-bold text-gray-700 uppercase text-[11px]">
+                                {unitName}
+                              </td>
+                              <td className="py-2.5 px-1.5 text-right font-semibold text-emerald-700">
+                                {discPercent > 0 ? `${discPercent}%` : "-"}
+                              </td>
+                              <td className="py-2.5 px-2 text-right font-semibold text-gray-900">
+                                ₹{effectiveUnitPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-bold text-gray-900">
                                 ₹{taxableBase.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                               </td>
-                              <td className="p-3 text-right font-medium text-gray-600">
-                                <div>₹{gstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-                                <div className="text-[10px] text-gray-400 font-normal">
-                                  {(item.taxPercent || 0).toFixed(2)}%
-                                </div>
-                              </td>
-                              <td className="p-3 text-right font-bold text-gray-900">
-                                ₹{(item.total || rowTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                              </td>
-                              <td className="p-3 text-center">
+                              <td className="py-2.5 px-2 text-center">
                                 <div className="flex items-center justify-center space-x-1">
                                   <button
                                     type="button"
@@ -1829,6 +1821,46 @@ function MakeQuotationContent() {
                             </tr>
                           );
                         })}
+
+                        {/* Tax Lines: CGST & SGST */}
+                        {taxTotal > 0 && (
+                          <>
+                            <tr className="border-t border-gray-100">
+                              <td></td>
+                              <td className="py-1.5 px-3 font-bold text-gray-700 italic pr-6 text-right" colSpan={8}>
+                                CGST
+                              </td>
+                              <td className="py-1.5 px-3 text-right font-semibold text-gray-900">
+                                ₹{cgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              </td>
+                              <td></td>
+                            </tr>
+                            <tr>
+                              <td></td>
+                              <td className="py-1.5 px-3 font-bold text-gray-700 italic pr-6 text-right" colSpan={8}>
+                                SGST
+                              </td>
+                              <td className="py-1.5 px-3 text-right font-semibold text-gray-900">
+                                ₹{sgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              </td>
+                              <td></td>
+                            </tr>
+                          </>
+                        )}
+
+                        {/* Round Off Line if applicable */}
+                        {isRoundOff && roundOffDifference !== 0 && (
+                          <tr>
+                            <td></td>
+                            <td className="py-1.5 px-3 font-bold text-gray-700 italic pr-6 text-right" colSpan={8}>
+                              ROUND OFF
+                            </td>
+                            <td className="py-1.5 px-3 text-right font-semibold text-gray-900">
+                              {roundOffDifference > 0 ? `+₹${roundOffDifference.toFixed(2)}` : `-₹${Math.abs(roundOffDifference).toFixed(2)}`}
+                            </td>
+                            <td></td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
