@@ -52,6 +52,9 @@ interface QuotationItem {
   name: string;
   quantity: number;
   unitPrice: number;
+  discountPercent?: number;
+  discountPerUnit?: number;
+  discountAmount?: number;
   description: string;
   taxPercent: number;
   total: number;
@@ -112,6 +115,7 @@ function MakeQuotationContent() {
   const [cfgName, setCfgName] = useState("");
   const [cfgQuantity, setCfgQuantity] = useState("1");
   const [cfgPrice, setCfgPrice] = useState("");
+  const [cfgDiscountPercent, setCfgDiscountPercent] = useState("0");
   const [cfgDescription, setCfgDescription] = useState("");
   const [cfgTaxPercent, setCfgTaxPercent] = useState("");
   const [cfgHsn, setCfgHsn] = useState("");
@@ -251,19 +255,37 @@ function MakeQuotationContent() {
                     }
                   }
 
+                  const qty = Number(it.quantity) || 1;
+                  const unitPrice = Number(it.unitPrice) || 0;
+                  const discountPercent = Math.max(0, Math.min(100, Number(it.discountPercent) || 0));
+                  const discountPerUnit = it.discountPerUnit !== undefined && it.discountPerUnit !== null
+                    ? Number(it.discountPerUnit)
+                    : Math.round(((unitPrice * discountPercent) / 100) * 100) / 100;
+                  const discountAmount = it.discountAmount !== undefined && it.discountAmount !== null
+                    ? Number(it.discountAmount)
+                    : Math.round((qty * discountPerUnit) * 100) / 100;
+                  const effectiveUnitPrice = unitPrice - discountPerUnit;
+                  const taxableBase = Math.round((qty * effectiveUnitPrice) * 100) / 100;
+                  const taxRate =
+                    it.taxPercent !== undefined && it.taxPercent !== null
+                      ? Number(it.taxPercent)
+                      : 0;
+                  const calcTax = Math.round(((taxableBase * taxRate) / 100) * 100) / 100;
+
                   return {
                     id: it.id || `item-${i}-${Date.now()}`,
+                    productId: it.productId,
                     name: displayName,
                     description: cleanedDesc,
-                    quantity: Number(it.quantity) || 1,
-                    unitPrice: Number(it.unitPrice) || 0,
-                    taxPercent:
-                      it.taxPercent !== undefined && it.taxPercent !== null
-                        ? Number(it.taxPercent)
-                        : 0,
+                    quantity: qty,
+                    unitPrice: unitPrice,
+                    discountPercent,
+                    discountPerUnit,
+                    discountAmount,
+                    taxPercent: taxRate,
                     total:
                       Number(it.total) ||
-                      (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0),
+                      Math.round((taxableBase + calcTax) * 100) / 100,
                     hsn: it.hsn && it.hsn.trim() !== "-" ? it.hsn.trim() : "",
                     unit: it.unit || "PCS",
                   };
@@ -310,12 +332,29 @@ function MakeQuotationContent() {
   }, [router, editId]);
 
   // Financial Calculations
-  const subtotal = useMemo(() => {
+  const grossSubtotal = useMemo(() => {
     return selectedItems.reduce(
       (acc, it) => acc + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
       0
     );
   }, [selectedItems]);
+
+  const totalDiscount = useMemo(() => {
+    return selectedItems.reduce((acc, it) => {
+      const qty = Number(it.quantity) || 0;
+      const unitPrice = Number(it.unitPrice) || 0;
+      const discPct = Number(it.discountPercent) || 0;
+      const discPerUnit =
+        it.discountPerUnit !== undefined && it.discountPerUnit !== null
+          ? Number(it.discountPerUnit)
+          : Math.round(((unitPrice * discPct) / 100) * 100) / 100;
+      return acc + qty * discPerUnit;
+    }, 0);
+  }, [selectedItems]);
+
+  const subtotal = useMemo(() => {
+    return Math.max(0, Math.round((grossSubtotal - totalDiscount) * 100) / 100);
+  }, [grossSubtotal, totalDiscount]);
 
   const otherChargeAmount = useMemo(() => {
     return otherCharge ? Number(otherCharge.amount) || 0 : 0;
@@ -323,9 +362,17 @@ function MakeQuotationContent() {
 
   const taxTotal = useMemo(() => {
     const itemsTax = selectedItems.reduce((acc, it) => {
-      const base = (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0);
+      const qty = Number(it.quantity) || 0;
+      const unitPrice = Number(it.unitPrice) || 0;
+      const discPct = Number(it.discountPercent) || 0;
+      const discPerUnit =
+        it.discountPerUnit !== undefined && it.discountPerUnit !== null
+          ? Number(it.discountPerUnit)
+          : Math.round(((unitPrice * discPct) / 100) * 100) / 100;
+      const effectiveUnitPrice = unitPrice - discPerUnit;
+      const taxableBase = qty * effectiveUnitPrice;
       const taxRate = Number(it.taxPercent) || 0;
-      return acc + (base * taxRate) / 100;
+      return acc + (taxableBase * taxRate) / 100;
     }, 0);
 
     const ocTax = otherCharge?.isTaxable ? (otherChargeAmount * 18) / 100 : 0;
@@ -482,6 +529,13 @@ function MakeQuotationContent() {
         ? String(prod.quantity)
         : "1"
     );
+    setCfgDiscountPercent(
+      editIndex !== null && selectedItems[editIndex]
+        ? String(selectedItems[editIndex].discountPercent ?? 0)
+        : prod.discountPercent !== undefined && prod.discountPercent !== null
+        ? String(prod.discountPercent)
+        : "0"
+    );
     setCfgDescription(prod.description || "");
     setCfgTaxPercent(
       prod.taxPercent !== undefined && prod.taxPercent !== null
@@ -501,9 +555,18 @@ function MakeQuotationContent() {
     e.preventDefault();
     const qty = Math.max(1, Number(cfgQuantity) || 1);
     const unitPrice = Math.max(0, Number(cfgPrice) || 0);
+    const discountPercent = Math.max(0, Math.min(100, Number(cfgDiscountPercent) || 0));
     const taxRate = Number(cfgTaxPercent) || 0;
-    const base = qty * unitPrice;
-    const total = Math.round((base + (base * taxRate) / 100) * 100) / 100;
+
+    // Per-unit discount calculations:
+    const discountPerUnit = Math.round(((unitPrice * discountPercent) / 100) * 100) / 100;
+    const effectiveUnitPrice = unitPrice - discountPerUnit;
+    const discountAmount = Math.round((qty * discountPerUnit) * 100) / 100;
+
+    // Taxable base after per-unit discount:
+    const taxableBase = Math.round((qty * effectiveUnitPrice) * 100) / 100;
+    const tax = Math.round(((taxableBase * taxRate) / 100) * 100) / 100;
+    const total = Math.round((taxableBase + tax) * 100) / 100;
 
     const itemObj: QuotationItem = {
       id: editingItemIndex !== null ? selectedItems[editingItemIndex].id : `item-${Date.now()}`,
@@ -511,6 +574,9 @@ function MakeQuotationContent() {
       name: cfgName.trim() || currentProductObj?.name || "Item",
       quantity: qty,
       unitPrice,
+      discountPercent,
+      discountPerUnit,
+      discountAmount,
       description: cfgDescription.trim(),
       taxPercent: taxRate,
       total,
@@ -617,10 +683,14 @@ function MakeQuotationContent() {
         }
 
         return {
+          productId: it.productId,
           name: displayName,
           description: cleanedDesc || null,
           quantity: it.quantity,
           unitPrice: it.unitPrice,
+          discountPercent: it.discountPercent || 0,
+          discountPerUnit: it.discountPerUnit || 0,
+          discountAmount: it.discountAmount || 0,
           taxPercent: it.taxPercent,
           total: it.total,
           hsn: it.hsn && it.hsn.trim() !== "" && it.hsn.trim() !== "-" ? it.hsn.trim() : null,
@@ -1629,6 +1699,9 @@ function MakeQuotationContent() {
               const hasAnyHsn = selectedItems.some(
                 (item) => item.hsn && item.hsn.trim() !== "" && item.hsn.trim() !== "-"
               );
+              const hasAnyDiscount = selectedItems.some(
+                (item) => (item.discountPercent || 0) > 0
+              );
 
               return (
                 <div className="space-y-3">
@@ -1640,7 +1713,9 @@ function MakeQuotationContent() {
                           <th className="p-3">Item Description</th>
                           {hasAnyHsn && <th className="p-3 text-center w-16">HSN</th>}
                           <th className="p-3 text-center w-20">Qty</th>
-                          <th className="p-3 text-right w-28">Price (₹)</th>
+                          <th className="p-3 text-right w-24">Unit Price (₹)</th>
+                          {hasAnyDiscount && <th className="p-3 text-right w-24">Discount</th>}
+                          <th className="p-3 text-right w-28">Taxable (₹)</th>
                           <th className="p-3 text-right w-24">GST</th>
                           <th className="p-3 text-right w-28">Total (₹)</th>
                           <th className="p-3 text-center w-16">Actions</th>
@@ -1668,9 +1743,18 @@ function MakeQuotationContent() {
                             }
                           }
 
-                          const basePrice = item.quantity * item.unitPrice;
-                          const gstAmount = (basePrice * (item.taxPercent || 0)) / 100;
-                          const rowTotal = basePrice + gstAmount;
+                          const qty = Number(item.quantity) || 1;
+                          const unitPrice = Number(item.unitPrice) || 0;
+                          const discPercent = Number(item.discountPercent) || 0;
+                          const discPerUnit =
+                            item.discountPerUnit !== undefined && item.discountPerUnit !== null
+                              ? Number(item.discountPerUnit)
+                              : Math.round(((unitPrice * discPercent) / 100) * 100) / 100;
+                          const effectiveUnitPrice = unitPrice - discPerUnit;
+                          const taxableBase = Math.round((qty * effectiveUnitPrice) * 100) / 100;
+                          const taxRate = Number(item.taxPercent) || 0;
+                          const gstAmount = Math.round(((taxableBase * taxRate) / 100) * 100) / 100;
+                          const rowTotal = Math.round((taxableBase + gstAmount) * 100) / 100;
 
                           return (
                             <tr key={item.id} className="hover:bg-blue-50/30 transition-colors">
@@ -1692,7 +1776,24 @@ function MakeQuotationContent() {
                                 {item.quantity} <span className="text-[10px] text-gray-500 uppercase">{item.unit || "COILS"}</span>
                               </td>
                               <td className="p-3 text-right font-medium text-gray-800">
-                                ₹{basePrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                ₹{unitPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              </td>
+                              {hasAnyDiscount && (
+                                <td className="p-3 text-right font-medium text-emerald-700">
+                                  {discPercent > 0 ? (
+                                    <div>
+                                      <span className="font-bold">{discPercent}%</span>
+                                      <span className="text-[10px] text-gray-500 font-normal block">
+                                        -₹{discPerUnit.toFixed(2)}/u
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-400">-</span>
+                                  )}
+                                </td>
+                              )}
+                              <td className="p-3 text-right font-medium text-gray-800">
+                                ₹{taxableBase.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                               </td>
                               <td className="p-3 text-right font-medium text-gray-600">
                                 <div>₹{gstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
@@ -1912,7 +2013,15 @@ function MakeQuotationContent() {
             </div>
 
             <div className="text-[11px] text-gray-500 flex flex-wrap gap-x-2.5 font-medium">
-              <span>Subtotal: ₹{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+              {totalDiscount > 0 ? (
+                <>
+                  <span>Gross: ₹{grossSubtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                  <span className="text-emerald-700 font-bold">• Disc: -₹{totalDiscount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                  <span>• Taxable: ₹{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                </>
+              ) : (
+                <span>Subtotal: ₹{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+              )}
               {otherCharge && otherCharge.amount > 0 && (
                 <span>• Other: ₹{otherCharge.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
               )}
@@ -1952,7 +2061,7 @@ function MakeQuotationContent() {
       {/* ================= MODAL 3: PRODUCT CONFIGURATOR ================= */}
       {isConfiguringProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 space-y-4">
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-6 space-y-4">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <h3 className="text-base font-bold text-gray-900">Configure Quotation Item</h3>
               <button
@@ -1976,7 +2085,7 @@ function MakeQuotationContent() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Quantity</label>
                   <input
@@ -1997,10 +2106,99 @@ function MakeQuotationContent() {
                     value={cfgPrice}
                     onChange={(e) => setCfgPrice(e.target.value)}
                     required
+                    placeholder="0.00"
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-900 focus:outline-none focus:border-brand"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-xs font-bold text-gray-700">Discount (%)</label>
+                    <span className="text-[10px] text-emerald-600 font-bold">Per 1 Unit</span>
+                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={cfgDiscountPercent}
+                    onChange={(e) => setCfgDiscountPercent(e.target.value)}
+                    placeholder="0"
                     className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-900 focus:outline-none focus:border-brand"
                   />
                 </div>
               </div>
+
+              {/* Dynamic Live Per-Unit Discount & Cost Breakdown */}
+              {(() => {
+                const modalQty = Math.max(1, Number(cfgQuantity) || 1);
+                const modalPrice = Math.max(0, Number(cfgPrice) || 0);
+                const modalDiscPct = Math.max(0, Math.min(100, Number(cfgDiscountPercent) || 0));
+                const modalTaxRate = Number(cfgTaxPercent) || 0;
+
+                const modalDiscPerUnit = Math.round(((modalPrice * modalDiscPct) / 100) * 100) / 100;
+                const modalEffectiveUnit = modalPrice - modalDiscPerUnit;
+                const modalTotalDisc = Math.round((modalQty * modalDiscPerUnit) * 100) / 100;
+                const modalTaxable = Math.round((modalQty * modalEffectiveUnit) * 100) / 100;
+                const modalTax = Math.round(((modalTaxable * modalTaxRate) / 100) * 100) / 100;
+                const modalTotal = Math.round((modalTaxable + modalTax) * 100) / 100;
+
+                return (
+                  <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 space-y-1.5 text-xs">
+                    <div className="flex justify-between items-center text-gray-600 font-medium">
+                      <span>Rate & Discount:</span>
+                      <span className="font-semibold text-gray-900">
+                        ₹{modalPrice.toFixed(2)}
+                        {modalDiscPct > 0 ? (
+                          <span className="text-emerald-700 font-bold ml-1.5">
+                            (-{modalDiscPct}% = -₹{modalDiscPerUnit.toFixed(2)} / unit)
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 font-normal ml-1.5">(No discount)</span>
+                        )}
+                      </span>
+                    </div>
+
+                    {modalDiscPct > 0 && (
+                      <div className="flex justify-between items-center text-gray-600 font-medium">
+                        <span>Net Price (Per 1 Unit):</span>
+                        <span className="font-bold text-emerald-700">
+                          ₹{modalEffectiveUnit.toFixed(2)} / {cfgUnit || "UNIT"}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center text-gray-600 font-medium">
+                      <span>
+                        Taxable Subtotal ({modalQty} {modalQty > 1 ? (cfgUnit || "units") : (cfgUnit || "unit")}):
+                      </span>
+                      <span className="font-bold text-gray-900">
+                        ₹{modalTaxable.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {modalDiscPct > 0 && (
+                          <span className="text-[11px] text-emerald-700 font-normal ml-1.5">
+                            (Discount: -₹{modalTotalDisc.toFixed(2)})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+
+                    {modalTaxRate > 0 && (
+                      <div className="flex justify-between items-center text-gray-600 font-medium">
+                        <span>GST ({modalTaxRate}%):</span>
+                        <span className="font-semibold text-gray-900">
+                          ₹{modalTax.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
+                      <span className="font-bold text-gray-700 text-xs">Calculated Total:</span>
+                      <span className="text-base font-black text-brand">
+                        ₹{modalTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="grid grid-cols-3 gap-3">
                 <div>

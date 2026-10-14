@@ -28,10 +28,14 @@ import { formatDisplayDate } from "@/lib/crmCurrencyData";
 
 interface QuotationItem {
   id?: string;
+  productId?: number;
   name?: string;
   description?: string;
   quantity?: number;
   unitPrice?: number;
+  discountPercent?: number;
+  discountPerUnit?: number;
+  discountAmount?: number;
   taxPercent?: number;
   total?: number;
   hsn?: string;
@@ -852,6 +856,9 @@ export default function QuotationDetailPage({
             const hasAnyHsn = items.some(
               (it) => it.hsn && it.hsn.trim() !== "" && it.hsn.trim() !== "-"
             );
+            const hasAnyDiscount = items.some(
+              (it) => it.discountPercent !== undefined && Number(it.discountPercent) > 0
+            );
 
             return (
               <div className="overflow-x-auto border border-gray-300 rounded-xl py-0.5 print:overflow-visible print:border-gray-400 print:rounded-lg">
@@ -864,15 +871,19 @@ export default function QuotationDetailPage({
                         <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-24">HSN</th>
                       )}
                       <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-20">QTY</th>
-                      <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-28">PRICE</th>
-                      <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-28">GST</th>
-                      <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-32">TOTAL</th>
+                      <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-24">RATE</th>
+                      {hasAnyDiscount && (
+                        <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-24">DISCOUNT</th>
+                      )}
+                      <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-28">TAXABLE</th>
+                      <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-24">GST</th>
+                      <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-28">TOTAL</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {items.length === 0 ? (
                       <tr>
-                        <td colSpan={hasAnyHsn ? 7 : 6} className="py-8 text-center text-gray-400">
+                        <td colSpan={hasAnyHsn ? (hasAnyDiscount ? 9 : 8) : (hasAnyDiscount ? 8 : 7)} className="py-8 text-center text-gray-400">
                           No products recorded in this quotation.
                         </td>
                       </tr>
@@ -880,10 +891,16 @@ export default function QuotationDetailPage({
                       items.map((it, idx) => {
                         const qty = Number(it.quantity) || 1;
                         const price = Number(it.unitPrice) || 0;
+                        const discPercent = Number(it.discountPercent) || 0;
+                        const discPerUnit =
+                          it.discountPerUnit !== undefined && it.discountPerUnit !== null
+                            ? Number(it.discountPerUnit)
+                            : Math.round(((price * discPercent) / 100) * 100) / 100;
+                        const effectiveUnitPrice = price - discPerUnit;
+                        const taxableBase = Math.round((qty * effectiveUnitPrice) * 100) / 100;
                         const taxRate = it.taxPercent !== undefined && it.taxPercent !== null ? Number(it.taxPercent) : 0;
-                        const baseTotal = qty * price;
-                        const gstAmount = (baseTotal * taxRate) / 100;
-                        const rowTotal = baseTotal + gstAmount;
+                        const gstAmount = Math.round(((taxableBase * taxRate) / 100) * 100) / 100;
+                        const rowTotal = Math.round((taxableBase + gstAmount) * 100) / 100;
 
                         const displayName =
                           it.name?.trim() ||
@@ -939,7 +956,24 @@ export default function QuotationDetailPage({
                               </div>
                             </td>
                             <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-semibold text-gray-900">
-                              {formatRs(baseTotal)}
+                              {formatRs(price)}
+                            </td>
+                            {hasAnyDiscount && (
+                              <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-semibold text-emerald-700">
+                                {discPercent > 0 ? (
+                                  <div>
+                                    <span>{discPercent}%</span>
+                                    <span className="text-[10px] text-gray-500 font-normal block">
+                                      (-{formatRs(discPerUnit)}/u)
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                            )}
+                            <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-semibold text-gray-900">
+                              {formatRs(taxableBase)}
                             </td>
                             <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-medium text-gray-700">
                               <div>{formatRs(gstAmount)}</div>
@@ -948,7 +982,7 @@ export default function QuotationDetailPage({
                               </div>
                             </td>
                             <td className="py-3 px-3 print:py-1.5 print:px-2 text-right font-black text-gray-900">
-                              {formatRs(baseTotal + gstAmount)}
+                              {formatRs(rowTotal)}
                             </td>
                           </tr>
                         );
@@ -963,10 +997,44 @@ export default function QuotationDetailPage({
           {/* ================= 5. FINANCIAL TOTALS BREAKDOWN ================= */}
           <div className="flex justify-end pt-1 print:pt-0.5">
             <div className="w-full sm:w-72 print:w-64 space-y-1 print:space-y-0.5 text-xs text-gray-800">
-              <div className="flex justify-between py-0.5">
-                <span className="font-semibold text-gray-600 uppercase text-xs print:text-[11px]">SUB TOTAL</span>
-                <span className="font-bold text-gray-900">{formatRs(quotation.subtotal)}</span>
-              </div>
+              {(() => {
+                const totalDiscountAmount = items.reduce((acc, it) => {
+                  const qty = Number(it.quantity) || 1;
+                  const price = Number(it.unitPrice) || 0;
+                  const discPct = Number(it.discountPercent) || 0;
+                  const discPerUnit =
+                    it.discountPerUnit !== undefined && it.discountPerUnit !== null
+                      ? Number(it.discountPerUnit)
+                      : Math.round(((price * discPct) / 100) * 100) / 100;
+                  return acc + qty * discPerUnit;
+                }, 0);
+
+                if (totalDiscountAmount > 0) {
+                  return (
+                    <>
+                      <div className="flex justify-between py-0.5">
+                        <span className="font-semibold text-gray-600 uppercase text-xs print:text-[11px]">GROSS TOTAL</span>
+                        <span className="font-bold text-gray-900">{formatRs(quotation.subtotal + totalDiscountAmount)}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 text-emerald-700">
+                        <span className="font-semibold uppercase text-xs print:text-[11px]">TOTAL DISCOUNT</span>
+                        <span className="font-bold">-{formatRs(totalDiscountAmount)}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5">
+                        <span className="font-semibold text-gray-600 uppercase text-xs print:text-[11px]">TAXABLE AMOUNT</span>
+                        <span className="font-bold text-gray-900">{formatRs(quotation.subtotal)}</span>
+                      </div>
+                    </>
+                  );
+                }
+
+                return (
+                  <div className="flex justify-between py-0.5">
+                    <span className="font-semibold text-gray-600 uppercase text-xs print:text-[11px]">SUB TOTAL</span>
+                    <span className="font-bold text-gray-900">{formatRs(quotation.subtotal)}</span>
+                  </div>
+                );
+              })()}
 
               {otherCharge && Number(otherCharge.amount) > 0 && (
                 <div className="flex justify-between py-0.5">

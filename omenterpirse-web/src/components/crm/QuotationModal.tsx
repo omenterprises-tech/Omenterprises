@@ -664,36 +664,73 @@ export function ViewQuotationModal({
           </div>
 
           {/* Items Table */}
-          <div className="overflow-x-auto border border-gray-200 rounded-2xl">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-gray-100 border-b border-gray-200 font-bold uppercase tracking-wider text-gray-700">
-                <tr>
-                  <th className="p-3 w-10 text-center">#</th>
-                  <th className="p-3">Item Description</th>
-                  <th className="p-3 text-center w-16">Qty</th>
-                  <th className="p-3 text-right w-24">Rate (₹)</th>
-                  <th className="p-3 text-center w-16">Tax %</th>
-                  <th className="p-3 text-right w-28">Amount (₹)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {parsedItems.map((it: any, idx: number) => (
-                  <tr key={idx}>
-                    <td className="p-3 text-center text-gray-400">{idx + 1}</td>
-                    <td className="p-3 font-semibold text-gray-900">{it.description}</td>
-                    <td className="p-3 text-center font-medium">{it.quantity}</td>
-                    <td className="p-3 text-right">
-                      ₹{Number(it.unitPrice).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="p-3 text-center text-gray-500">{it.taxPercent || 0}%</td>
-                    <td className="p-3 text-right font-bold text-gray-900">
-                      ₹{Number(it.total).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {(() => {
+            const hasAnyDiscount = parsedItems.some(
+              (it: any) => it.discountPercent !== undefined && Number(it.discountPercent) > 0
+            );
+
+            return (
+              <div className="overflow-x-auto border border-gray-200 rounded-2xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-100 border-b border-gray-200 font-bold uppercase tracking-wider text-gray-700">
+                    <tr>
+                      <th className="p-3 w-10 text-center">#</th>
+                      <th className="p-3">Item Description</th>
+                      <th className="p-3 text-center w-16">Qty</th>
+                      <th className="p-3 text-right w-24">Rate (₹)</th>
+                      {hasAnyDiscount && <th className="p-3 text-right w-24">Discount</th>}
+                      <th className="p-3 text-right w-24">Taxable (₹)</th>
+                      <th className="p-3 text-center w-16">Tax %</th>
+                      <th className="p-3 text-right w-28">Amount (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {parsedItems.map((it: any, idx: number) => {
+                      const qty = Number(it.quantity) || 1;
+                      const price = Number(it.unitPrice) || 0;
+                      const discPercent = Number(it.discountPercent) || 0;
+                      const discPerUnit =
+                        it.discountPerUnit !== undefined && it.discountPerUnit !== null
+                          ? Number(it.discountPerUnit)
+                          : Math.round(((price * discPercent) / 100) * 100) / 100;
+                      const effectiveUnitPrice = price - discPerUnit;
+                      const taxableBase = Math.round((qty * effectiveUnitPrice) * 100) / 100;
+
+                      return (
+                        <tr key={idx}>
+                          <td className="p-3 text-center text-gray-400">{idx + 1}</td>
+                          <td className="p-3 font-semibold text-gray-900">{it.name || it.description}</td>
+                          <td className="p-3 text-center font-medium">{qty}</td>
+                          <td className="p-3 text-right">
+                            ₹{price.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                          {hasAnyDiscount && (
+                            <td className="p-3 text-right font-medium text-emerald-700">
+                              {discPercent > 0 ? (
+                                <div>
+                                  <span className="font-bold">{discPercent}%</span>
+                                  <span className="text-[10px] text-gray-500 block">(-₹{discPerUnit.toFixed(2)}/u)</span>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                          )}
+                          <td className="p-3 text-right font-semibold text-gray-800">
+                            ₹{taxableBase.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-3 text-center text-gray-500">{it.taxPercent || 0}%</td>
+                          <td className="p-3 text-right font-bold text-gray-900">
+                            ₹{Number(it.total).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
 
           {/* Summary & Signatory Section */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-6 pt-2">
@@ -724,12 +761,52 @@ export function ViewQuotationModal({
             {/* Financial Totals & Signatory */}
             <div className="w-full sm:w-72 space-y-4">
               <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-2 text-xs">
-                <div className="flex justify-between text-gray-600">
-                  <span>Subtotal:</span>
-                  <span className="font-semibold">
-                    ₹{Number(quotation.subtotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
+                {(() => {
+                  const totalDiscountAmount = parsedItems.reduce((acc: number, it: any) => {
+                    const qty = Number(it.quantity) || 1;
+                    const price = Number(it.unitPrice) || 0;
+                    const discPct = Number(it.discountPercent) || 0;
+                    const discPerUnit =
+                      it.discountPerUnit !== undefined && it.discountPerUnit !== null
+                        ? Number(it.discountPerUnit)
+                        : Math.round(((price * discPct) / 100) * 100) / 100;
+                    return acc + qty * discPerUnit;
+                  }, 0);
+
+                  if (totalDiscountAmount > 0) {
+                    return (
+                      <>
+                        <div className="flex justify-between text-gray-600">
+                          <span>Gross Subtotal:</span>
+                          <span className="font-semibold">
+                            ₹{Number(quotation.subtotal + totalDiscountAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-emerald-700">
+                          <span>Total Discount:</span>
+                          <span className="font-bold">
+                            -₹{totalDiscountAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-gray-600">
+                          <span>Taxable Subtotal:</span>
+                          <span className="font-semibold">
+                            ₹{Number(quotation.subtotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </>
+                    );
+                  }
+
+                  return (
+                    <div className="flex justify-between text-gray-600">
+                      <span>Subtotal:</span>
+                      <span className="font-semibold">
+                        ₹{Number(quotation.subtotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  );
+                })()}
                 {parsedOtherCharges && Number(parsedOtherCharges.amount) > 0 && (
                   <div className="flex justify-between text-gray-600">
                     <span>{parsedOtherCharges.label || "Other Charges"}:</span>
