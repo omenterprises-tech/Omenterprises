@@ -29,9 +29,25 @@ export default function CrmQuotationsListPage() {
 
   const [user, setUser] = useState<any>(storeUser);
   const [business, setBusiness] = useState<any>(storeBusiness);
-  const [quotations, setQuotations] = useState<any[]>([]);
+  const [quotations, setQuotations] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem("crm_cached_quotations_list");
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return [];
+  });
   const [isLoadingSession, setIsLoadingSession] = useState(!storeUser);
-  const [isLoadingQuotes, setIsLoadingQuotes] = useState(true);
+  const [isLoadingQuotes, setIsLoadingQuotes] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem("crm_cached_quotations_list");
+        if (cached) return false;
+      } catch (e) {}
+    }
+    return true;
+  });
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState("");
@@ -53,12 +69,35 @@ export default function CrmQuotationsListPage() {
     setTimeout(() => setNotification(null), 4000);
   };
 
+  const openQuotation = (q: any) => {
+    try {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(`crm_preview_quotation_${q.id}`, JSON.stringify(q));
+        if (business) {
+          sessionStorage.setItem("crm_preview_business", JSON.stringify(business));
+        }
+      }
+    } catch (e) {}
+    router.push(`/crm/quotations/${q.id}`);
+  };
+
   const loadQuotations = async () => {
     try {
       const res = await fetch("/api/crm/quotations");
       const data = await res.json();
       if (data.success && data.quotations) {
         setQuotations(data.quotations);
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.setItem("crm_cached_quotations_list", JSON.stringify(data.quotations));
+            data.quotations.forEach((q: any) => {
+              sessionStorage.setItem(`crm_preview_quotation_${q.id}`, JSON.stringify(q));
+            });
+            if (data.business) {
+              sessionStorage.setItem("crm_preview_business", JSON.stringify(data.business));
+            }
+          } catch (e) {}
+        }
       }
     } catch (err) {
       console.error("Failed to load quotations:", err);
@@ -89,6 +128,17 @@ export default function CrmQuotationsListPage() {
 
         if (quotesData?.success && quotesData.quotations) {
           setQuotations(quotesData.quotations);
+          if (typeof window !== "undefined") {
+            try {
+              sessionStorage.setItem("crm_cached_quotations_list", JSON.stringify(quotesData.quotations));
+              quotesData.quotations.forEach((q: any) => {
+                sessionStorage.setItem(`crm_preview_quotation_${q.id}`, JSON.stringify(q));
+              });
+              if (quotesData.business) {
+                sessionStorage.setItem("crm_preview_business", JSON.stringify(quotesData.business));
+              }
+            } catch (e) {}
+          }
         }
       } catch (err) {
         console.error("Failed to load CRM session or quotations:", err);
@@ -583,6 +633,7 @@ export default function CrmQuotationsListPage() {
                     return (
                       <tr
                         key={q.id}
+                        onMouseEnter={() => router.prefetch(`/crm/quotations/${q.id}`)}
                         className={`transition-colors ${
                           isSelected
                             ? "bg-blue-50/50 hover:bg-blue-50/80"
@@ -606,7 +657,7 @@ export default function CrmQuotationsListPage() {
                           </label>
                         </td>
                         <td
-                          onClick={() => router.push(`/crm/quotations/${q.id}`)}
+                          onClick={() => openQuotation(q)}
                           className="py-4 pl-2 font-bold text-brand hover:underline text-xs sm:text-sm cursor-pointer"
                         >
                           {q.quotationNumber}
@@ -686,7 +737,7 @@ export default function CrmQuotationsListPage() {
                         <div className="flex items-center justify-end space-x-2">
                           <button
                             type="button"
-                            onClick={() => router.push(`/crm/quotations/${q.id}`)}
+                            onClick={() => openQuotation(q)}
                             className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold flex items-center space-x-1 cursor-pointer transition-colors"
                           >
                             <Eye size={13} />

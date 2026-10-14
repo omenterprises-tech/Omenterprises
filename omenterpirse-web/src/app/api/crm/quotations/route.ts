@@ -83,14 +83,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "At least one item is required." }, { status: 400 });
     }
 
-    // Generate Quotation Number
-    const existingCount = await db
-      .select({ id: crmQuotations.id })
+    // Generate Quotation Number fast with single-row lookup
+    const lastQuote = await db
+      .select({ quotationNumber: crmQuotations.quotationNumber, id: crmQuotations.id })
       .from(crmQuotations)
-      .where(eq(crmQuotations.businessId, business.id));
+      .where(eq(crmQuotations.businessId, business.id))
+      .orderBy(desc(crmQuotations.id))
+      .limit(1);
 
-    const nextSeq = existingCount.length + 1;
+    let nextSeq = 1;
     const year = new Date().getFullYear();
+    if (lastQuote.length > 0 && lastQuote[0].quotationNumber) {
+      const match = lastQuote[0].quotationNumber.match(/(\d+)$/);
+      if (match) {
+        nextSeq = parseInt(match[1], 10) + 1;
+      }
+    }
     const qNum = "QT-" + year + "-" + String(nextSeq).padStart(4, "0");
 
     const authorName = user?.fullName || "Team Member";
@@ -128,6 +136,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       quotation: newQuotation[0],
+      business,
     });
   } catch (error: any) {
     console.error("Create quotation error:", error);

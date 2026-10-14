@@ -58,9 +58,34 @@ export default function QuotationDetailPage({
   const quotationId = resolvedParams.id;
 
   const storeBusiness = useCrmSessionStore((s) => s.business);
-  const [quotation, setQuotation] = useState<any | null>(null);
-  const [business, setBusiness] = useState<any | null>(storeBusiness);
-  const [isLoading, setIsLoading] = useState(true);
+  const [quotation, setQuotation] = useState<any | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem(`crm_preview_quotation_${quotationId}`);
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return null;
+  });
+  const [business, setBusiness] = useState<any | null>(() => {
+    if (storeBusiness) return storeBusiness;
+    if (typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem("crm_preview_business");
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return null;
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem(`crm_preview_quotation_${quotationId}`);
+        if (cached) return false;
+      } catch (e) {}
+    }
+    return true;
+  });
   const [error, setError] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -77,7 +102,18 @@ export default function QuotationDetailPage({
   // Share Modal & PDF Generation
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [customWhatsAppPhone, setCustomWhatsAppPhone] = useState("");
+  const [customWhatsAppPhone, setCustomWhatsAppPhone] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem(`crm_preview_quotation_${quotationId}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.customerPhone) return parsed.customerPhone;
+        }
+      } catch (e) {}
+    }
+    return "";
+  });
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -87,7 +123,9 @@ export default function QuotationDetailPage({
   // Load quotation data
   const loadQuotation = async () => {
     try {
-      setIsLoading(true);
+      if (!quotation) {
+        setIsLoading(true);
+      }
       const res = await fetch(`/api/crm/quotations/${quotationId}`);
       if (res.status === 401) {
         router.replace("/crm");
@@ -96,16 +134,28 @@ export default function QuotationDetailPage({
       const data = await res.json();
       if (data.success && data.quotation) {
         setQuotation(data.quotation);
-        setBusiness(data.business);
+        if (data.business) {
+          setBusiness(data.business);
+        }
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.setItem(`crm_preview_quotation_${quotationId}`, JSON.stringify(data.quotation));
+            if (data.business) {
+              sessionStorage.setItem("crm_preview_business", JSON.stringify(data.business));
+            }
+          } catch (e) {}
+        }
         if (data.quotation.customerPhone) {
           setCustomWhatsAppPhone(data.quotation.customerPhone);
         }
-      } else {
+      } else if (!quotation) {
         setError(data.error || "Failed to load quotation.");
       }
     } catch (err: any) {
       console.error("Load quotation error:", err);
-      setError(err.message || "Failed to load quotation.");
+      if (!quotation) {
+        setError(err.message || "Failed to load quotation.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -165,6 +215,11 @@ export default function QuotationDetailPage({
       const data = await res.json();
       if (data.success && data.quotation) {
         setQuotation(data.quotation);
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.setItem(`crm_preview_quotation_${quotation.id}`, JSON.stringify(data.quotation));
+          } catch (e) {}
+        }
         setIsStatusModalOpen(false);
         setIsMoreOpen(false);
         showToast(`Status updated to "${newStatus}"`);
@@ -192,6 +247,11 @@ export default function QuotationDetailPage({
       });
       const data = await res.json();
       if (data.success) {
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.removeItem(`crm_preview_quotation_${quotation.id}`);
+          } catch (e) {}
+        }
         alert("Quotation deleted successfully.");
         router.push("/crm/quotations");
       } else {
@@ -234,10 +294,16 @@ export default function QuotationDetailPage({
 
       const data = await res.json();
       if (data.success && data.quotation) {
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.setItem(`crm_preview_quotation_${data.quotation.id}`, JSON.stringify(data.quotation));
+            if (data.business || business) {
+              sessionStorage.setItem("crm_preview_business", JSON.stringify(data.business || business));
+            }
+          } catch (e) {}
+        }
         showToast("Quotation duplicated successfully!");
-        setTimeout(() => {
-          router.push(`/crm/quotations/${data.quotation.id}`);
-        }, 400);
+        router.push(`/crm/quotations/${data.quotation.id}`);
       } else {
         alert(data.error || "Failed to duplicate quotation.");
       }
@@ -251,6 +317,14 @@ export default function QuotationDetailPage({
   // Handle Edit
   const handleEdit = () => {
     if (!quotation) return;
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.setItem(`crm_preview_quotation_${quotation.id}`, JSON.stringify(quotation));
+        if (business) {
+          sessionStorage.setItem("crm_preview_business", JSON.stringify(business));
+        }
+      } catch (e) {}
+    }
     router.push(`/crm/quotations/create?edit=${quotation.id}`);
   };
 

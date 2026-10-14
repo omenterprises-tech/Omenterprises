@@ -94,14 +94,30 @@ function MakeQuotationContent() {
   const [otherInfo, setOtherInfo] = useState("");
 
   // 1. Customer State & Selection Page View
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem("crm_cached_customers");
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return [];
+  });
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [isCustomerSelectOpen, setIsCustomerSelectOpen] = useState(false);
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
 
   // 2. Products State & Selection Page View
-  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [allProducts, setAllProducts] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem("crm_cached_products");
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return [];
+  });
   const [selectedItems, setSelectedItems] = useState<QuotationItem[]>([]);
   const [isProductSelectOpen, setIsProductSelectOpen] = useState(false);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
@@ -141,10 +157,139 @@ function MakeQuotationContent() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [submissionError, setSubmissionError] = useState("");
 
+  // Helper to populate existing quotation data into form state
+  const populateQuotationData = (q: any, dateFormat?: string) => {
+    setQuotationNo(q.quotationNumber || "-");
+    if (q.quotationDate) setQuotationDate(formatDisplayDate(q.quotationDate, dateFormat));
+    if (q.notes) setOtherInfo(q.notes);
+
+    setSelectedCustomer({
+      id: q.customerId,
+      name: q.customerName,
+      email: q.customerEmail,
+      phone: q.customerPhone,
+      addressLine1: q.customerAddress,
+      gstin: q.customerGstin,
+    });
+
+    let parsedItems: any[] = [];
+    try {
+      parsedItems = typeof q.items === "string" ? JSON.parse(q.items) : q.items;
+    } catch (e) {}
+
+    if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+      setSelectedItems(
+        parsedItems.map((it: any, i: number) => {
+          const displayName =
+            it.name?.trim() ||
+            (it.description?.includes(" - ")
+              ? it.description.split(" - ")[0].trim()
+              : it.description?.trim()) ||
+            "Item";
+
+          let rawDesc = (it.description || "").trim();
+          let cleanedDesc = "";
+          if (rawDesc) {
+            if (rawDesc.toLowerCase() === displayName.toLowerCase()) {
+              cleanedDesc = "";
+            } else if (
+              rawDesc.toLowerCase().startsWith((displayName + " - ").toLowerCase())
+            ) {
+              cleanedDesc = rawDesc.slice(displayName.length + 3).trim();
+            } else if (rawDesc.toLowerCase().startsWith(displayName.toLowerCase())) {
+              cleanedDesc = rawDesc
+                .slice(displayName.length)
+                .replace(/^[-–—:\s]+/, "")
+                .trim();
+            } else {
+              cleanedDesc = rawDesc;
+            }
+          }
+
+          const qty = Number(it.quantity) || 1;
+          const unitPrice = Number(it.unitPrice) || 0;
+          const discountPercent = Math.max(0, Math.min(100, Number(it.discountPercent) || 0));
+          const discountPerUnit = it.discountPerUnit !== undefined && it.discountPerUnit !== null
+            ? Number(it.discountPerUnit)
+            : Math.round(((unitPrice * discountPercent) / 100) * 100) / 100;
+          const discountAmount = it.discountAmount !== undefined && it.discountAmount !== null
+            ? Number(it.discountAmount)
+            : Math.round((qty * discountPerUnit) * 100) / 100;
+          const effectiveUnitPrice = unitPrice - discountPerUnit;
+          const taxableBase = Math.round((qty * effectiveUnitPrice) * 100) / 100;
+          const taxRate =
+            it.taxPercent !== undefined && it.taxPercent !== null
+              ? Number(it.taxPercent)
+              : 0;
+          const calcTax = Math.round(((taxableBase * taxRate) / 100) * 100) / 100;
+
+          return {
+            id: it.id || `item-${i}-${Date.now()}`,
+            productId: it.productId,
+            name: displayName,
+            description: cleanedDesc,
+            quantity: qty,
+            unitPrice: unitPrice,
+            discountPercent,
+            discountPerUnit,
+            discountAmount,
+            taxPercent: taxRate,
+            total:
+              Number(it.total) ||
+              Math.round((taxableBase + calcTax) * 100) / 100,
+            hsn: it.hsn && it.hsn.trim() !== "-" ? it.hsn.trim() : "",
+            unit: it.unit || "PCS",
+          };
+        })
+      );
+    }
+
+    if (q.otherCharges) {
+      try {
+        const parsedOc =
+          typeof q.otherCharges === "string" ? JSON.parse(q.otherCharges) : q.otherCharges;
+        if (parsedOc && (parsedOc.amount || parsedOc.label)) {
+          setOtherCharge({
+            label: parsedOc.label || "Other Charges",
+            amount: Number(parsedOc.amount) || 0,
+            isTaxable: Boolean(parsedOc.isTaxable),
+          });
+        }
+      } catch (e) {}
+    }
+
+    if (q.termsConditions) {
+      const qLines = q.termsConditions
+        .split("\n")
+        .map((l: string) => l.trim())
+        .filter(Boolean);
+      if (qLines.length > 0) {
+        const qMappedTerms: TermItem[] = qLines.map((l: string, idx: number) => ({
+          id: `term-${idx + 1}-${Date.now()}`,
+          text: l.replace(/^(\d+[\.\)]\s*|[•\-\*]\s*)/, "").trim(),
+        }));
+        setTermsList(qMappedTerms);
+        setSelectedTermIds(qMappedTerms.map((t) => t.id));
+      }
+    }
+  };
+
   // Load initial data
   useEffect(() => {
     router.prefetch("/crm/quotations");
     router.prefetch("/crm/dashboard");
+
+    // Instantly pre-populate from cached preview quotation if in edit mode
+    if (editId && typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem(`crm_preview_quotation_${editId}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          populateQuotationData(parsed, storeBusiness?.dateFormat);
+          setIsLoading(false);
+        }
+      } catch (e) {}
+    }
 
     async function init() {
       try {
@@ -174,9 +319,19 @@ function MakeQuotationContent() {
 
         if (custRes?.success && custRes.customers) {
           setCustomers(custRes.customers);
+          if (typeof window !== "undefined") {
+            try {
+              sessionStorage.setItem("crm_cached_customers", JSON.stringify(custRes.customers));
+            } catch (e) {}
+          }
         }
         if (prodRes?.success && prodRes.products) {
           setAllProducts(prodRes.products);
+          if (typeof window !== "undefined") {
+            try {
+              sessionStorage.setItem("crm_cached_products", JSON.stringify(prodRes.products));
+            } catch (e) {}
+          }
         }
 
         // Initialize terms list
@@ -202,126 +357,22 @@ function MakeQuotationContent() {
         }));
 
         setTermsList(mappedTerms);
-        // Do not select any terms and conditions by default per user requirement
-        setSelectedTermIds([]);
+        if (!editId) {
+          setSelectedTermIds([]);
+        }
 
         // Load existing quotation if in edit mode
         if (editId && qRes && qRes.success && qRes.quotation) {
-          const q = qRes.quotation;
-          setQuotationNo(q.quotationNumber || "-");
-          if (q.quotationDate) setQuotationDate(formatDisplayDate(q.quotationDate, sessionData.business?.dateFormat));
-          if (q.notes) setOtherInfo(q.notes);
-
-            setSelectedCustomer({
-              id: q.customerId,
-              name: q.customerName,
-              email: q.customerEmail,
-              phone: q.customerPhone,
-              addressLine1: q.customerAddress,
-              gstin: q.customerGstin,
-            });
-
-            let parsedItems: any[] = [];
+          populateQuotationData(qRes.quotation, sessionData.business?.dateFormat);
+          if (typeof window !== "undefined") {
             try {
-              parsedItems = typeof q.items === "string" ? JSON.parse(q.items) : q.items;
-            } catch (e) {}
-
-            if (Array.isArray(parsedItems) && parsedItems.length > 0) {
-              setSelectedItems(
-                parsedItems.map((it: any, i: number) => {
-                  const displayName =
-                    it.name?.trim() ||
-                    (it.description?.includes(" - ")
-                      ? it.description.split(" - ")[0].trim()
-                      : it.description?.trim()) ||
-                    "Item";
-
-                  let rawDesc = (it.description || "").trim();
-                  let cleanedDesc = "";
-                  if (rawDesc) {
-                    if (rawDesc.toLowerCase() === displayName.toLowerCase()) {
-                      cleanedDesc = "";
-                    } else if (
-                      rawDesc.toLowerCase().startsWith((displayName + " - ").toLowerCase())
-                    ) {
-                      cleanedDesc = rawDesc.slice(displayName.length + 3).trim();
-                    } else if (rawDesc.toLowerCase().startsWith(displayName.toLowerCase())) {
-                      cleanedDesc = rawDesc
-                        .slice(displayName.length)
-                        .replace(/^[-–—:\s]+/, "")
-                        .trim();
-                    } else {
-                      cleanedDesc = rawDesc;
-                    }
-                  }
-
-                  const qty = Number(it.quantity) || 1;
-                  const unitPrice = Number(it.unitPrice) || 0;
-                  const discountPercent = Math.max(0, Math.min(100, Number(it.discountPercent) || 0));
-                  const discountPerUnit = it.discountPerUnit !== undefined && it.discountPerUnit !== null
-                    ? Number(it.discountPerUnit)
-                    : Math.round(((unitPrice * discountPercent) / 100) * 100) / 100;
-                  const discountAmount = it.discountAmount !== undefined && it.discountAmount !== null
-                    ? Number(it.discountAmount)
-                    : Math.round((qty * discountPerUnit) * 100) / 100;
-                  const effectiveUnitPrice = unitPrice - discountPerUnit;
-                  const taxableBase = Math.round((qty * effectiveUnitPrice) * 100) / 100;
-                  const taxRate =
-                    it.taxPercent !== undefined && it.taxPercent !== null
-                      ? Number(it.taxPercent)
-                      : 0;
-                  const calcTax = Math.round(((taxableBase * taxRate) / 100) * 100) / 100;
-
-                  return {
-                    id: it.id || `item-${i}-${Date.now()}`,
-                    productId: it.productId,
-                    name: displayName,
-                    description: cleanedDesc,
-                    quantity: qty,
-                    unitPrice: unitPrice,
-                    discountPercent,
-                    discountPerUnit,
-                    discountAmount,
-                    taxPercent: taxRate,
-                    total:
-                      Number(it.total) ||
-                      Math.round((taxableBase + calcTax) * 100) / 100,
-                    hsn: it.hsn && it.hsn.trim() !== "-" ? it.hsn.trim() : "",
-                    unit: it.unit || "PCS",
-                  };
-                })
-              );
-            }
-
-            if (q.otherCharges) {
-              try {
-                const parsedOc =
-                  typeof q.otherCharges === "string" ? JSON.parse(q.otherCharges) : q.otherCharges;
-                if (parsedOc && (parsedOc.amount || parsedOc.label)) {
-                  setOtherCharge({
-                    label: parsedOc.label || "Other Charges",
-                    amount: Number(parsedOc.amount) || 0,
-                    isTaxable: Boolean(parsedOc.isTaxable),
-                  });
-                }
-              } catch (e) {}
-            }
-
-            if (q.termsConditions) {
-              const qLines = q.termsConditions
-                .split("\n")
-                .map((l: string) => l.trim())
-                .filter(Boolean);
-              if (qLines.length > 0) {
-                const qMappedTerms: TermItem[] = qLines.map((l: string, idx: number) => ({
-                  id: `term-${idx + 1}-${Date.now()}`,
-                  text: l.replace(/^(\d+[\.\)]\s*|[•\-\*]\s*)/, "").trim(),
-                }));
-                setTermsList(qMappedTerms);
-                setSelectedTermIds(qMappedTerms.map((t) => t.id));
+              sessionStorage.setItem(`crm_preview_quotation_${editId}`, JSON.stringify(qRes.quotation));
+              if (sessionData.business) {
+                sessionStorage.setItem("crm_preview_business", JSON.stringify(sessionData.business));
               }
-            }
+            } catch (e) {}
           }
+        }
       } catch (err) {
         console.error("Failed to load quotation editor data:", err);
       } finally {
@@ -329,7 +380,7 @@ function MakeQuotationContent() {
       }
     }
     init();
-  }, [router, editId]);
+  }, [router, editId, fetchSession]);
 
   // Financial Calculations
   const grossSubtotal = useMemo(() => {
@@ -736,6 +787,36 @@ function MakeQuotationContent() {
 
       const data = await res.json();
       if (data.success && data.quotation) {
+        if (typeof window !== "undefined") {
+          try {
+            const biz = data.business || business;
+            if (biz) {
+              sessionStorage.setItem("crm_preview_business", JSON.stringify(biz));
+            }
+            sessionStorage.setItem(
+              `crm_preview_quotation_${data.quotation.id}`,
+              JSON.stringify(data.quotation)
+            );
+            // Update cached quotations list so returning to the ledger is instant and fresh
+            const listStr = sessionStorage.getItem("crm_cached_quotations_list");
+            if (listStr) {
+              const list = JSON.parse(listStr);
+              if (Array.isArray(list)) {
+                if (editId) {
+                  const updatedList = list.map((item: any) =>
+                    item.id === data.quotation.id ? { ...item, ...data.quotation } : item
+                  );
+                  sessionStorage.setItem("crm_cached_quotations_list", JSON.stringify(updatedList));
+                } else {
+                  sessionStorage.setItem(
+                    "crm_cached_quotations_list",
+                    JSON.stringify([data.quotation, ...list])
+                  );
+                }
+              }
+            }
+          } catch (e) {}
+        }
         router.push(`/crm/quotations/${data.quotation.id}`);
       } else {
         setSubmissionError(data.error || "Failed to save quotation.");

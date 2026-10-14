@@ -109,6 +109,7 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       quotation: updated[0],
+      business,
     });
   } catch (error: any) {
     console.error("Update quotation status error:", error);

@@ -326,6 +326,8 @@ export const crmQuotations = sqliteTable("crm_quotations", {
   createdByRole: text("created_by_role").notNull().default("Staff"),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
   updatedAt: text("updated_at").$defaultFn(() => new Date().toISOString()),
-});
+}, (table) => [
+  index("crm_quotations_biz_idx").on(table.businessId),
+]);
 
 
