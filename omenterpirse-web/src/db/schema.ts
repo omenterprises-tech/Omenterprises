@@ -254,7 +254,7 @@ export const crmBusinesses = sqliteTable("crm_businesses", {
   dateFormat: text("date_format").default("dd/MM/yyyy"),
   currencyCode: text("currency_code").default("INR"),
   currencyCountry: text("currency_country").default("India"),
-  currencyPriceFormatted: text("currency_price_formatted").default("₹999,999.12"),
+  currencyPriceFormatted: text("currency_price_formatted").default("₹9,99,999"),
   bankName: text("bank_name"),
   bankAccountNo: text("bank_account_no"),
   bankIfsc: text("bank_ifsc"),

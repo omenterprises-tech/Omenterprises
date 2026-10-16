@@ -6,7 +6,7 @@ export interface CurrencyOption {
 }
 
 export const CURRENCIES: CurrencyOption[] = [
-  { country: "India", code: "INR", symbol: "₹", priceFormatted: "₹999,999.12" },
+  { country: "India", code: "INR", symbol: "₹", priceFormatted: "₹9,99,999" },
   { country: "Afghanistan", code: "AFN", symbol: "؋", priceFormatted: "AFN999,999.12" },
   { country: "Aland Islands", code: "EUR", symbol: "€", priceFormatted: "999999,12€" },
   { country: "Albania", code: "ALL", symbol: "Lek", priceFormatted: "999999,12Lekë" },
@@ -129,5 +129,29 @@ export function formatDisplayDate(
 
   // If unparseable, return the string as is
   return str;
+}
+
+/**
+ * Formats a numeric value into the Indian currency format (e.g. ₹9,99,999).
+ * If includeDecimals is false (default), values are rounded (wen use roundups if necessary)
+ * without decimal places, matching the Indian numbering format.
+ */
+export function formatIndianCurrency(
+  value: number | string | null | undefined,
+  includeDecimals: boolean = false
+): string {
+  if (value === null || value === undefined || value === "") return "₹0";
+  const num = typeof value === "number" ? value : parseFloat(String(value));
+  if (isNaN(num)) return "₹0";
+
+  if (!includeDecimals) {
+    const rounded = Math.round(num);
+    return `₹${rounded.toLocaleString("en-IN")}`;
+  }
+
+  return `₹${num.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 

@@ -67,6 +67,10 @@ export async function POST(request: Request) {
       bankIfsc,
       bankAccountType,
       bankAccountName,
+      dateFormat,
+      currencyCode,
+      currencyCountry,
+      currencyPriceFormatted,
     } = body;
 
     if (!businessName || !businessName.trim()) {
@@ -104,6 +108,10 @@ export async function POST(request: Request) {
       bankIfsc: (bankIfsc || "").trim() || null,
       bankAccountType: (bankAccountType || "").trim() || null,
       bankAccountName: (bankAccountName || "").trim() || null,
+      dateFormat: (dateFormat || business?.dateFormat || "dd/MM/yyyy").trim(),
+      currencyCode: (currencyCode || business?.currencyCode || "INR").trim(),
+      currencyCountry: (currencyCountry || business?.currencyCountry || "India").trim(),
+      currencyPriceFormatted: (currencyPriceFormatted || business?.currencyPriceFormatted || "₹9,99,999").trim(),
       updatedAt: new Date().toISOString(),
     };
 

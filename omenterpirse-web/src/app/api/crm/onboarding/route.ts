@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       dateFormat: dateFormat || "dd/MM/yyyy",
       currencyCode: currencyCode || "INR",
       currencyCountry: currencyCountry || "India",
-      currencyPriceFormatted: currencyPriceFormatted || "₹999,999.12",
+      currencyPriceFormatted: currencyPriceFormatted || "₹9,99,999",
       updatedAt: new Date().toISOString(),
     };
 

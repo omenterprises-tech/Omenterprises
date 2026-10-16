@@ -13,12 +13,17 @@ import {
   X,
   AlertCircle,
   ChevronDown,
+  ChevronRight,
   Building2,
   FileText,
+  Calendar,
 } from "lucide-react";
 import CategoryModal from "@/components/crm/CategoryModal";
 import SignaturePad from "@/components/crm/SignaturePad";
+import DateFormatModal from "@/components/crm/DateFormatModal";
+import CurrencyModal from "@/components/crm/CurrencyModal";
 import { INDIAN_STATES } from "@/lib/crmCategoriesData";
+import { CURRENCIES, CurrencyOption, formatDateWithPattern } from "@/lib/crmCurrencyData";
 
 export default function CrmManageProfilePage() {
   const router = useRouter();
@@ -86,6 +91,22 @@ export default function CrmManageProfilePage() {
   // Category Modal
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
+  // Date & Currency
+  const defaultCurrency = CURRENCIES.find((c) => c.code === "INR") || CURRENCIES[0];
+  const [selectedDateFormat, setSelectedDateFormat] = useState(
+    storeBusiness?.dateFormat || "dd/MM/yyyy"
+  );
+  const [isDateFormatModalOpen, setIsDateFormatModalOpen] = useState(false);
+
+  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyOption>(() => {
+    if (storeBusiness?.currencyCode) {
+      const found = CURRENCIES.find((c) => c.code === storeBusiness.currencyCode);
+      if (found) return found;
+    }
+    return defaultCurrency;
+  });
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
+
   // Load existing profile
   useEffect(() => {
     router.prefetch("/crm/dashboard");
@@ -131,6 +152,13 @@ export default function CrmManageProfilePage() {
           setLogoUrl(b.logoUrl || null);
           setSignatureUrl(b.signatureUrl || null);
           setSignatureType(b.signatureType || "draw");
+          if (b.dateFormat) {
+            setSelectedDateFormat(b.dateFormat);
+          }
+          if (b.currencyCode) {
+            const found = CURRENCIES.find((c) => c.code === b.currencyCode);
+            if (found) setSelectedCurrency(found);
+          }
 
           // Keep store synchronized
           if (data.user && data.business) {
@@ -227,12 +255,20 @@ export default function CrmManageProfilePage() {
           bankAccountNo: bankAccountNo.trim(),
           bankIfsc: bankIfsc.trim().toUpperCase(),
           bankAccountType: bankAccountType.trim(),
+          dateFormat: selectedDateFormat,
+          currencyCode: selectedCurrency.code,
+          currencyCountry: selectedCurrency.country,
+          currencyPriceFormatted: selectedCurrency.priceFormatted,
         }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Failed to update profile.");
+      }
+
+      if (data.business) {
+        setSession(data.user || storeUser, data.business);
       }
 
       setSuccessMessage("Business information updated successfully! Returning to home...");
@@ -619,6 +655,74 @@ export default function CrmManageProfilePage() {
             </div>
           </div>
 
+          {/* ================= DATE & CURRENCY FORMATS ================= */}
+          <div className="pt-2 space-y-4">
+            {/* Gray Header Pill */}
+            <div className="bg-[#E5E7EB] text-gray-800 font-bold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider">
+              Date & Currency Formats
+            </div>
+
+            {/* Preferred Date Format */}
+            <div className="bg-[#F3F4F6] rounded-2xl p-3 border border-transparent transition-all">
+              <label className="block text-[11px] text-gray-500 font-medium mb-1.5">
+                Preferred Date Format
+              </label>
+              <button
+                type="button"
+                onClick={() => canManageBusiness && setIsDateFormatModalOpen(true)}
+                disabled={!canManageBusiness}
+                className="w-full px-3.5 py-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between text-left transition-all group cursor-pointer shadow-sm disabled:cursor-not-allowed"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-9 h-9 rounded-lg bg-brand/10 text-brand flex items-center justify-center">
+                    <Calendar size={18} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-gray-900">
+                      {selectedDateFormat}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Example: {formatDateWithPattern(selectedDateFormat)}
+                    </div>
+                  </div>
+                </div>
+                {canManageBusiness && (
+                  <ChevronRight size={18} className="text-gray-400 group-hover:text-gray-600 transition-transform group-hover:translate-x-0.5" />
+                )}
+              </button>
+            </div>
+
+            {/* Preferred Currency */}
+            <div className="bg-[#F3F4F6] rounded-2xl p-3 border border-transparent transition-all">
+              <label className="block text-[11px] text-gray-500 font-medium mb-1.5">
+                Preferred Currency
+              </label>
+              <button
+                type="button"
+                onClick={() => canManageBusiness && setIsCurrencyModalOpen(true)}
+                disabled={!canManageBusiness}
+                className="w-full px-3.5 py-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between text-left transition-all group cursor-pointer shadow-sm disabled:cursor-not-allowed"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-base">
+                    {selectedCurrency.symbol}
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-gray-900">
+                      {selectedCurrency.country} ({selectedCurrency.code})
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Formatted: {selectedCurrency.priceFormatted}
+                    </div>
+                  </div>
+                </div>
+                {canManageBusiness && (
+                  <ChevronRight size={18} className="text-gray-400 group-hover:text-gray-600 transition-transform group-hover:translate-x-0.5" />
+                )}
+              </button>
+            </div>
+          </div>
+
           {/* ================= BANK & PAYMENT DETAILS (For Quotations) ================= */}
           <div className="pt-2 space-y-4">
             {/* Gray Header Pill */}
@@ -736,6 +840,22 @@ export default function CrmManageProfilePage() {
         onClose={() => setIsCategoryModalOpen(false)}
         selectedCategory={businessCategory}
         onSelect={(cat) => setBusinessCategory(cat)}
+      />
+
+      {/* Date Format Modal */}
+      <DateFormatModal
+        isOpen={isDateFormatModalOpen}
+        onClose={() => setIsDateFormatModalOpen(false)}
+        selectedFormat={selectedDateFormat}
+        onSelect={(fmt) => setSelectedDateFormat(fmt)}
+      />
+
+      {/* Currency Modal */}
+      <CurrencyModal
+        isOpen={isCurrencyModalOpen}
+        onClose={() => setIsCurrencyModalOpen(false)}
+        selectedCode={selectedCurrency.code}
+        onSelect={(curr) => setSelectedCurrency(curr)}
       />
 
       {/* Signature Modal */}
