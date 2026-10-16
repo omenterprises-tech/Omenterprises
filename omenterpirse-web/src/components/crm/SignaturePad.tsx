@@ -32,6 +32,7 @@ export default function SignaturePad({ onSave, initialValue }: SignaturePadProps
 
     if (initialValue) {
       const img = new Image();
+      img.crossOrigin = "anonymous";
       img.onload = () => {
         ctx.drawImage(img, 0, 0, rect.width, rect.height);
         setHasDrawn(true);

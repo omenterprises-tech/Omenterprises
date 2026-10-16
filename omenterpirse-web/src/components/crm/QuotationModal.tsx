@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Plus, Trash2, Loader2, AlertCircle, Printer, CheckCircle2, Building2 } from "lucide-react";
+import { X, Plus, Trash2, Loader2, AlertCircle, Printer, CheckCircle2, Building2, QrCode, CreditCard } from "lucide-react";
 import { formatDisplayDate } from "@/lib/crmCurrencyData";
 
 interface ItemRow {
@@ -45,6 +45,7 @@ export function CreateQuotationModal({
   const [items, setItems] = useState<ItemRow[]>([
     { id: "1", description: "", quantity: 1, unitPrice: 0, taxPercent: 0, total: 0 },
   ]);
+  const [paymentDisplayOption, setPaymentDisplayOption] = useState<"both" | "bank" | "upi">("both");
   const [notes, setNotes] = useState("Thank you for your business. Please contact us if you have any questions.");
   const [terms, setTerms] = useState("");
   const [loading, setLoading] = useState(false);
@@ -137,6 +138,7 @@ export function CreateQuotationModal({
           grandTotal,
           notes,
           termsConditions: terms,
+          paymentDisplayOption,
           status: "Draft",
         }),
       });
@@ -470,6 +472,55 @@ export function CreateQuotationModal({
             </div>
           </div>
 
+          {/* Payment Instructions Selector */}
+          <div className="bg-gray-50/80 p-3.5 rounded-2xl border border-gray-200">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 mb-2">
+              Payment Instructions on Quotation
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setPaymentDisplayOption("both")}
+                className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                  paymentDisplayOption === "both"
+                    ? "bg-brand text-white border-brand shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <div className="flex items-center gap-1">
+                  <CreditCard size={13} />
+                  <span>+</span>
+                  <QrCode size={13} />
+                </div>
+                <span>Both (Default)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentDisplayOption("bank")}
+                className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                  paymentDisplayOption === "bank"
+                    ? "bg-brand text-white border-brand shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <CreditCard size={13} />
+                <span>Bank Only</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentDisplayOption("upi")}
+                className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                  paymentDisplayOption === "upi"
+                    ? "bg-brand text-white border-brand shadow-sm"
+                    : "bg-white text-gray-700 border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <QrCode size={13} />
+                <span>UPI Only</span>
+              </button>
+            </div>
+          </div>
+
           <div className="flex gap-3 pt-3">
             <button
               type="button"
@@ -755,6 +806,93 @@ export function ViewQuotationModal({
                   <p className="whitespace-pre-line">{quotation.termsConditions}</p>
                 </div>
               )}
+
+              {/* Payment Instructions / Bank & UPI Details */}
+              {(() => {
+                const bankName = business?.bankName || "";
+                const bankAccount = business?.bankAccount || "";
+                const bankIfsc = business?.bankIfsc || "";
+                const bankBranch = business?.bankBranch || "";
+                const upiId = business?.upiId || "";
+                const upiQrCodeUrl = business?.upiQrCodeUrl || "";
+
+                const paymentOption = quotation?.paymentDisplayOption || "both";
+                const hasBankDetails = Boolean(bankName || bankAccount || bankIfsc);
+                const hasUpiDetails = Boolean(upiId || upiQrCodeUrl);
+                const showBank = (paymentOption === "bank" || paymentOption === "both") && hasBankDetails;
+                const showUpi = (paymentOption === "upi" || paymentOption === "both") && hasUpiDetails;
+
+                if (!showBank && !showUpi) return null;
+
+                return (
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-[11px] print:p-2">
+                    <div className="font-bold text-gray-800 uppercase tracking-wider mb-2 text-[10px] border-b border-gray-200 pb-1">
+                      Payment Instructions
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3 items-start justify-between">
+                      {/* Bank Details */}
+                      {showBank && (
+                        <div className="space-y-0.5 text-gray-600 flex-1">
+                          <p className="font-semibold text-gray-800 text-[11px]">Direct Bank Transfer</p>
+                          {bankName && (
+                            <p>
+                              <span className="text-gray-400">Bank:</span>{" "}
+                              <strong className="text-gray-700">{bankName}</strong>
+                            </p>
+                          )}
+                          {bankAccount && (
+                            <p>
+                              <span className="text-gray-400">A/C No:</span>{" "}
+                              <strong className="font-mono text-gray-900">{bankAccount}</strong>
+                            </p>
+                          )}
+                          {bankIfsc && (
+                            <p>
+                              <span className="text-gray-400">IFSC:</span>{" "}
+                              <strong className="font-mono text-gray-900">{bankIfsc}</strong>
+                            </p>
+                          )}
+                          {bankBranch && (
+                            <p>
+                              <span className="text-gray-400">Branch:</span> {bankBranch}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* UPI QR & ID */}
+                      {showUpi && (
+                        <div className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-gray-200 shrink-0">
+                          {upiQrCodeUrl && (
+                            <div className="w-28 h-28 rounded-lg border border-gray-200 p-1 overflow-hidden flex items-center justify-center bg-gray-50 shrink-0">
+                              <img
+                                src={upiQrCodeUrl}
+                                alt="UPI QR Code"
+                                crossOrigin="anonymous"
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
+                          )}
+                          <div className="space-y-1 text-[11px]">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 block">
+                              UPI Payment
+                            </span>
+                            {upiId && (
+                              <div>
+                                <span className="text-gray-400 block text-[9px]">UPI ID:</span>
+                                <span className="font-mono font-bold text-gray-800 text-xs select-all">
+                                  {upiId}
+                                </span>
+                              </div>
+                            )}
+                            <span className="text-[10px] text-gray-500 block">Scan to Pay via any UPI App</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {quotation.createdByName && (
                 <div className="pt-2 text-[11px] text-gray-500 flex items-center gap-1.5">

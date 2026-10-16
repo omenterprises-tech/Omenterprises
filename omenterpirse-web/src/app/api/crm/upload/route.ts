@@ -14,21 +14,21 @@ export async function POST(request: Request) {
     if (contentType.includes("application/json")) {
       const { base64 } = await request.json();
       if (!base64 || typeof base64 !== "string") {
-        return NextResponse.json({ error: "No image data provided" }, { status: 400 });
+        return NextResponse.json({ success: false, error: "No image data provided" }, { status: 400 });
       }
 
       const uploadResponse = await cloudinary.uploader.upload(base64, {
         folder: "om_enterprises/crm",
       });
 
-      return NextResponse.json({ url: uploadResponse.secure_url });
+      return NextResponse.json({ success: true, url: uploadResponse.secure_url });
     }
 
     // Otherwise multipart/form-data
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     if (!file) {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "No file uploaded" }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -38,11 +38,11 @@ export async function POST(request: Request) {
       folder: "om_enterprises/crm",
     });
 
-    return NextResponse.json({ url: uploadResponse.secure_url });
+    return NextResponse.json({ success: true, url: uploadResponse.secure_url });
   } catch (error: any) {
     console.error("CRM Cloudinary upload error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to upload image" },
+      { success: false, error: error.message || "Failed to upload image" },
       { status: 500 }
     );
   }

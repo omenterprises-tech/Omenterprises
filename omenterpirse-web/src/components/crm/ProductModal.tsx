@@ -27,6 +27,7 @@ import {
   Folder,
   FolderPlus,
   CornerDownRight,
+  Edit3,
 } from "lucide-react";
 import { alphabeticalCompare } from "@/lib/utils";
 
@@ -329,6 +330,22 @@ export default function ProductModal({
     return findPathToNode(treeRoot, activeDrillDownNode.id) || [treeRoot];
   }, [treeRoot, activeDrillDownNode]);
 
+  // Rename node state
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+  const [editingNodeName, setEditingNodeName] = useState<string>("");
+  const [isEditingActiveNode, setIsEditingActiveNode] = useState<boolean>(false);
+  const [activeNodeNameInput, setActiveNodeNameInput] = useState<string>("");
+
+  const handleRenameTreeNode = (nodeId: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    setTreeRoot((prev) => renameNodeInTree(prev, nodeId, trimmed));
+    if (nodeId === "root") {
+      setBatchMainCategory(trimmed);
+    }
+    showLocalToast(`Renamed to "${trimmed}"`);
+  };
+
   // Tree action handlers
   const handleAddChildrenToActiveNode = (customText?: string) => {
     const textToAdd = customText !== undefined ? customText : drillDownInput;
@@ -520,7 +537,8 @@ export default function ProductModal({
       setHsn(initialProduct.hsn || "");
 
       // Prepopulate batch tab with same common details
-      setBatchMainCategory(loadedHierarchy[0] || initialProduct.category || "");
+      const mainCategoryName = loadedHierarchy[0] || initialProduct.category || "";
+      setBatchMainCategory(mainCategoryName);
       setBatchBasePrice(loadedPrice);
       setBatchUnit(initialProduct.unit || "");
       setBatchHsn(initialProduct.hsn || "");
@@ -531,7 +549,37 @@ export default function ProductModal({
       );
       setBatchDescription(initialProduct.description || "");
 
-      setActiveTab("single");
+      if (initialProduct._mode === "batch") {
+        setActiveTab("batch");
+        if (mainCategoryName) {
+          const rootNode: TreeNode = {
+            id: "root",
+            name: mainCategoryName,
+            children: [],
+          };
+          let parentNode = rootNode;
+          let targetActiveId = "root";
+
+          const cleanSegments = loadedHierarchy.map((h: string) => h.trim()).filter(Boolean);
+          for (let i = 1; i < cleanSegments.length; i++) {
+            const seg = cleanSegments[i];
+            const childId = `node-init-${i}-${Date.now()}`;
+            const childNode: TreeNode = {
+              id: childId,
+              name: seg,
+              children: [],
+            };
+            parentNode.children = [childNode];
+            parentNode = childNode;
+            targetActiveId = childId;
+          }
+
+          setTreeRoot(rootNode);
+          setActiveDrillDownId(targetActiveId);
+        }
+      } else {
+        setActiveTab("single");
+      }
     } else {
       setCategories(["", "", ""]);
       setName("");
@@ -1844,9 +1892,68 @@ export default function ProductModal({
               <div className="space-y-4">
                 {/* Sub-categories input & Presets */}
                 <div className="space-y-2">
-                  <label className="block text-xs font-bold text-gray-700">
-                    Add sub-categories inside <span className="text-brand font-black">&quot;{activeDrillDownNode.name || "Main Category"}&quot;</span>:
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-1.5 text-xs font-bold text-gray-700">
+                      <span>Add sub-categories inside:</span>
+                      {isEditingActiveNode ? (
+                        <div className="flex items-center space-x-1">
+                          <input
+                            type="text"
+                            value={activeNodeNameInput}
+                            onChange={(e) => setActiveNodeNameInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleRenameTreeNode(activeDrillDownNode.id, activeNodeNameInput);
+                                setIsEditingActiveNode(false);
+                              } else if (e.key === "Escape") {
+                                setIsEditingActiveNode(false);
+                              }
+                            }}
+                            autoFocus
+                            className="px-2 py-0.5 text-xs font-bold border border-brand rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-brand w-36"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleRenameTreeNode(activeDrillDownNode.id, activeNodeNameInput);
+                              setIsEditingActiveNode(false);
+                            }}
+                            className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
+                            title="Save name"
+                          >
+                            <Check size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingActiveNode(false)}
+                            className="p-1 text-gray-400 hover:bg-gray-100 rounded cursor-pointer"
+                            title="Cancel"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-brand font-black">
+                            &quot;{activeDrillDownNode.name || "Main Category"}&quot;
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveNodeNameInput(activeDrillDownNode.name || "");
+                              setIsEditingActiveNode(true);
+                            }}
+                            className="p-1 text-gray-400 hover:text-brand hover:bg-brand/10 rounded transition-colors cursor-pointer"
+                            title={`Rename "${activeDrillDownNode.name}"`}
+                          >
+                            <Edit3 size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="flex items-center space-x-2">
                     <input
                       type="text"
@@ -1911,10 +2018,23 @@ export default function ProductModal({
                     /* Leaf final product */
                     <div className="p-4 bg-emerald-50/70 rounded-xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
-                        <p className="text-xs font-black text-emerald-900">
-                          🌿 Final Product Tier: &quot;{activeDrillDownNode.name}&quot;
-                        </p>
-                        <p className="text-[11px] text-emerald-700">
+                        <div className="flex items-center space-x-1.5">
+                          <p className="text-xs font-black text-emerald-900">
+                            🌿 Final Product Tier: &quot;{activeDrillDownNode.name}&quot;
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveNodeNameInput(activeDrillDownNode.name || "");
+                              setIsEditingActiveNode(true);
+                            }}
+                            className="p-1 text-emerald-700 hover:text-emerald-950 hover:bg-emerald-100 rounded transition-colors cursor-pointer"
+                            title={`Rename "${activeDrillDownNode.name}"`}
+                          >
+                            <Edit3 size={11} />
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-emerald-700 mt-0.5">
                           This category has no further sub-categories. Enter price &amp; HSN (if available):
                         </p>
                       </div>
@@ -1964,6 +2084,7 @@ export default function ProductModal({
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                       {activeDrillDownNode.children.map((child) => {
                         const childIsLeaf = !child.children || child.children.length === 0;
+                        const isRenamingThisChild = editingNodeId === child.id;
                         return (
                           <div
                             key={child.id}
@@ -1976,9 +2097,63 @@ export default function ProductModal({
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center space-x-1.5">
                                 <span className="text-xs">{childIsLeaf ? "🌿" : "📁"}</span>
-                                <p className="text-xs font-bold text-gray-900 truncate">
-                                  {child.name}
-                                </p>
+                                {isRenamingThisChild ? (
+                                  <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="text"
+                                      value={editingNodeName}
+                                      onChange={(e) => setEditingNodeName(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.preventDefault();
+                                          handleRenameTreeNode(child.id, editingNodeName);
+                                          setEditingNodeId(null);
+                                        } else if (e.key === "Escape") {
+                                          setEditingNodeId(null);
+                                        }
+                                      }}
+                                      autoFocus
+                                      className="px-1.5 py-0.5 text-xs font-bold border border-brand rounded bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-brand w-28"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleRenameTreeNode(child.id, editingNodeName);
+                                        setEditingNodeId(null);
+                                      }}
+                                      className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
+                                      title="Save"
+                                    >
+                                      <Check size={12} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingNodeId(null)}
+                                      className="p-1 text-gray-400 hover:bg-gray-100 rounded cursor-pointer"
+                                      title="Cancel"
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center space-x-1 min-w-0">
+                                    <p className="text-xs font-bold text-gray-900 truncate">
+                                      {child.name}
+                                    </p>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingNodeId(child.id);
+                                        setEditingNodeName(child.name);
+                                      }}
+                                      className="p-0.5 text-gray-400 hover:text-brand hover:bg-brand/10 rounded transition-colors cursor-pointer shrink-0"
+                                      title={`Rename "${child.name}"`}
+                                    >
+                                      <Edit3 size={11} />
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                               {childIsLeaf ? (
                                 <div className="flex items-center flex-wrap gap-2 mt-1.5">

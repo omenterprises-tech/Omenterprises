@@ -17,6 +17,8 @@ import {
   Building2,
   FileText,
   Calendar,
+  Upload,
+  PenTool,
 } from "lucide-react";
 import CategoryModal from "@/components/crm/CategoryModal";
 import SignaturePad from "@/components/crm/SignaturePad";
@@ -87,6 +89,17 @@ export default function CrmManageProfilePage() {
     storeBusiness?.signatureType || "draw"
   );
   const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
+  const [signatureModalTab, setSignatureModalTab] = useState<"draw" | "upload">("draw");
+  const [isUploadingSignature, setIsUploadingSignature] = useState(false);
+  const signatureFileInputRef = useRef<HTMLInputElement>(null);
+
+  // UPI & QR Code
+  const [upiId, setUpiId] = useState(storeBusiness?.upiId || "");
+  const [upiQrCodeUrl, setUpiQrCodeUrl] = useState<string | null>(
+    storeBusiness?.upiQrCodeUrl || null
+  );
+  const [isUploadingQr, setIsUploadingQr] = useState(false);
+  const qrFileInputRef = useRef<HTMLInputElement>(null);
 
   // Category Modal
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -149,6 +162,8 @@ export default function CrmManageProfilePage() {
           setBankAccountNo(b.bankAccountNo || "");
           setBankIfsc(b.bankIfsc || "");
           setBankAccountType(b.bankAccountType || "CURRENT ACCOUNT");
+          setUpiId(b.upiId || "");
+          setUpiQrCodeUrl(b.upiQrCodeUrl || null);
           setLogoUrl(b.logoUrl || null);
           setSignatureUrl(b.signatureUrl || null);
           setSignatureType(b.signatureType || "draw");
@@ -193,7 +208,7 @@ export default function CrmManageProfilePage() {
         body: formData,
       });
       const data = await res.json();
-      if (!res.ok || !data.success) {
+      if (!res.ok || (!data.success && !data.url)) {
         throw new Error(data.error || "Failed to upload logo.");
       }
       setLogoUrl(data.url);
@@ -201,6 +216,74 @@ export default function CrmManageProfilePage() {
       setErrorMessage(err.message || "Failed to upload logo.");
     } finally {
       setIsUploadingLogo(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // Handle Signature Image Upload
+  const handleSignatureImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingSignature(true);
+    setErrorMessage("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "signature");
+
+      const res = await fetch("/api/crm/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok || (!data.success && !data.url)) {
+        throw new Error(data.error || "Failed to upload signature image.");
+      }
+      setSignatureUrl(data.url);
+      setSignatureType("upload");
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to upload signature image.");
+    } finally {
+      setIsUploadingSignature(false);
+      if (signatureFileInputRef.current) {
+        signatureFileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // Handle UPI QR Code Upload
+  const handleQrCodeSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingQr(true);
+    setErrorMessage("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "qr_code");
+
+      const res = await fetch("/api/crm/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok || (!data.success && !data.url)) {
+        throw new Error(data.error || "Failed to upload UPI QR code.");
+      }
+      setUpiQrCodeUrl(data.url);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to upload UPI QR code.");
+    } finally {
+      setIsUploadingQr(false);
+      if (qrFileInputRef.current) {
+        qrFileInputRef.current.value = "";
+      }
     }
   };
 
@@ -231,6 +314,25 @@ export default function CrmManageProfilePage() {
     setIsUpdating(true);
 
     try {
+      let finalSignatureUrl = signatureUrl;
+      // If user drew on canvas, upload base64 to Cloudinary so we store a clean CDN URL
+      if (signatureUrl && signatureUrl.startsWith("data:image/")) {
+        try {
+          const upRes = await fetch("/api/crm/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ base64: signatureUrl }),
+          });
+          const upData = await upRes.json();
+          if (upData.url) {
+            finalSignatureUrl = upData.url;
+            setSignatureUrl(upData.url);
+          }
+        } catch (uploadErr) {
+          console.error("Failed to upload canvas signature to cloud:", uploadErr);
+        }
+      }
+
       const res = await fetch("/api/crm/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -248,13 +350,15 @@ export default function CrmManageProfilePage() {
           taxNumber: taxNumber.trim(),
           state: selectedState.trim(),
           logoUrl,
-          signatureUrl,
+          signatureUrl: finalSignatureUrl,
           signatureType,
           bankAccountName: bankAccountName.trim(),
           bankName: bankName.trim(),
           bankAccountNo: bankAccountNo.trim(),
           bankIfsc: bankIfsc.trim().toUpperCase(),
           bankAccountType: bankAccountType.trim(),
+          upiId: upiId.trim(),
+          upiQrCodeUrl,
           dateFormat: selectedDateFormat,
           currencyCode: selectedCurrency.code,
           currencyCountry: selectedCurrency.country,
@@ -414,13 +518,33 @@ export default function CrmManageProfilePage() {
                   <Edit3 size={13} />
                 </button>
               )}
+
+              {/* Remove Logo Badge */}
+              {canManageBusiness && logoUrl && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLogoUrl(null);
+                  }}
+                  className="absolute -top-2 -left-2 w-7 h-7 bg-white rounded-full border border-gray-200 shadow-md flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-transform active:scale-90 cursor-pointer"
+                  title="Remove Logo"
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
 
             {/* ADD SIGNATURE CARD */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => canManageBusiness && setIsSignatureModalOpen(true)}
+                onClick={() => {
+                  if (canManageBusiness) {
+                    setSignatureModalTab(signatureType === "upload" ? "upload" : "draw");
+                    setIsSignatureModalOpen(true);
+                  }
+                }}
                 disabled={!canManageBusiness}
                 className={`w-28 h-28 bg-[#18181B] text-white rounded-2xl flex flex-col items-center justify-center p-2.5 transition-all shadow-md relative overflow-hidden group border border-gray-800 ${
                   canManageBusiness ? "hover:bg-[#27272A] active:scale-95 cursor-pointer" : "cursor-default opacity-90"
@@ -444,11 +568,30 @@ export default function CrmManageProfilePage() {
               {canManageBusiness && (
                 <button
                   type="button"
-                  onClick={() => setIsSignatureModalOpen(true)}
+                  onClick={() => {
+                    setSignatureModalTab(signatureType === "upload" ? "upload" : "draw");
+                    setIsSignatureModalOpen(true);
+                  }}
                   className="absolute -top-2 -right-2 w-7 h-7 bg-white rounded-full border border-gray-200 shadow-md flex items-center justify-center text-black hover:bg-gray-100 transition-transform active:scale-90 cursor-pointer"
                   title="Change Signature"
                 >
                   <Edit3 size={13} />
+                </button>
+              )}
+
+              {/* Remove Signature Badge */}
+              {canManageBusiness && signatureUrl && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSignatureUrl(null);
+                    setSignatureType(null);
+                  }}
+                  className="absolute -top-2 -left-2 w-7 h-7 bg-white rounded-full border border-gray-200 shadow-md flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-transform active:scale-90 cursor-pointer"
+                  title="Remove Signature"
+                >
+                  <X size={13} />
                 </button>
               )}
             </div>
@@ -806,6 +949,112 @@ export default function CrmManageProfilePage() {
                 <option value="OVERDRAFT ACCOUNT">OVERDRAFT ACCOUNT</option>
               </select>
             </div>
+
+            {/* UPI ID (VPA) */}
+            <div className="bg-[#F3F4F6] rounded-2xl px-4 py-2.5 border border-transparent focus-within:border-gray-400 focus-within:bg-white transition-all">
+              <label className="block text-[11px] text-gray-500 font-medium">
+                UPI ID (VPA)
+              </label>
+              <input
+                type="text"
+                value={upiId}
+                onChange={(e) => setUpiId(e.target.value)}
+                disabled={!canManageBusiness}
+                placeholder="e.g. omenterprises@okaxis / 9849845555@paytm"
+                className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed"
+              />
+            </div>
+
+            {/* UPI QR Code Image Upload */}
+            <div className="bg-[#F3F4F6] rounded-2xl p-3.5 border border-transparent transition-all">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-[11px] text-gray-500 font-medium">
+                  UPI Payment QR Code
+                </label>
+                <span className="text-[10px] text-gray-400 uppercase font-semibold">Optional</span>
+              </div>
+
+              <input
+                ref={qrFileInputRef}
+                type="file"
+                accept="image/png, image/jpeg, image/jpg, image/webp, image/svg+xml"
+                onChange={handleQrCodeSelect}
+                className="hidden"
+              />
+
+              {upiQrCodeUrl ? (
+                <div className="bg-white rounded-xl p-3 border border-gray-200 flex items-center justify-between shadow-xs">
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <div className="w-24 h-24 rounded-xl bg-gray-50 border border-gray-200 p-1.5 flex items-center justify-center shrink-0 shadow-2xs">
+                      <img
+                        src={upiQrCodeUrl}
+                        alt="UPI QR Code"
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-gray-900 flex items-center gap-1">
+                        <Check size={13} className="text-emerald-600 shrink-0" />
+                        <span>QR Code active</span>
+                      </span>
+                      <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                        Displayed in Quotation Payment Instructions
+                      </p>
+                    </div>
+                  </div>
+
+                  {canManageBusiness && (
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      <button
+                        type="button"
+                        onClick={() => qrFileInputRef.current?.click()}
+                        disabled={isUploadingQr}
+                        className="p-1.5 text-gray-500 hover:text-black hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                        title="Change QR Code"
+                      >
+                        <Edit3 size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUpiQrCodeUrl(null)}
+                        className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Remove QR Code"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  onClick={() => canManageBusiness && !isUploadingQr && qrFileInputRef.current?.click()}
+                  className={`bg-white border-2 border-dashed border-gray-300 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all ${
+                    canManageBusiness
+                      ? "hover:border-gray-500 hover:bg-gray-50/50 cursor-pointer group"
+                      : "cursor-default opacity-80"
+                  }`}
+                >
+                  {isUploadingQr ? (
+                    <div className="flex items-center space-x-2 text-gray-600 py-1">
+                      <Loader2 size={18} className="animate-spin text-[#18181B]" />
+                      <span className="text-xs font-semibold">Uploading QR Code...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="w-9 h-9 rounded-full bg-gray-100 group-hover:bg-gray-200 text-gray-700 flex items-center justify-center mb-1.5 transition-colors">
+                        <Upload size={16} />
+                      </div>
+                      <span className="text-xs font-bold text-gray-800">
+                        Upload UPI QR Code Image
+                      </span>
+                      <span className="text-[10px] text-gray-400 mt-0.5">
+                        PNG, JPG, WebP or SVG up to 5MB
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ================= BOTTOM BUTTON: UPDATE ================= */}
@@ -862,31 +1111,145 @@ export default function CrmManageProfilePage() {
       {isSignatureModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden p-6 space-y-4 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
+            {/* Modal Header */}
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-              <h3 className="text-base font-bold text-gray-900">Authorized Signature</h3>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Authorized Signature</h3>
+                <p className="text-[11px] text-gray-500">Sign directly or upload your signature image</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsSignatureModalOpen(false)}
-                className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <div className="space-y-4">
-              <SignaturePad
-                onSave={(dataUrl: string | null) => {
-                  setSignatureUrl(dataUrl);
-                  setSignatureType("draw");
-                }}
-                initialValue={signatureUrl}
-              />
+            {/* Segmented Mode Switcher */}
+            <div className="flex bg-[#F3F4F6] p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setSignatureModalTab("draw")}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  signatureModalTab === "draw"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-900"
+                }`}
+              >
+                <PenTool size={13} />
+                <span>Draw Signature</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSignatureModalTab("upload")}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  signatureModalTab === "upload"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-900"
+                }`}
+              >
+                <Upload size={13} />
+                <span>Upload Image</span>
+              </button>
+            </div>
 
+            {/* Content Area */}
+            <div className="space-y-4">
+              {signatureModalTab === "draw" ? (
+                <SignaturePad
+                  onSave={(dataUrl: string | null) => {
+                    setSignatureUrl(dataUrl);
+                    if (dataUrl) {
+                      setSignatureType("draw");
+                    }
+                  }}
+                  initialValue={signatureType === "draw" ? signatureUrl : null}
+                />
+              ) : (
+                <div className="flex flex-col space-y-2">
+                  <input
+                    ref={signatureFileInputRef}
+                    type="file"
+                    accept="image/png, image/jpeg, image/jpg, image/webp, image/svg+xml"
+                    onChange={handleSignatureImageSelect}
+                    className="hidden"
+                  />
+
+                  {signatureType === "upload" && signatureUrl ? (
+                    <div className="relative w-full h-44 bg-gray-50 border-2 border-solid border-gray-200 rounded-2xl overflow-hidden p-3 flex flex-col items-center justify-center shadow-inner">
+                      <div className="w-full h-28 flex items-center justify-center bg-white rounded-xl border border-gray-100 p-2">
+                        <img
+                          src={signatureUrl}
+                          alt="Signature Preview"
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      </div>
+                      <div className="w-full flex items-center justify-between mt-2.5 px-1">
+                        <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                          <Check size={13} />
+                          <span>Signature image uploaded</span>
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => signatureFileInputRef.current?.click()}
+                            disabled={isUploadingSignature}
+                            className="text-xs font-semibold text-gray-700 hover:text-black hover:underline cursor-pointer"
+                          >
+                            Change
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSignatureUrl(null);
+                              setSignatureType(null);
+                            }}
+                            className="text-xs font-semibold text-rose-600 hover:text-rose-700 cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => !isUploadingSignature && signatureFileInputRef.current?.click()}
+                      className="relative w-full h-44 bg-white border-2 border-dashed border-gray-300 hover:border-gray-500 rounded-2xl flex flex-col items-center justify-center p-4 cursor-pointer transition-all shadow-inner group"
+                    >
+                      {isUploadingSignature ? (
+                        <div className="flex flex-col items-center space-y-2 text-gray-600">
+                          <Loader2 size={26} className="animate-spin text-[#18181B]" />
+                          <span className="text-xs font-semibold">Uploading signature to cloud...</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center text-center space-y-1.5">
+                          <div className="w-10 h-10 rounded-full bg-gray-100 group-hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors">
+                            <Upload size={18} />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-gray-800">
+                              Click to browse or drag signature image
+                            </p>
+                            <p className="text-[11px] text-gray-400 mt-0.5">
+                              PNG, JPG, SVG, WebP (Transparent PNG recommended)
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Bottom Action Buttons */}
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     setSignatureUrl(null);
+                    setSignatureType(null);
                     setIsSignatureModalOpen(false);
                   }}
                   className="flex-1 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-bold transition-all cursor-pointer"

@@ -673,6 +673,10 @@ export default function QuotationDetailPage({
     accountType: business?.bankAccountType || "CURRENT ACCOUNT",
   };
 
+  const upiId = business?.upiId || "";
+  const upiQrCodeUrl = business?.upiQrCodeUrl || "";
+  const paymentOption = quotation?.paymentDisplayOption || "both";
+
   // Status color styles
   const statusColors: Record<string, string> = {
     Draft: "bg-amber-50 text-amber-800 border-amber-200",
@@ -1257,34 +1261,71 @@ export default function QuotationDetailPage({
             {/* Right Column: PAYMENT INSTRUCTIONS + SIGNATORY */}
             <div className="space-y-4 print:space-y-2 text-xs sm:text-sm sm:text-right print:text-right">
               {/* Payment Instructions Box */}
-              <div className="space-y-1 text-xs text-gray-800 sm:text-left sm:ml-auto sm:max-w-xs bg-gray-50/70 p-3.5 print:p-2.5 rounded-xl border border-gray-200 print:text-[11px] print:rounded-lg">
+              <div className="space-y-1.5 text-xs text-gray-800 sm:text-left sm:ml-auto sm:max-w-sm bg-gray-50/70 p-3.5 print:p-2.5 rounded-xl border border-gray-200 print:text-[11px] print:rounded-lg">
                 <h5 className="font-black text-brand uppercase tracking-wider text-xs print:text-[11px] mb-1">
                   PAYMENT INSTRUCTIONS
                 </h5>
-                <p>
-                  <strong className="text-gray-500 uppercase text-[10px] tracking-wider">NAME : </strong>
-                  <span className="font-bold text-gray-900">{bankDetails.name}</span>
-                </p>
-                <p>
-                  <strong className="text-gray-500 uppercase text-[10px] tracking-wider">BANK : </strong>
-                  <span className="font-bold text-gray-900">{bankDetails.bank}</span>
-                </p>
-                <p>
-                  <strong className="text-gray-500 uppercase text-[10px] tracking-wider">A/C NO : </strong>
-                  <span className="font-bold text-gray-900">{bankDetails.accountNo}</span>
-                </p>
-                <p>
-                  <strong className="text-gray-500 uppercase text-[10px] tracking-wider">IFSC CODE : </strong>
-                  <span className="font-bold text-gray-900">{bankDetails.ifsc}</span>
-                </p>
-                <p>
-                  <strong className="text-gray-500 uppercase text-[10px] tracking-wider">ACCOUNT TYPE : </strong>
-                  <span className="font-bold text-gray-900">{bankDetails.accountType}</span>
-                </p>
+
+                {/* Bank Details (If 'bank' or 'both') */}
+                {(paymentOption === "bank" || paymentOption === "both") && (
+                  <div className="space-y-1">
+                    <p>
+                      <strong className="text-gray-500 uppercase text-[10px] tracking-wider">NAME : </strong>
+                      <span className="font-bold text-gray-900">{bankDetails.name}</span>
+                    </p>
+                    <p>
+                      <strong className="text-gray-500 uppercase text-[10px] tracking-wider">BANK : </strong>
+                      <span className="font-bold text-gray-900">{bankDetails.bank}</span>
+                    </p>
+                    <p>
+                      <strong className="text-gray-500 uppercase text-[10px] tracking-wider">A/C NO : </strong>
+                      <span className="font-bold text-gray-900">{bankDetails.accountNo}</span>
+                    </p>
+                    <p>
+                      <strong className="text-gray-500 uppercase text-[10px] tracking-wider">IFSC CODE : </strong>
+                      <span className="font-bold text-gray-900">{bankDetails.ifsc}</span>
+                    </p>
+                    <p>
+                      <strong className="text-gray-500 uppercase text-[10px] tracking-wider">ACCOUNT TYPE : </strong>
+                      <span className="font-bold text-gray-900">{bankDetails.accountType}</span>
+                    </p>
+                  </div>
+                )}
+
+                {/* UPI Details (If 'upi' or 'both') */}
+                {(paymentOption === "upi" || paymentOption === "both") && (upiId || upiQrCodeUrl) && (
+                  <div className={`space-y-1.5 ${paymentOption === "both" ? "border-t border-gray-200/90 pt-2 mt-1.5" : ""}`}>
+                    {upiId && (
+                      <p>
+                        <strong className="text-gray-500 uppercase text-[10px] tracking-wider">UPI ID : </strong>
+                        <span className="font-bold text-gray-900 break-all">{upiId}</span>
+                      </p>
+                    )}
+                    {upiQrCodeUrl && (
+                      <div className="pt-1.5 flex items-center gap-3">
+                        <div className="w-28 h-28 print:w-28 print:h-28 bg-white p-1.5 rounded-xl border border-gray-300 shadow-2xs shrink-0 flex items-center justify-center">
+                          <img
+                            src={upiQrCodeUrl}
+                            alt="UPI QR Code"
+                            crossOrigin="anonymous"
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        </div>
+                        <div className="text-[10px] print:text-[9px] text-gray-600 leading-tight space-y-1">
+                          <span className="font-bold text-gray-900 block text-xs print:text-[11px]">
+                            Scan to Pay
+                          </span>
+                          <span className="text-gray-500 block">GPay • PhonePe • Paytm • UPI</span>
+                          <span className="text-[9px] text-gray-400 block">Scan using any UPI App</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Authorized Signatory Block */}
-              <div className="pt-2 print:pt-0.5 sm:ml-auto sm:max-w-xs space-y-0.5 text-center">
+              <div className="pt-2 print:pt-0.5 sm:ml-auto sm:max-w-sm space-y-0.5 text-center">
                 <p className="font-bold text-xs text-gray-900 print:text-[11px]">
                   For, {business?.businessName?.toUpperCase() || "OM ENTERPRISES"}
                 </p>

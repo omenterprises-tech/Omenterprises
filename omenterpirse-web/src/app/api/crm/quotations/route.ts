@@ -72,6 +72,7 @@ export async function POST(request: Request) {
       otherCharges,
       notes,
       termsConditions,
+      paymentDisplayOption,
       status,
     } = body;
 
@@ -124,6 +125,7 @@ export async function POST(request: Request) {
         otherCharges: otherCharges ? (typeof otherCharges === "string" ? otherCharges : JSON.stringify(otherCharges)) : null,
         notes: notes?.trim() || null,
         termsConditions: termsConditions?.trim() || null,
+        paymentDisplayOption: paymentDisplayOption || "both",
         status: status || "Draft",
         createdByUserId: session.userId,
         createdByName: authorName,

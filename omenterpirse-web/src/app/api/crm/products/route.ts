@@ -313,3 +313,179 @@ export async function DELETE(request: Request) {
     );
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    await ensureProductsSchema();
+
+    const session = await getCrmSession();
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+    }
+
+    const { business } = await resolveBusinessAndRole(session.userId);
+    if (!business) {
+      return NextResponse.json({ success: false, error: "Business not found." }, { status: 404 });
+    }
+
+    const body = await request.json();
+    const { action, categoryPath } = body;
+
+    if (!Array.isArray(categoryPath) || categoryPath.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "categoryPath array is required." },
+        { status: 400 }
+      );
+    }
+
+    // Fetch all products for this business
+    const businessProducts = await db
+      .select()
+      .from(products)
+      .where(eq(products.businessId, business.id));
+
+    const levelIndex = categoryPath.length - 1;
+
+    // Helper to get hierarchy from product
+    const getHierarchy = (prod: any): { hier: string[]; specsObj: any } => {
+      let specsObj: any = null;
+      if (typeof prod.specifications === "string") {
+        try {
+          specsObj = JSON.parse(prod.specifications);
+        } catch (e) {}
+      } else if (prod.specifications && typeof prod.specifications === "object") {
+        specsObj = prod.specifications;
+      }
+      if (specsObj && Array.isArray(specsObj.hierarchy) && specsObj.hierarchy.length > 0) {
+        return {
+          hier: specsObj.hierarchy.map((h: any) => String(h).trim()).filter(Boolean),
+          specsObj,
+        };
+      }
+      const cat = (prod.category || "General").trim() || "General";
+      return { hier: [cat], specsObj };
+    };
+
+    // Filter products matching categoryPath prefix
+    const matchingProducts = businessProducts.filter((prod) => {
+      const { hier } = getHierarchy(prod);
+      if (hier.length < categoryPath.length) return false;
+      return categoryPath.every(
+        (seg: string, idx: number) => hier[idx]?.toLowerCase() === seg.toLowerCase()
+      );
+    });
+
+    if (action === "rename_category") {
+      const { newName } = body;
+      const trimmedNewName = String(newName || "").trim();
+      if (!trimmedNewName) {
+        return NextResponse.json(
+          { success: false, error: "New category name cannot be empty." },
+          { status: 400 }
+        );
+      }
+
+      let updatedCount = 0;
+      for (const prod of matchingProducts) {
+        const { hier, specsObj } = getHierarchy(prod);
+        const newHier = [...hier];
+        newHier[levelIndex] = trimmedNewName;
+
+        const nameOrder = specsObj?.nameOrder || "reverse";
+        const newProductName =
+          nameOrder === "reverse"
+            ? [...newHier].reverse().join(" ")
+            : newHier.join(" ");
+
+        const newSpecs = {
+          ...(specsObj || {}),
+          hierarchy: newHier,
+        };
+
+        const updatePayload: any = {
+          name: newProductName,
+          specifications: JSON.stringify(newSpecs),
+        };
+
+        if (levelIndex === 0) {
+          updatePayload.category = trimmedNewName;
+        }
+
+        await db
+          .update(products)
+          .set(updatePayload)
+          .where(and(eq(products.id, prod.id), eq(products.businessId, business.id)));
+
+        updatedCount++;
+      }
+
+      return NextResponse.json({
+        success: true,
+        action: "rename_category",
+        updatedCount,
+      });
+    }
+
+    if (action === "update_category_details") {
+      const { gst, basePrice, unit, hsn } = body;
+      const updateData: any = {};
+
+      if (gst !== undefined) {
+        if (gst === null || gst === "" || isNaN(Number(gst))) {
+          updateData.gst = null;
+        } else {
+          updateData.gst = parseFloat(gst);
+        }
+      }
+
+      if (basePrice !== undefined && basePrice !== null && basePrice !== "") {
+        const p = parseFloat(basePrice);
+        if (!isNaN(p) && p >= 0) {
+          updateData.basePrice = p;
+          updateData.salePrice = p;
+        }
+      }
+
+      if (unit !== undefined) {
+        updateData.unit = unit ? String(unit).trim() : null;
+      }
+
+      if (hsn !== undefined) {
+        updateData.hsn = hsn ? String(hsn).trim() : null;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return NextResponse.json(
+          { success: false, error: "No fields to update provided." },
+          { status: 400 }
+        );
+      }
+
+      let updatedCount = 0;
+      for (const prod of matchingProducts) {
+        await db
+          .update(products)
+          .set(updateData)
+          .where(and(eq(products.id, prod.id), eq(products.businessId, business.id)));
+        updatedCount++;
+      }
+
+      return NextResponse.json({
+        success: true,
+        action: "update_category_details",
+        updatedCount,
+      });
+    }
+
+    return NextResponse.json(
+      { success: false, error: `Invalid action: ${action}` },
+      { status: 400 }
+    );
+  } catch (error: any) {
+    console.error("PATCH products category error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to update category products." },
+      { status: 500 }
+    );
+  }
+}

@@ -150,7 +150,10 @@ function MakeQuotationContent() {
   const [selectedTermIds, setSelectedTermIds] = useState<string[]>([]);
   const [isEditingTerms, setIsEditingTerms] = useState(false);
 
-  // 5. Round Off State
+  // 5. Payment Instructions Display Option
+  const [paymentDisplayOption, setPaymentDisplayOption] = useState<"both" | "bank" | "upi">("both");
+
+  // 6. Round Off State
   const [isRoundOff, setIsRoundOff] = useState(true);
 
   // Submission State
@@ -271,6 +274,10 @@ function MakeQuotationContent() {
         setTermsList(qMappedTerms);
         setSelectedTermIds(qMappedTerms.map((t) => t.id));
       }
+    }
+
+    if (q.paymentDisplayOption) {
+      setPaymentDisplayOption(q.paymentDisplayOption);
     }
   };
 
@@ -773,6 +780,7 @@ function MakeQuotationContent() {
         otherCharges: otherCharge || null,
         notes: otherInfo.trim() || null,
         termsConditions: selectedTermsFormatted || null,
+        paymentDisplayOption,
         status: "Draft",
       };
 
@@ -2075,7 +2083,86 @@ function MakeQuotationContent() {
           </div>
         </div>
 
-        {/* ---------------- 5. ROUND OFF CHARGE CHECKBOX ---------------- */}
+        {/* ---------------- 5. PAYMENT INSTRUCTIONS DISPLAY OPTION ---------------- */}
+        <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-3">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-brand/10 text-brand flex items-center justify-center font-bold">
+              <Building2 size={20} />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+                PAYMENT INSTRUCTIONS ON QUOTATION
+              </h2>
+              <p className="text-xs text-gray-500 font-medium mt-0.5">
+                Choose which payment credentials appear on this quotation
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+            <button
+              type="button"
+              onClick={() => setPaymentDisplayOption("both")}
+              className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                paymentDisplayOption === "both"
+                  ? "border-brand bg-brand/5 ring-1 ring-brand text-gray-900 shadow-xs"
+                  : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 text-gray-600"
+              }`}
+            >
+              <div className="flex items-center justify-between w-full mb-1">
+                <span className="text-xs font-bold text-gray-900">Both (Bank & UPI)</span>
+                {paymentDisplayOption === "both" && (
+                  <span className="w-2 h-2 rounded-full bg-brand" />
+                )}
+              </div>
+              <span className="text-[11px] text-gray-500">
+                Shows bank account and UPI QR code on quotation (Default)
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPaymentDisplayOption("bank")}
+              className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                paymentDisplayOption === "bank"
+                  ? "border-brand bg-brand/5 ring-1 ring-brand text-gray-900 shadow-xs"
+                  : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 text-gray-600"
+              }`}
+            >
+              <div className="flex items-center justify-between w-full mb-1">
+                <span className="text-xs font-bold text-gray-900">Bank Info Only</span>
+                {paymentDisplayOption === "bank" && (
+                  <span className="w-2 h-2 rounded-full bg-brand" />
+                )}
+              </div>
+              <span className="text-[11px] text-gray-500">
+                Beneficiary name, A/C number, bank name & IFSC code
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPaymentDisplayOption("upi")}
+              className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                paymentDisplayOption === "upi"
+                  ? "border-brand bg-brand/5 ring-1 ring-brand text-gray-900 shadow-xs"
+                  : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 text-gray-600"
+              }`}
+            >
+              <div className="flex items-center justify-between w-full mb-1">
+                <span className="text-xs font-bold text-gray-900">UPI Only</span>
+                {paymentDisplayOption === "upi" && (
+                  <span className="w-2 h-2 rounded-full bg-brand" />
+                )}
+              </div>
+              <span className="text-[11px] text-gray-500">
+                UPI QR code for instant mobile app scanning & UPI ID
+              </span>
+            </button>
+          </div>
+        </section>
+
+        {/* ---------------- 6. ROUND OFF CHARGE CHECKBOX ---------------- */}
         <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start sm:items-center space-x-3">
