@@ -1013,9 +1013,6 @@ export default function QuotationDetailPage({
                       <th className="py-2.5 px-2 text-right w-24">
                         Rate
                       </th>
-                      <th className="py-2.5 px-1 text-center w-14 lowercase font-bold">
-                        per
-                      </th>
                       <th className="py-2.5 px-1.5 text-right w-16">
                         Disc %
                       </th>
@@ -1031,7 +1028,7 @@ export default function QuotationDetailPage({
                   <tbody className="divide-y divide-gray-200">
                     {items.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-8 text-center text-gray-400">
+                        <td colSpan={9} className="py-8 text-center text-gray-400">
                           No products recorded in this quotation.
                         </td>
                       </tr>
@@ -1103,9 +1100,6 @@ export default function QuotationDetailPage({
                             <td className="py-2.5 px-2 text-right font-medium text-gray-800">
                               {formatRs(price)}
                             </td>
-                            <td className="py-2.5 px-1 text-center font-bold text-gray-700 uppercase text-[11px] print:text-[9.5px]">
-                              {unitName}
-                            </td>
                             <td className="py-2.5 px-1.5 text-right font-semibold text-gray-900 print:text-black">
                               {discPercent > 0 ? `${discPercent} %` : "-"}
                             </td>
@@ -1124,7 +1118,7 @@ export default function QuotationDetailPage({
                     {otherCharge && Number(otherCharge.amount) > 0 && (
                       <tr className="border-t border-gray-200">
                         <td></td>
-                        <td className="py-2 px-3 font-bold text-gray-800" colSpan={8}>
+                        <td className="py-2 px-3 font-bold text-gray-800" colSpan={7}>
                           {otherCharge.label || "Other Charges"}
                         </td>
                         <td className="py-2 px-3 text-right font-bold text-gray-900">
@@ -1138,7 +1132,7 @@ export default function QuotationDetailPage({
                       <>
                         <tr className="border-t border-gray-100">
                           <td></td>
-                          <td className="py-1 px-3 text-right font-bold text-gray-700 italic pr-8" colSpan={8}>
+                          <td className="py-1 px-3 text-right font-bold text-gray-700 italic pr-8" colSpan={7}>
                             CGST
                           </td>
                           <td className="py-1 px-3 text-right font-semibold text-gray-900">
@@ -1147,7 +1141,7 @@ export default function QuotationDetailPage({
                         </tr>
                         <tr>
                           <td></td>
-                          <td className="py-1 px-3 text-right font-bold text-gray-700 italic pr-8" colSpan={8}>
+                          <td className="py-1 px-3 text-right font-bold text-gray-700 italic pr-8" colSpan={7}>
                             SGST
                           </td>
                           <td className="py-1 px-3 text-right font-semibold text-gray-900">
@@ -1161,7 +1155,7 @@ export default function QuotationDetailPage({
                     {roundOffDiff !== 0 && (
                       <tr>
                         <td></td>
-                        <td className="py-1 px-3 text-right font-bold text-gray-700 italic pr-8" colSpan={8}>
+                        <td className="py-1 px-3 text-right font-bold text-gray-700 italic pr-8" colSpan={7}>
                           ROUND OFF
                         </td>
                         <td className="py-1 px-3 text-right font-semibold text-gray-900">

@@ -791,7 +791,6 @@ export function ViewQuotationModal({
                       </th>
                       <th className="p-2.5 text-center w-20">Quantity</th>
                       <th className="p-2.5 text-right w-24">Rate (₹)</th>
-                      <th className="p-2.5 text-center w-14 lowercase font-bold">per</th>
                       <th className="p-2.5 text-right w-16">Disc %</th>
                       <th className="p-2.5 text-right w-24">
                         <div>Landed</div>
@@ -826,9 +825,6 @@ export function ViewQuotationModal({
                           </td>
                           <td className="p-2.5 text-right">
                             ₹{price.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="p-2.5 text-center font-bold text-gray-700 uppercase text-[11px]">
-                            {unitName}
                           </td>
                           <td className="p-2.5 text-right font-semibold text-gray-900 print:text-black">
                             {discPercent > 0 ? `${discPercent}%` : "-"}
