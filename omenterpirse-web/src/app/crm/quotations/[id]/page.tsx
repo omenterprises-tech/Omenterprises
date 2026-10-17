@@ -63,7 +63,7 @@ export default function QuotationDetailPage({
       try {
         const cached = sessionStorage.getItem(`crm_preview_quotation_${quotationId}`);
         if (cached) return JSON.parse(cached);
-      } catch (e) {}
+      } catch (e) { }
     }
     return null;
   });
@@ -73,7 +73,7 @@ export default function QuotationDetailPage({
       try {
         const cached = sessionStorage.getItem("crm_preview_business");
         if (cached) return JSON.parse(cached);
-      } catch (e) {}
+      } catch (e) { }
     }
     return null;
   });
@@ -82,7 +82,7 @@ export default function QuotationDetailPage({
       try {
         const cached = sessionStorage.getItem(`crm_preview_quotation_${quotationId}`);
         if (cached) return false;
-      } catch (e) {}
+      } catch (e) { }
     }
     return true;
   });
@@ -110,7 +110,7 @@ export default function QuotationDetailPage({
           const parsed = JSON.parse(cached);
           if (parsed.customerPhone) return parsed.customerPhone;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     return "";
   });
@@ -143,7 +143,7 @@ export default function QuotationDetailPage({
             if (data.business) {
               sessionStorage.setItem("crm_preview_business", JSON.stringify(data.business));
             }
-          } catch (e) {}
+          } catch (e) { }
         }
         if (data.quotation.customerPhone) {
           setCustomWhatsAppPhone(data.quotation.customerPhone);
@@ -218,7 +218,7 @@ export default function QuotationDetailPage({
         if (typeof window !== "undefined") {
           try {
             sessionStorage.setItem(`crm_preview_quotation_${quotation.id}`, JSON.stringify(data.quotation));
-          } catch (e) {}
+          } catch (e) { }
         }
         setIsStatusModalOpen(false);
         setIsMoreOpen(false);
@@ -250,7 +250,7 @@ export default function QuotationDetailPage({
         if (typeof window !== "undefined") {
           try {
             sessionStorage.removeItem(`crm_preview_quotation_${quotation.id}`);
-          } catch (e) {}
+          } catch (e) { }
         }
         alert("Quotation deleted successfully.");
         router.push("/crm/quotations");
@@ -300,7 +300,7 @@ export default function QuotationDetailPage({
             if (data.business || business) {
               sessionStorage.setItem("crm_preview_business", JSON.stringify(data.business || business));
             }
-          } catch (e) {}
+          } catch (e) { }
         }
         showToast("Quotation duplicated successfully!");
         router.push(`/crm/quotations/${data.quotation.id}`);
@@ -323,7 +323,7 @@ export default function QuotationDetailPage({
         if (business) {
           sessionStorage.setItem("crm_preview_business", JSON.stringify(business));
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     router.push(`/crm/quotations/create?edit=${quotation.id}`);
   };
@@ -422,7 +422,7 @@ export default function QuotationDetailPage({
                         ctxHelper.fillStyle = c;
                         const res = ctxHelper.fillStyle;
                         if (res && res !== "#000000" && !res.includes("oklch")) return res;
-                      } catch (e) {}
+                      } catch (e) { }
                     }
                     return fallback;
                   }
@@ -688,7 +688,7 @@ export default function QuotationDetailPage({
       if (Array.isArray(parsed) && parsed.length > 0) {
         displayedPhoneNumbers = parsed;
       }
-    } catch (e) {}
+    } catch (e) { }
   }
   if (displayedPhoneNumbers.length === 0) {
     if (business?.phoneNumbers) {
@@ -700,7 +700,7 @@ export default function QuotationDetailPage({
         if (Array.isArray(parsed) && parsed.length > 0) {
           displayedPhoneNumbers = parsed;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
   }
   if (displayedPhoneNumbers.length === 0 && business?.mobileNumber) {
@@ -811,9 +811,8 @@ export default function QuotationDetailPage({
                     {quotation.quotationNumber}
                   </h1>
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
-                      statusColors[quotation.status] || "bg-gray-100 text-gray-700"
-                    }`}
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${statusColors[quotation.status] || "bg-gray-100 text-gray-700"
+                      }`}
                   >
                     {quotation.status}
                   </span>
@@ -1053,7 +1052,7 @@ export default function QuotationDetailPage({
                             : it.description?.trim()) ||
                           "Item";
 
-                        let rawDesc = (it.description || "").trim();
+                        const rawDesc = (it.description || "").trim();
                         let cleanedDesc = "";
 
                         if (rawDesc) {
@@ -1127,42 +1126,7 @@ export default function QuotationDetailPage({
                       </tr>
                     )}
 
-                    {/* Tax Lines as in Reference Image: CGST & SGST */}
-                    {Number(quotation.taxTotal) > 0 && (
-                      <>
-                        <tr className="border-t border-gray-100">
-                          <td></td>
-                          <td className="py-1 px-3 text-right font-bold text-gray-700 italic pr-8" colSpan={7}>
-                            CGST
-                          </td>
-                          <td className="py-1 px-3 text-right font-semibold text-gray-900">
-                            {formatRs(cgstAmount)}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td></td>
-                          <td className="py-1 px-3 text-right font-bold text-gray-700 italic pr-8" colSpan={7}>
-                            SGST
-                          </td>
-                          <td className="py-1 px-3 text-right font-semibold text-gray-900">
-                            {formatRs(sgstAmount)}
-                          </td>
-                        </tr>
-                      </>
-                    )}
 
-                    {/* Round Off Line as in Reference Image */}
-                    {roundOffDiff !== 0 && (
-                      <tr>
-                        <td></td>
-                        <td className="py-1 px-3 text-right font-bold text-gray-700 italic pr-8" colSpan={7}>
-                          ROUND OFF
-                        </td>
-                        <td className="py-1 px-3 text-right font-semibold text-gray-900">
-                          {roundOffDiff > 0 ? `+${roundOffDiff.toFixed(2)}` : roundOffDiff.toFixed(2)}
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               </div>
@@ -1504,11 +1468,10 @@ export default function QuotationDetailPage({
                   type="button"
                   onClick={() => handleUpdateStatus(st)}
                   disabled={isUpdatingStatus}
-                  className={`w-full p-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all cursor-pointer ${
-                    quotation.status === st
+                  className={`w-full p-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all cursor-pointer ${quotation.status === st
                       ? "bg-brand text-white border-brand"
                       : "bg-gray-50 text-gray-800 border-gray-200 hover:bg-gray-100"
-                  }`}
+                    }`}
                 >
                   <span>{st}</span>
                   {quotation.status === st && <Check size={16} />}
