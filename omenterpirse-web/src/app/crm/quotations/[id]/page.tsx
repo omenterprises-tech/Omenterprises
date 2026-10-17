@@ -58,34 +58,9 @@ export default function QuotationDetailPage({
   const quotationId = resolvedParams.id;
 
   const storeBusiness = useCrmSessionStore((s) => s.business);
-  const [quotation, setQuotation] = useState<any | null>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = sessionStorage.getItem(`crm_preview_quotation_${quotationId}`);
-        if (cached) return JSON.parse(cached);
-      } catch (e) { }
-    }
-    return null;
-  });
-  const [business, setBusiness] = useState<any | null>(() => {
-    if (storeBusiness) return storeBusiness;
-    if (typeof window !== "undefined") {
-      try {
-        const cached = sessionStorage.getItem("crm_preview_business");
-        if (cached) return JSON.parse(cached);
-      } catch (e) { }
-    }
-    return null;
-  });
-  const [isLoading, setIsLoading] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = sessionStorage.getItem(`crm_preview_quotation_${quotationId}`);
-        if (cached) return false;
-      } catch (e) { }
-    }
-    return true;
-  });
+  const [quotation, setQuotation] = useState<any | null>(null);
+  const [business, setBusiness] = useState<any | null>(storeBusiness || null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -102,18 +77,7 @@ export default function QuotationDetailPage({
   // Share Modal & PDF Generation
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [customWhatsAppPhone, setCustomWhatsAppPhone] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = sessionStorage.getItem(`crm_preview_quotation_${quotationId}`);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed.customerPhone) return parsed.customerPhone;
-        }
-      } catch (e) { }
-    }
-    return "";
-  });
+  const [customWhatsAppPhone, setCustomWhatsAppPhone] = useState("");
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -442,6 +406,40 @@ export default function QuotationDetailPage({
             } catch (err) {
               console.warn("Color sanitization warning:", err);
             }
+
+            // Check page collision for #quotation-bottom-block:
+            // If the bottom block straddles a page boundary, push it cleanly to start on the next page!
+            try {
+              const bottomBlock = clonedDoc.getElementById("quotation-bottom-block");
+              if (bottomBlock) {
+                // A4 aspect ratio usable height in px:
+                // Width is 794px. Printable height before footer (283mm / 210mm) * 794 ≈ 1070px
+                const sheetWidth = sheet.offsetWidth || 794;
+                const pageContentHeightPx = Math.floor((sheetWidth * 283) / 210);
+
+                const blockTop = bottomBlock.offsetTop;
+                const blockHeight = bottomBlock.offsetHeight;
+                const pageIndex = Math.floor(blockTop / pageContentHeightPx);
+                const pageBoundaryPx = (pageIndex + 1) * pageContentHeightPx;
+
+                // If block starts on current page but ends beyond the current page boundary
+                // (or within 25px safety margin of the footer line), push it to the next page
+                // and give it a top gap matching the first page (~40px)
+                if (blockTop + blockHeight > pageBoundaryPx - 25) {
+                  const topGapPx = 40; // Clean top margin for next page matching page 1
+                  const spacerHeight = pageBoundaryPx - blockTop + topGapPx;
+                  const spacer = clonedDoc.createElement("div");
+                  spacer.style.height = `${spacerHeight}px`;
+                  spacer.style.width = "100%";
+                  spacer.style.margin = "0";
+                  spacer.style.padding = "0";
+                  spacer.setAttribute("data-pdf-page-break-spacer", "true");
+                  bottomBlock.parentNode?.insertBefore(spacer, bottomBlock);
+                }
+              }
+            } catch (pageBreakErr) {
+              console.warn("Quotation bottom block page break adjustment error:", pageBreakErr);
+            }
           }
         },
       });
@@ -484,7 +482,7 @@ export default function QuotationDetailPage({
         }
       }
 
-      // Add bottom footer (separator line + "Page X of Y") at the exact bottom of every page
+      // Add bottom footer (separator line + "Page X of Y" + "Continued on Next Page... »") at the exact bottom of every page
       const totalPages = pdf.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         pdf.setPage(i);
@@ -497,6 +495,14 @@ export default function QuotationDetailPage({
         pdf.setDrawColor(229, 231, 235); // #E5E7EB
         pdf.setLineWidth(0.25);
         pdf.line(12, pdfHeight - 11, pdfWidth - 12, pdfHeight - 11);
+
+        // Meaningful Next Page Indication on all non-final pages
+        if (i < totalPages) {
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(8);
+          pdf.setTextColor(13, 71, 161); // Brand Blue #0D47A1
+          pdf.text("Continued on Next Page... »", pdfWidth - 36, pdfHeight - 5.5, { align: "right" });
+        }
 
         // Right-aligned page number
         pdf.setFont("helvetica", "normal");
@@ -724,7 +730,10 @@ export default function QuotationDetailPage({
       <style>{`
         @page {
           size: A4 portrait;
-          margin: 0mm !important;
+          margin-top: 10mm !important;
+          margin-bottom: 10mm !important;
+          margin-left: 0mm !important;
+          margin-right: 0mm !important;
         }
         @media print {
           html, body {
@@ -750,7 +759,7 @@ export default function QuotationDetailPage({
           }
           #quotation-sheet {
             margin: 0 auto !important;
-            padding: 8mm 12mm 6mm 12mm !important;
+            padding: 0mm 12mm 0mm 12mm !important;
             box-sizing: border-box !important;
             width: 100% !important;
             max-width: 210mm !important;
@@ -768,9 +777,14 @@ export default function QuotationDetailPage({
             break-inside: avoid !important;
             page-break-inside: avoid !important;
           }
+          #quotation-bottom-block,
+          .quotation-bottom-block {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
           #quotation-page-footer {
             position: fixed !important;
-            bottom: 6mm !important;
+            bottom: 4mm !important;
             left: 12mm !important;
             right: 12mm !important;
             margin: 0 !important;
@@ -778,7 +792,8 @@ export default function QuotationDetailPage({
             border-top: 1px solid #e5e7eb !important;
             background: #ffffff !important;
             display: flex !important;
-            justify-content: flex-end !important;
+            justify-content: space-between !important;
+            align-items: center !important;
           }
         }
       `}</style>
@@ -1222,128 +1237,142 @@ export default function QuotationDetailPage({
             </div>
           </div>
 
-          {/* ================= 6. CLOSING STATEMENT ================= */}
-          <div className="pt-1 print:pt-0.5 text-xs sm:text-sm print:text-xs text-gray-700 font-medium">
-            We hope you find our offer to be in line with your requirement.
+          {/* Right Bottom Corner Next Page Indication (Prominently visible when multi-page content continues) */}
+          <div className="hidden print:flex justify-end items-center pt-2 pb-1 text-right">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-50 border border-gray-300 text-[10px] font-bold tracking-wide uppercase text-gray-700">
+              <span>Continued on Next Page</span>
+              <span className="text-brand font-black text-xs leading-none">»</span>
+            </div>
           </div>
 
-          {/* ================= 7. BOTTOM SECTION: TERMS (LEFT) & PAYMENT + SIGNATURE (RIGHT) ================= */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-4 items-start border-t border-gray-100 print:grid-cols-2 print:gap-4 print:pt-2">
-            {/* Left Column: TERMS & CONDITIONS */}
-            <div className="space-y-2 text-xs sm:text-sm print:space-y-1 print:text-xs">
-              <h5 className="font-black text-gray-900 uppercase tracking-wider text-xs border-b border-gray-200 pb-1 inline-block">
-                TERMS & CONDITIONS:
-              </h5>
-              {termsList.length === 0 ? (
-                <ul className="space-y-1.5 text-gray-600 text-xs print:space-y-0.5 print:text-[11px]">
-                  <li>• DELIVERY CHARGES : EXTRA AT ACTUAL</li>
-                  <li>• PAYMENT : 100% AGAINST DELIVERY</li>
-                  <li>• VALIDITY : 30 DAYS</li>
-                  <li>• DELIVERY : READY STOCK</li>
-                </ul>
-              ) : (
-                <ul className="space-y-1.5 text-gray-700 text-xs print:space-y-0.5 print:text-[11px]">
-                  {termsList.map((t, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="font-bold text-brand shrink-0">•</span>
-                      <span>{t}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+          {/* ================= 6 & 7. BOTTOM UNIFIED BLOCK: CLOSING, TERMS, PAYMENT, SIGNATURE ================= */}
+          <div
+            id="quotation-bottom-block"
+            className="quotation-bottom-block space-y-4 pt-1 print:pt-4 break-inside-avoid page-break-inside-avoid"
+          >
+            {/* Closing Statement */}
+            <div className="text-xs sm:text-sm print:text-xs text-gray-700 font-medium">
+              We hope you find our offer to be in line with your requirement.
             </div>
 
-            {/* Right Column: PAYMENT INSTRUCTIONS + SIGNATORY */}
-            <div className="space-y-4 print:space-y-2 text-xs sm:text-sm sm:text-right print:text-right">
-              {/* Payment Instructions Box */}
-              <div className="space-y-1.5 text-xs text-gray-800 sm:text-left sm:ml-auto sm:max-w-sm bg-gray-50/70 p-3.5 print:p-2.5 rounded-xl border border-gray-200 print:text-[11px] print:rounded-lg">
-                <h5 className="font-black text-brand uppercase tracking-wider text-xs print:text-[11px] mb-1">
-                  PAYMENT INSTRUCTIONS
+            {/* Bottom Section: Terms (Left) & Payment + Signature (Right) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-2 items-start border-t border-gray-100 print:grid-cols-2 print:gap-4 print:pt-2">
+              {/* Left Column: TERMS & CONDITIONS */}
+              <div className="space-y-2 text-xs sm:text-sm print:space-y-1 print:text-xs">
+                <h5 className="font-black text-gray-900 uppercase tracking-wider text-xs border-b border-gray-200 pb-1 inline-block">
+                  TERMS & CONDITIONS:
                 </h5>
-
-                {/* Bank Details (If 'bank' or 'both') */}
-                {(paymentOption === "bank" || paymentOption === "both") && (
-                  <div className="space-y-1">
-                    <p>
-                      <strong className="text-gray-500 uppercase text-[10px] tracking-wider">NAME : </strong>
-                      <span className="font-bold text-gray-900">{bankDetails.name}</span>
-                    </p>
-                    <p>
-                      <strong className="text-gray-500 uppercase text-[10px] tracking-wider">BANK : </strong>
-                      <span className="font-bold text-gray-900">{bankDetails.bank}</span>
-                    </p>
-                    <p>
-                      <strong className="text-gray-500 uppercase text-[10px] tracking-wider">A/C NO : </strong>
-                      <span className="font-bold text-gray-900">{bankDetails.accountNo}</span>
-                    </p>
-                    <p>
-                      <strong className="text-gray-500 uppercase text-[10px] tracking-wider">IFSC CODE : </strong>
-                      <span className="font-bold text-gray-900">{bankDetails.ifsc}</span>
-                    </p>
-                    <p>
-                      <strong className="text-gray-500 uppercase text-[10px] tracking-wider">ACCOUNT TYPE : </strong>
-                      <span className="font-bold text-gray-900">{bankDetails.accountType}</span>
-                    </p>
-                  </div>
-                )}
-
-                {/* UPI Details (If 'upi' or 'both') */}
-                {(paymentOption === "upi" || paymentOption === "both") && (upiId || upiQrCodeUrl) && (
-                  <div className={`space-y-1.5 ${paymentOption === "both" ? "border-t border-gray-200/90 pt-2 mt-1.5" : ""}`}>
-                    {upiId && (
-                      <p>
-                        <strong className="text-gray-500 uppercase text-[10px] tracking-wider">UPI ID : </strong>
-                        <span className="font-bold text-gray-900 break-all">{upiId}</span>
-                      </p>
-                    )}
-                    {upiQrCodeUrl && (
-                      <div className="pt-1.5 flex items-center gap-3">
-                        <div className="w-28 h-28 print:w-28 print:h-28 bg-white p-1.5 rounded-xl border border-gray-300 shadow-2xs shrink-0 flex items-center justify-center">
-                          <img
-                            src={upiQrCodeUrl}
-                            alt="UPI QR Code"
-                            crossOrigin="anonymous"
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        </div>
-                        <div className="text-[10px] print:text-[9px] text-gray-600 leading-tight space-y-1">
-                          <span className="font-bold text-gray-900 block text-xs print:text-[11px]">
-                            Scan to Pay
-                          </span>
-                          <span className="text-gray-500 block">GPay • PhonePe • Paytm • UPI</span>
-                          <span className="text-[9px] text-gray-400 block">Scan using any UPI App</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                {termsList.length === 0 ? (
+                  <ul className="space-y-1.5 text-gray-600 text-xs print:space-y-0.5 print:text-[11px]">
+                    <li>• DELIVERY CHARGES : EXTRA AT ACTUAL</li>
+                    <li>• PAYMENT : 100% AGAINST DELIVERY</li>
+                    <li>• VALIDITY : 30 DAYS</li>
+                    <li>• DELIVERY : READY STOCK</li>
+                  </ul>
+                ) : (
+                  <ul className="space-y-1.5 text-gray-700 text-xs print:space-y-0.5 print:text-[11px]">
+                    {termsList.map((t, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="font-bold text-brand shrink-0">•</span>
+                        <span>{t}</span>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
 
-              {/* Authorized Signatory Block */}
-              <div className="pt-2 print:pt-0.5 sm:ml-auto sm:max-w-sm space-y-0.5 text-center">
-                <p className="font-bold text-xs text-gray-900 print:text-[11px]">
-                  For, {business?.businessName?.toUpperCase() || "OM ENTERPRISES"}
-                </p>
+              {/* Right Column: PAYMENT INSTRUCTIONS + SIGNATORY */}
+              <div className="space-y-4 print:space-y-2 text-xs sm:text-sm sm:text-right print:text-right">
+                {/* Payment Instructions Box */}
+                <div className="space-y-1.5 text-xs text-gray-800 sm:text-left sm:ml-auto sm:max-w-sm bg-gray-50/70 p-3.5 print:p-2.5 rounded-xl border border-gray-200 print:text-[11px] print:rounded-lg">
+                  <h5 className="font-black text-brand uppercase tracking-wider text-xs print:text-[11px] mb-1">
+                    PAYMENT INSTRUCTIONS
+                  </h5>
 
-                {/* Signature Image or Text */}
-                <div className="h-14 print:h-10 flex items-center justify-center">
-                  {business?.signatureUrl ? (
-                    <img
-                      src={business.signatureUrl}
-                      alt="Signature"
-                      crossOrigin="anonymous"
-                      className="max-h-full max-w-full object-contain"
-                    />
-                  ) : (
-                    <span className="text-base font-playfair italic text-gray-700 font-bold">
-                      {business?.contactName || "Authorized Signature"}
-                    </span>
+                  {/* Bank Details (If 'bank' or 'both') */}
+                  {(paymentOption === "bank" || paymentOption === "both") && (
+                    <div className="space-y-1">
+                      <p>
+                        <strong className="text-gray-500 uppercase text-[10px] tracking-wider">NAME : </strong>
+                        <span className="font-bold text-gray-900">{bankDetails.name}</span>
+                      </p>
+                      <p>
+                        <strong className="text-gray-500 uppercase text-[10px] tracking-wider">BANK : </strong>
+                        <span className="font-bold text-gray-900">{bankDetails.bank}</span>
+                      </p>
+                      <p>
+                        <strong className="text-gray-500 uppercase text-[10px] tracking-wider">A/C NO : </strong>
+                        <span className="font-bold text-gray-900">{bankDetails.accountNo}</span>
+                      </p>
+                      <p>
+                        <strong className="text-gray-500 uppercase text-[10px] tracking-wider">IFSC CODE : </strong>
+                        <span className="font-bold text-gray-900">{bankDetails.ifsc}</span>
+                      </p>
+                      <p>
+                        <strong className="text-gray-500 uppercase text-[10px] tracking-wider">ACCOUNT TYPE : </strong>
+                        <span className="font-bold text-gray-900">{bankDetails.accountType}</span>
+                      </p>
+                    </div>
+                  )}
+
+                  {/* UPI Details (If 'upi' or 'both') */}
+                  {(paymentOption === "upi" || paymentOption === "both") && (upiId || upiQrCodeUrl) && (
+                    <div className={`space-y-1.5 ${paymentOption === "both" ? "border-t border-gray-200/90 pt-2 mt-1.5" : ""}`}>
+                      {upiId && (
+                        <p>
+                          <strong className="text-gray-500 uppercase text-[10px] tracking-wider">UPI ID : </strong>
+                          <span className="font-bold text-gray-900 break-all">{upiId}</span>
+                        </p>
+                      )}
+                      {upiQrCodeUrl && (
+                        <div className="pt-1.5 flex items-center gap-3">
+                          <div className="w-28 h-28 print:w-28 print:h-28 bg-white p-1.5 rounded-xl border border-gray-300 shadow-2xs shrink-0 flex items-center justify-center">
+                            <img
+                              src={upiQrCodeUrl}
+                              alt="UPI QR Code"
+                              crossOrigin="anonymous"
+                              className="max-h-full max-w-full object-contain"
+                            />
+                          </div>
+                          <div className="text-[10px] print:text-[9px] text-gray-600 leading-tight space-y-1">
+                            <span className="font-bold text-gray-900 block text-xs print:text-[11px]">
+                              Scan to Pay
+                            </span>
+                            <span className="text-gray-500 block">GPay • PhonePe • Paytm • UPI</span>
+                            <span className="text-[9px] text-gray-400 block">Scan using any UPI App</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
 
-                <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 border-t border-gray-200 pt-1">
-                  AUTHORIZED SIGNATURE
-                </p>
+                {/* Authorized Signatory Block */}
+                <div className="pt-2 print:pt-0.5 sm:ml-auto sm:max-w-sm space-y-0.5 text-center">
+                  <p className="font-bold text-xs text-gray-900 print:text-[11px]">
+                    For, {business?.businessName?.toUpperCase() || "OM ENTERPRISES"}
+                  </p>
+
+                  {/* Signature Image or Text */}
+                  <div className="h-14 print:h-10 flex items-center justify-center">
+                    {business?.signatureUrl ? (
+                      <img
+                        src={business.signatureUrl}
+                        alt="Signature"
+                        crossOrigin="anonymous"
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    ) : (
+                      <span className="text-base font-playfair italic text-gray-700 font-bold">
+                        {business?.contactName || "Authorized Signature"}
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 border-t border-gray-200 pt-1">
+                    AUTHORIZED SIGNATURE
+                  </p>
+                </div>
               </div>
             </div>
           </div>

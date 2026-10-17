@@ -650,6 +650,16 @@ export function ViewQuotationModal({
           size: A4 portrait;
           margin: 0mm !important;
         }
+        @media print {
+          table, tr, td, th {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+          .modal-quotation-bottom-block {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+        }
       `}</style>
       <div className="w-full max-w-3xl bg-white rounded-3xl shadow-2xl p-6 sm:p-10 animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto print:max-h-none print:shadow-none print:p-0 print:border-none">
         {/* Modal Controls (Hidden when printing) */}
@@ -845,7 +855,7 @@ export function ViewQuotationModal({
           })()}
 
           {/* Summary & Signatory Section */}
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-6 pt-2">
+          <div className="modal-quotation-bottom-block break-inside-avoid page-break-inside-avoid flex flex-col sm:flex-row justify-between items-start gap-6 pt-2">
             {/* Notes & Terms */}
             <div className="flex-1 space-y-3 text-xs text-gray-600">
               {quotation.notes && (
