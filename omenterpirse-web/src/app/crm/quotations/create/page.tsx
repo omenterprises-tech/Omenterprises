@@ -23,6 +23,7 @@ import {
   ChevronRight,
   FolderTree,
   Layers,
+  Phone,
 } from "lucide-react";
 import CustomerModal from "@/components/crm/CustomerModal";
 import ProductModal from "@/components/crm/ProductModal";
@@ -153,7 +154,32 @@ function MakeQuotationContent() {
   // 5. Payment Instructions Display Option
   const [paymentDisplayOption, setPaymentDisplayOption] = useState<"both" | "bank" | "upi">("both");
 
-  // 6. Round Off State
+  // 6. Header Phone Numbers Selection
+  const [selectedHeaderPhones, setSelectedHeaderPhones] = useState<string[]>([]);
+  const [isHeaderPhonesCustomized, setIsHeaderPhonesCustomized] = useState(false);
+
+  const allBusinessPhones: string[] = useMemo(() => {
+    if (!business) return [];
+    if (Array.isArray(business.phoneNumbers) && business.phoneNumbers.length > 0) {
+      return business.phoneNumbers;
+    }
+    if (typeof business.phoneNumbers === "string") {
+      try {
+        const parsed = JSON.parse(business.phoneNumbers);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    if (business.mobileNumber) return [business.mobileNumber];
+    return [];
+  }, [business]);
+
+  useEffect(() => {
+    if (!isHeaderPhonesCustomized && allBusinessPhones.length > 0) {
+      setSelectedHeaderPhones(allBusinessPhones);
+    }
+  }, [allBusinessPhones, isHeaderPhonesCustomized]);
+
+  // 7. Round Off State
   const [isRoundOff, setIsRoundOff] = useState(true);
 
   // Submission State
@@ -278,6 +304,19 @@ function MakeQuotationContent() {
 
     if (q.paymentDisplayOption) {
       setPaymentDisplayOption(q.paymentDisplayOption);
+    }
+
+    if (q.headerPhoneNumbers) {
+      try {
+        const parsed =
+          typeof q.headerPhoneNumbers === "string"
+            ? JSON.parse(q.headerPhoneNumbers)
+            : q.headerPhoneNumbers;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSelectedHeaderPhones(parsed);
+          setIsHeaderPhonesCustomized(true);
+        }
+      } catch (e) {}
     }
   };
 
@@ -781,6 +820,7 @@ function MakeQuotationContent() {
         notes: otherInfo.trim() || null,
         termsConditions: selectedTermsFormatted || null,
         paymentDisplayOption,
+        headerPhoneNumbers: selectedHeaderPhones.length > 0 ? selectedHeaderPhones : allBusinessPhones,
         status: "Draft",
       };
 
@@ -2160,6 +2200,105 @@ function MakeQuotationContent() {
               </span>
             </button>
           </div>
+        </section>
+
+        {/* ---------------- 6. HEADER CONTACT NUMBERS ---------------- */}
+        <section className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-gray-200/80 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center space-x-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-brand/10 text-brand flex items-center justify-center font-bold">
+                <Phone size={20} />
+              </div>
+              <div>
+                <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+                  HEADER CONTACT NUMBERS
+                </h2>
+                <p className="text-xs text-gray-500 font-medium mt-0.5">
+                  Select which contact numbers appear at the top of this quotation
+                </p>
+              </div>
+            </div>
+
+            {allBusinessPhones.length > 1 && (
+              <div className="flex items-center gap-2 self-start sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedHeaderPhones(allBusinessPhones);
+                    setIsHeaderPhonesCustomized(true);
+                  }}
+                  className="text-xs font-bold text-brand hover:underline cursor-pointer"
+                >
+                  Select All
+                </button>
+              </div>
+            )}
+          </div>
+
+          {allBusinessPhones.length === 0 ? (
+            <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-500">
+              No business phone numbers registered yet. Go to Business Info to add contact numbers.
+            </div>
+          ) : (
+            <div className="space-y-2.5 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                {allBusinessPhones.map((phone, idx) => {
+                  const isSelected = selectedHeaderPhones.includes(phone);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setIsHeaderPhonesCustomized(true);
+                        setSelectedHeaderPhones((prev) => {
+                          if (prev.includes(phone)) {
+                            // Don't allow unchecking if it's the last selected
+                            if (prev.length <= 1) return prev;
+                            return prev.filter((p) => p !== phone);
+                          } else {
+                            return [...prev, phone];
+                          }
+                        });
+                      }}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                        isSelected
+                          ? "border-brand bg-brand/5 ring-1 ring-brand text-gray-900 shadow-xs"
+                          : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 text-gray-600"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <Phone size={14} className={isSelected ? "text-brand" : "text-gray-400"} />
+                        <span className="text-xs font-bold font-mono tracking-tight">{phone}</span>
+                        {idx === 0 && (
+                          <span className="text-[9px] font-bold text-brand bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                            Primary
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                          isSelected ? "bg-brand border-brand text-white" : "border-gray-300 bg-white"
+                        }`}
+                      >
+                        {isSelected && <Check size={11} strokeWidth={3} />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Live Preview Pill */}
+              <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-600 flex items-center gap-2">
+                <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider shrink-0">
+                  Header Preview:
+                </span>
+                <span className="font-semibold text-gray-900 font-mono text-[11px] truncate inline-flex items-center gap-1.5">
+                  <Phone size={12} className="text-brand shrink-0" />
+                  <span>{selectedHeaderPhones.length > 0 ? selectedHeaderPhones.join(", ") : allBusinessPhones.join(", ")}</span>
+                </span>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* ---------------- 6. ROUND OFF CHARGE CHECKBOX ---------------- */}

@@ -14,9 +14,21 @@ export async function GET() {
 
     const { business, role, user, canManageBusiness } = await resolveBusinessAndRole(session.userId);
 
+    let parsedPhoneNumbers: string[] = [];
+    if (business) {
+      try {
+        parsedPhoneNumbers = business.phoneNumbers ? JSON.parse(business.phoneNumbers) : [];
+      } catch (e) {
+        parsedPhoneNumbers = [];
+      }
+      if (parsedPhoneNumbers.length === 0 && business.mobileNumber) {
+        parsedPhoneNumbers = [business.mobileNumber];
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      business: business || null,
+      business: business ? { ...business, phoneNumbers: parsedPhoneNumbers } : null,
       user: user || null,
       role: role || "Owner",
       canManageBusiness,
@@ -50,6 +62,7 @@ export async function POST(request: Request) {
       businessName,
       contactName,
       mobileNumber,
+      phoneNumbers,
       email,
       addressLine1,
       addressLine2,
@@ -81,7 +94,17 @@ export async function POST(request: Request) {
     if (!contactName || !contactName.trim()) {
       return NextResponse.json({ success: false, error: "Contact name is required." }, { status: 400 });
     }
-    if (!mobileNumber || !mobileNumber.trim()) {
+
+    const sanitizedPhoneNumbers: string[] =
+      Array.isArray(phoneNumbers) && phoneNumbers.length > 0
+        ? phoneNumbers.map((p: any) => String(p).trim()).filter(Boolean)
+        : mobileNumber
+        ? [mobileNumber.trim()]
+        : [];
+
+    const effectiveMobileNumber = sanitizedPhoneNumbers[0] || (mobileNumber ? mobileNumber.trim() : "");
+
+    if (!effectiveMobileNumber) {
       return NextResponse.json({ success: false, error: "Mobile number is required." }, { status: 400 });
     }
     if (!email || !email.trim()) {
@@ -92,7 +115,8 @@ export async function POST(request: Request) {
       userId: session.userId,
       businessName: businessName.trim(),
       contactName: contactName.trim(),
-      mobileNumber: mobileNumber.trim(),
+      mobileNumber: effectiveMobileNumber,
+      phoneNumbers: JSON.stringify(sanitizedPhoneNumbers),
       email: email.trim(),
       addressLine1: (addressLine1 || "").trim(),
       addressLine2: (addressLine2 || "").trim(),

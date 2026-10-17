@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Plus, Trash2, Loader2, AlertCircle, Printer, CheckCircle2, Building2, QrCode, CreditCard } from "lucide-react";
+import { X, Plus, Trash2, Loader2, AlertCircle, Printer, CheckCircle2, Building2, QrCode, CreditCard, Phone, Mail } from "lucide-react";
 import { formatDisplayDate } from "@/lib/crmCurrencyData";
 
 interface ItemRow {
@@ -46,6 +46,29 @@ export function CreateQuotationModal({
     { id: "1", description: "", quantity: 1, unitPrice: 0, taxPercent: 0, total: 0 },
   ]);
   const [paymentDisplayOption, setPaymentDisplayOption] = useState<"both" | "bank" | "upi">("both");
+
+  const allBusinessPhones: string[] = React.useMemo(() => {
+    if (!business) return [];
+    if (Array.isArray(business.phoneNumbers) && business.phoneNumbers.length > 0) {
+      return business.phoneNumbers;
+    }
+    if (typeof business.phoneNumbers === "string") {
+      try {
+        const parsed = JSON.parse(business.phoneNumbers);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    if (business.mobileNumber) return [business.mobileNumber];
+    return [];
+  }, [business]);
+
+  const [selectedHeaderPhones, setSelectedHeaderPhones] = useState<string[]>([]);
+  useEffect(() => {
+    if (allBusinessPhones.length > 0) {
+      setSelectedHeaderPhones(allBusinessPhones);
+    }
+  }, [allBusinessPhones]);
+
   const [notes, setNotes] = useState("Thank you for your business. Please contact us if you have any questions.");
   const [terms, setTerms] = useState("");
   const [loading, setLoading] = useState(false);
@@ -139,6 +162,7 @@ export function CreateQuotationModal({
           notes,
           termsConditions: terms,
           paymentDisplayOption,
+          headerPhoneNumbers: selectedHeaderPhones.length > 0 ? selectedHeaderPhones : allBusinessPhones,
           status: "Draft",
         }),
       });
@@ -583,6 +607,31 @@ export function ViewQuotationModal({
     }
   }
 
+  let modalHeaderPhones: string[] = [];
+  if (quotation.headerPhoneNumbers) {
+    try {
+      const parsed =
+        typeof quotation.headerPhoneNumbers === "string"
+          ? JSON.parse(quotation.headerPhoneNumbers)
+          : quotation.headerPhoneNumbers;
+      if (Array.isArray(parsed) && parsed.length > 0) modalHeaderPhones = parsed;
+    } catch (e) {}
+  }
+  if (modalHeaderPhones.length === 0) {
+    if (business?.phoneNumbers) {
+      try {
+        const parsed =
+          typeof business.phoneNumbers === "string"
+            ? JSON.parse(business.phoneNumbers)
+            : business.phoneNumbers;
+        if (Array.isArray(parsed) && parsed.length > 0) modalHeaderPhones = parsed;
+      } catch (e) {}
+    }
+  }
+  if (modalHeaderPhones.length === 0 && business?.mobileNumber) {
+    modalHeaderPhones = [business.mobileNumber];
+  }
+
   const handlePrint = () => {
     const prevTitle = document.title;
     if (quotation?.quotationNumber) {
@@ -654,9 +703,18 @@ export function ViewQuotationModal({
               <p className="text-xs text-gray-600 leading-relaxed">
                 {[business?.addressLine1, business?.addressLine2, business?.addressLine3, business?.state].filter(Boolean).join(", ")}
               </p>
-              <p className="text-xs text-gray-600">
-                Phone: {business?.mobileNumber} | Email: {business?.email}
-              </p>
+              {modalHeaderPhones.length > 0 && (
+                <p className="text-xs text-gray-700 font-medium flex items-center gap-1.5">
+                  <Phone size={12} className="text-brand shrink-0" />
+                  <span className="text-gray-900 font-semibold">{modalHeaderPhones.join(", ")}</span>
+                </p>
+              )}
+              {business?.email && (
+                <p className="text-xs text-gray-700 font-medium flex items-center gap-1.5">
+                  <Mail size={12} className="text-brand shrink-0" />
+                  <span className="text-gray-900">{business.email}</span>
+                </p>
+              )}
               {business?.taxNumber && (
                 <p className="text-xs font-semibold text-brand">
                   {business?.taxLabel || "GSTIN"}: {business?.taxNumber}

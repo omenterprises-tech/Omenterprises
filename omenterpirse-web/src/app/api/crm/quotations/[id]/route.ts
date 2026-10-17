@@ -95,6 +95,13 @@ export async function PATCH(
     if (body.notes !== undefined) updateData.notes = body.notes;
     if (body.termsConditions !== undefined) updateData.termsConditions = body.termsConditions;
     if (body.paymentDisplayOption !== undefined) updateData.paymentDisplayOption = body.paymentDisplayOption;
+    if (body.headerPhoneNumbers !== undefined) {
+      updateData.headerPhoneNumbers = body.headerPhoneNumbers
+        ? typeof body.headerPhoneNumbers === "string"
+          ? body.headerPhoneNumbers
+          : JSON.stringify(body.headerPhoneNumbers)
+        : null;
+    }
 
     const updated = await db
       .update(crmQuotations)

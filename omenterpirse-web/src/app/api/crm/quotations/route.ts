@@ -73,6 +73,7 @@ export async function POST(request: Request) {
       notes,
       termsConditions,
       paymentDisplayOption,
+      headerPhoneNumbers,
       status,
     } = body;
 
@@ -126,6 +127,11 @@ export async function POST(request: Request) {
         notes: notes?.trim() || null,
         termsConditions: termsConditions?.trim() || null,
         paymentDisplayOption: paymentDisplayOption || "both",
+        headerPhoneNumbers: headerPhoneNumbers
+          ? typeof headerPhoneNumbers === "string"
+            ? headerPhoneNumbers
+            : JSON.stringify(headerPhoneNumbers)
+          : null,
         status: status || "Draft",
         createdByUserId: session.userId,
         createdByName: authorName,

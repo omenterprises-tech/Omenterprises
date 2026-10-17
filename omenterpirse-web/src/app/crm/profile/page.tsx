@@ -19,6 +19,9 @@ import {
   Calendar,
   Upload,
   PenTool,
+  Phone,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import CategoryModal from "@/components/crm/CategoryModal";
 import SignaturePad from "@/components/crm/SignaturePad";
@@ -53,6 +56,99 @@ export default function CrmManageProfilePage() {
   const [mobileNumber, setMobileNumber] = useState(
     storeBusiness?.mobileNumber || storeUser?.phoneNumber || ""
   );
+  const [phoneNumbers, setPhoneNumbers] = useState<string[]>(() => {
+    if (storeBusiness?.phoneNumbers) {
+      if (Array.isArray(storeBusiness.phoneNumbers)) return storeBusiness.phoneNumbers;
+      try {
+        const parsed = JSON.parse(storeBusiness.phoneNumbers);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    const initial = storeBusiness?.mobileNumber || storeUser?.phoneNumber || "";
+    return initial ? [initial] : [];
+  });
+  const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
+  const [newPhoneNumber, setNewPhoneNumber] = useState("");
+  const [editingPhoneIndex, setEditingPhoneIndex] = useState<number | null>(null);
+  const [editingPhoneValue, setEditingPhoneValue] = useState("");
+  const [phoneModalError, setPhoneModalError] = useState("");
+
+  const handleAddPhoneNumber = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newPhoneNumber.trim();
+    if (!trimmed) {
+      setPhoneModalError("Please enter a phone number.");
+      return;
+    }
+    const digitsOnly = trimmed.replace(/\D/g, "");
+    if (digitsOnly.length < 10) {
+      setPhoneModalError("Phone number must have at least 10 digits.");
+      return;
+    }
+    if (phoneNumbers.includes(trimmed)) {
+      setPhoneModalError("This phone number is already added.");
+      return;
+    }
+    const updated = [...phoneNumbers, trimmed];
+    setPhoneNumbers(updated);
+    setMobileNumber(updated[0] || "");
+    setNewPhoneNumber("");
+    setPhoneModalError("");
+  };
+
+  const handleDeletePhoneNumber = (indexToDelete: number) => {
+    if (phoneNumbers.length <= 1) {
+      setPhoneModalError("At least one contact phone number is required.");
+      return;
+    }
+    const updated = phoneNumbers.filter((_, i) => i !== indexToDelete);
+    setPhoneNumbers(updated);
+    setMobileNumber(updated[0] || "");
+    if (editingPhoneIndex === indexToDelete) {
+      setEditingPhoneIndex(null);
+    }
+    setPhoneModalError("");
+  };
+
+  const handleStartEditPhone = (index: number) => {
+    setEditingPhoneIndex(index);
+    setEditingPhoneValue(phoneNumbers[index] || "");
+    setPhoneModalError("");
+  };
+
+  const handleSaveEditPhone = (index: number) => {
+    const trimmed = editingPhoneValue.trim();
+    if (!trimmed) {
+      setPhoneModalError("Phone number cannot be empty.");
+      return;
+    }
+    const digitsOnly = trimmed.replace(/\D/g, "");
+    if (digitsOnly.length < 10) {
+      setPhoneModalError("Phone number must have at least 10 digits.");
+      return;
+    }
+    const existsAtOther = phoneNumbers.findIndex((p, i) => i !== index && p === trimmed);
+    if (existsAtOther !== -1) {
+      setPhoneModalError("This phone number already exists.");
+      return;
+    }
+    const updated = [...phoneNumbers];
+    updated[index] = trimmed;
+    setPhoneNumbers(updated);
+    setMobileNumber(updated[0] || "");
+    setEditingPhoneIndex(null);
+    setEditingPhoneValue("");
+    setPhoneModalError("");
+  };
+
+  const handleSetPrimaryPhone = (index: number) => {
+    if (index === 0) return;
+    const target = phoneNumbers[index];
+    const remaining = phoneNumbers.filter((_, i) => i !== index);
+    const updated = [target, ...remaining];
+    setPhoneNumbers(updated);
+    setMobileNumber(updated[0] || "");
+  };
   const [addressLine1, setAddressLine1] = useState(storeBusiness?.addressLine1 || "");
   const [addressLine2, setAddressLine2] = useState(storeBusiness?.addressLine2 || "");
   const [addressLine3, setAddressLine3] = useState(storeBusiness?.addressLine3 || "");
@@ -148,7 +244,20 @@ export default function CrmManageProfilePage() {
           setBusinessName(b.businessName || "");
           setContactName(b.contactName || u.fullName || "");
           setEmail(b.email || u.email || "");
-          setMobileNumber(b.mobileNumber || u.phoneNumber || "");
+          let loadedPhones: string[] = [];
+          if (Array.isArray(b.phoneNumbers) && b.phoneNumbers.length > 0) {
+            loadedPhones = b.phoneNumbers;
+          } else if (typeof b.phoneNumbers === "string") {
+            try {
+              const parsed = JSON.parse(b.phoneNumbers);
+              if (Array.isArray(parsed)) loadedPhones = parsed;
+            } catch (e) {}
+          }
+          if (loadedPhones.length === 0 && (b.mobileNumber || u.phoneNumber)) {
+            loadedPhones = [b.mobileNumber || u.phoneNumber];
+          }
+          setPhoneNumbers(loadedPhones);
+          setMobileNumber(loadedPhones[0] || b.mobileNumber || u.phoneNumber || "");
           setAddressLine1(b.addressLine1 || "");
           setAddressLine2(b.addressLine2 || "");
           setAddressLine3(b.addressLine3 || "");
@@ -305,8 +414,11 @@ export default function CrmManageProfilePage() {
       setErrorMessage("Please enter a valid email address.");
       return;
     }
-    const cleanPhone = mobileNumber.replace(/\D/g, "");
-    if (!cleanPhone || cleanPhone.length !== 10) {
+    const cleanPhoneNumbers = phoneNumbers.map((p) => p.trim()).filter(Boolean);
+    const cleanPhone = cleanPhoneNumbers[0]
+      ? cleanPhoneNumbers[0].replace(/\D/g, "")
+      : mobileNumber.replace(/\D/g, "");
+    if (!cleanPhone || cleanPhone.length < 10) {
       setErrorMessage("Please enter a valid 10-digit mobile number.");
       return;
     }
@@ -340,6 +452,7 @@ export default function CrmManageProfilePage() {
           businessName: businessName.trim(),
           contactName: contactName.trim(),
           mobileNumber: cleanPhone,
+          phoneNumbers: cleanPhoneNumbers.length > 0 ? cleanPhoneNumbers : [cleanPhone],
           email: email.trim().toLowerCase(),
           addressLine1: addressLine1.trim(),
           addressLine2: addressLine2.trim(),
@@ -643,19 +756,60 @@ export default function CrmManageProfilePage() {
             />
           </div>
 
-          {/* Phone Number */}
+          {/* Phone Numbers */}
           <div className="bg-[#F3F4F6] rounded-2xl px-4 py-2.5 border border-transparent focus-within:border-gray-400 focus-within:bg-white transition-all">
-            <label className="block text-[11px] text-gray-500 font-medium">
-              Phone Number
-            </label>
-            <input
-              type="tel"
-              value={mobileNumber}
-              onChange={(e) => setMobileNumber(e.target.value)}
-              disabled={!canManageBusiness}
-              placeholder="10-digit mobile number"
-              className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none pt-0.5 disabled:text-gray-700 disabled:cursor-not-allowed"
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] text-gray-500 font-medium">
+                Phone Number{phoneNumbers.length > 1 ? "s" : ""}
+              </label>
+              {canManageBusiness && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhoneModalError("");
+                    setNewPhoneNumber("");
+                    setEditingPhoneIndex(null);
+                    setIsPhoneModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-brand hover:text-brand-hover bg-white px-2.5 py-1 rounded-xl border border-gray-200 shadow-2xs hover:border-brand/40 transition-all cursor-pointer"
+                >
+                  <Plus size={12} />
+                  <span>+ Add</span>
+                </button>
+              )}
+            </div>
+            <div
+              onClick={() => {
+                if (canManageBusiness) {
+                  setPhoneModalError("");
+                  setNewPhoneNumber("");
+                  setEditingPhoneIndex(null);
+                  setIsPhoneModalOpen(true);
+                }
+              }}
+              className={`w-full pt-0.5 flex flex-wrap gap-1.5 items-center min-h-[30px] ${
+                canManageBusiness ? "cursor-pointer" : "cursor-not-allowed"
+              }`}
+            >
+              {phoneNumbers.length > 0 ? (
+                phoneNumbers.map((num, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-800 shadow-2xs"
+                  >
+                    <Phone size={11} className="text-brand shrink-0" />
+                    <span>{num}</span>
+                    {idx === 0 && (
+                      <span className="text-[9px] uppercase tracking-wider font-extrabold text-brand bg-blue-50 px-1.5 py-0.5 rounded-md">
+                        Primary
+                      </span>
+                    )}
+                  </span>
+                ))
+              ) : (
+                <span className="text-gray-400 text-xs font-medium">Click &apos;+ Add&apos; to add phone numbers</span>
+              )}
+            </div>
           </div>
 
           {/* Address Line 1 */}
@@ -1264,6 +1418,191 @@ export default function CrmManageProfilePage() {
                   Done
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: MANAGE PHONE NUMBERS ================= */}
+      {isPhoneModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div>
+                <h4 className="text-base font-bold text-gray-900">Manage Contact Numbers</h4>
+                <p className="text-xs text-gray-500">Available contact numbers for your business & quotations</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPhoneModalError("");
+                  setEditingPhoneIndex(null);
+                  setIsPhoneModalOpen(false);
+                }}
+                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Error Message */}
+            {phoneModalError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center space-x-2">
+                <AlertCircle size={15} className="shrink-0 text-rose-600" />
+                <span>{phoneModalError}</span>
+              </div>
+            )}
+
+            {/* Stack of Available Phone Numbers */}
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                Current Phone Numbers ({phoneNumbers.length})
+              </label>
+
+              {phoneNumbers.length === 0 ? (
+                <div className="p-4 text-center text-xs text-gray-400 border border-dashed border-gray-200 rounded-2xl">
+                  No contact numbers added yet.
+                </div>
+              ) : (
+                phoneNumbers.map((num, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 bg-gray-50 rounded-2xl border border-gray-200 flex items-center justify-between gap-2 transition-all hover:bg-gray-100/70"
+                  >
+                    {editingPhoneIndex === idx ? (
+                      <div className="flex-1 flex items-center gap-2">
+                        <input
+                          type="tel"
+                          value={editingPhoneValue}
+                          onChange={(e) => setEditingPhoneValue(e.target.value)}
+                          placeholder="10-digit number"
+                          className="flex-1 bg-white px-3 py-1.5 rounded-xl border border-brand text-xs font-bold text-gray-900 focus:outline-none"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveEditPhone(idx);
+                            if (e.key === "Escape") setEditingPhoneIndex(null);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveEditPhone(idx)}
+                          className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer"
+                          title="Save"
+                        >
+                          <Check size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingPhoneIndex(null)}
+                          className="p-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-xs cursor-pointer"
+                          title="Cancel"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center space-x-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-brand shrink-0">
+                            <Phone size={14} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-bold text-gray-900 font-mono tracking-tight">
+                                {num}
+                              </span>
+                              {idx === 0 && (
+                                <span className="text-[9px] uppercase tracking-wider font-extrabold text-brand bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-100">
+                                  Primary
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-gray-400 block truncate">
+                              {idx === 0 ? "Default header contact" : "Alternate contact"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          {idx !== 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleSetPrimaryPhone(idx)}
+                              className="text-[10px] font-bold text-brand hover:text-brand-hover px-2 py-1 rounded-lg hover:bg-blue-50 cursor-pointer"
+                              title="Set as Primary"
+                            >
+                              Make Primary
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditPhone(idx)}
+                            className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                            title="Edit Number"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePhoneNumber(idx)}
+                            disabled={phoneNumbers.length <= 1}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              phoneNumbers.length <= 1
+                                ? "text-gray-300 cursor-not-allowed"
+                                : "text-rose-500 hover:text-rose-700 hover:bg-rose-50 cursor-pointer"
+                            }`}
+                            title={phoneNumbers.length <= 1 ? "Cannot delete the only phone number" : "Delete Number"}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Add New Phone Number Section */}
+            <form onSubmit={handleAddPhoneNumber} className="pt-2 border-t border-gray-100 space-y-2">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700">
+                Add Another Contact Number
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  value={newPhoneNumber}
+                  onChange={(e) => {
+                    setNewPhoneNumber(e.target.value);
+                    if (phoneModalError) setPhoneModalError("");
+                  }}
+                  placeholder="Enter 10-digit phone number"
+                  className="flex-1 px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand bg-white"
+                />
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1 shadow-sm cursor-pointer shrink-0"
+                >
+                  <Plus size={14} />
+                  <span>+ Add</span>
+                </button>
+              </div>
+            </form>
+
+            {/* Done Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPhoneModalError("");
+                  setEditingPhoneIndex(null);
+                  setIsPhoneModalOpen(false);
+                }}
+                className="w-full py-3 bg-[#18181B] hover:bg-black text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm"
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>

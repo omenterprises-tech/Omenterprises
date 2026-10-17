@@ -262,6 +262,7 @@ export const crmBusinesses = sqliteTable("crm_businesses", {
   bankAccountName: text("bank_account_name"),
   upiId: text("upi_id"),
   upiQrCodeUrl: text("upi_qr_code_url"),
+  phoneNumbers: text("phone_numbers"),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
   updatedAt: text("updated_at").$defaultFn(() => new Date().toISOString()),
 });
@@ -323,6 +324,7 @@ export const crmQuotations = sqliteTable("crm_quotations", {
   notes: text("notes"),
   termsConditions: text("terms_conditions"),
   paymentDisplayOption: text("payment_display_option").default("both"),
+  headerPhoneNumbers: text("header_phone_numbers"),
   status: text("status").notNull().default("Draft"), // Draft, Sent, Accepted, Declined
   createdByUserId: integer("created_by_user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
   createdByName: text("created_by_name").notNull(),

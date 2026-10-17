@@ -677,6 +677,39 @@ export default function QuotationDetailPage({
   const upiQrCodeUrl = business?.upiQrCodeUrl || "";
   const paymentOption = quotation?.paymentDisplayOption || "both";
 
+  // Parse header contact numbers for quotation top header
+  let displayedPhoneNumbers: string[] = [];
+  if (quotation?.headerPhoneNumbers) {
+    try {
+      const parsed =
+        typeof quotation.headerPhoneNumbers === "string"
+          ? JSON.parse(quotation.headerPhoneNumbers)
+          : quotation.headerPhoneNumbers;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        displayedPhoneNumbers = parsed;
+      }
+    } catch (e) {}
+  }
+  if (displayedPhoneNumbers.length === 0) {
+    if (business?.phoneNumbers) {
+      try {
+        const parsed =
+          typeof business.phoneNumbers === "string"
+            ? JSON.parse(business.phoneNumbers)
+            : business.phoneNumbers;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          displayedPhoneNumbers = parsed;
+        }
+      } catch (e) {}
+    }
+  }
+  if (displayedPhoneNumbers.length === 0 && business?.mobileNumber) {
+    displayedPhoneNumbers = [business.mobileNumber];
+  }
+  if (displayedPhoneNumbers.length === 0) {
+    displayedPhoneNumbers = ["+91 9246999660", "9849845555"];
+  }
+
   // Status color styles
   const statusColors: Record<string, string> = {
     Draft: "bg-amber-50 text-amber-800 border-amber-200",
@@ -851,17 +884,21 @@ export default function QuotationDetailPage({
                   "# 5-1-26, Mahalaxmi Complex, R.P. Road, Near Citylight Hotel, Secunderabad - 500003, Telangana state."}
               </p>
 
-              {/* Phone & Email */}
-              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs sm:text-sm print:text-[11px] text-gray-700 font-medium pt-0.5">
-                <span className="inline-flex items-center gap-1.5">
+              {/* Phone Numbers (Line 1) */}
+              {displayedPhoneNumbers.length > 0 && (
+                <div className="flex items-center justify-center gap-1.5 text-xs sm:text-sm print:text-[11px] text-gray-700 font-medium pt-0.5">
                   <Phone size={13} className="text-brand shrink-0" />
-                  <span>{business?.mobileNumber || "+91 9246999660 / 9849845555"}</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5">
+                  <span className="text-gray-900 font-semibold">{displayedPhoneNumbers.join(", ")}</span>
+                </div>
+              )}
+
+              {/* Email (Line 2) */}
+              {(business?.email || "om5555enterprises@gmail.com") && (
+                <div className="flex items-center justify-center gap-1.5 text-xs sm:text-sm print:text-[11px] text-gray-700 font-medium">
                   <Mail size={13} className="text-brand shrink-0" />
-                  <span>{business?.email || "om5555enterprises@gmail.com"}</span>
-                </span>
-              </div>
+                  <span className="text-gray-900">{business?.email || "om5555enterprises@gmail.com"}</span>
+                </div>
+              )}
 
               {/* GSTIN */}
               {(business?.taxNumber || "36ASLPS7570G1Z5") && (
