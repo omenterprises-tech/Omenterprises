@@ -830,7 +830,7 @@ export function ViewQuotationModal({
                           <td className="p-2.5 text-center font-bold text-gray-700 uppercase text-[11px]">
                             {unitName}
                           </td>
-                          <td className="p-2.5 text-right font-semibold text-emerald-700">
+                          <td className="p-2.5 text-right font-semibold text-gray-900 print:text-black">
                             {discPercent > 0 ? `${discPercent}%` : "-"}
                           </td>
                           <td className="p-2.5 text-right font-semibold text-gray-900">
@@ -985,7 +985,7 @@ export function ViewQuotationModal({
                             ₹{Number(quotation.subtotal + totalDiscountAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                           </span>
                         </div>
-                        <div className="flex justify-between text-emerald-700">
+                        <div className="flex justify-between text-gray-900 print:text-black">
                           <span>Total Discount:</span>
                           <span className="font-bold">
                             -₹{totalDiscountAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}

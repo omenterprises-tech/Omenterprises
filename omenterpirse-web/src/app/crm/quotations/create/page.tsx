@@ -1916,7 +1916,7 @@ function MakeQuotationContent() {
                               <td className="py-2.5 px-1 text-center font-bold text-gray-700 uppercase text-[11px]">
                                 {unitName}
                               </td>
-                              <td className="py-2.5 px-1.5 text-right font-semibold text-emerald-700">
+                              <td className="py-2.5 px-1.5 text-right font-semibold text-gray-900">
                                 {discPercent > 0 ? `${discPercent}%` : "-"}
                               </td>
                               <td className="py-2.5 px-2 text-right font-semibold text-gray-900">
@@ -2355,7 +2355,7 @@ function MakeQuotationContent() {
               {totalDiscount > 0 ? (
                 <>
                   <span>Gross: ₹{grossSubtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                  <span className="text-emerald-700 font-bold">• Disc: -₹{totalDiscount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                  <span className="text-gray-900 font-bold">• Disc: -₹{totalDiscount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                   <span>• Taxable: ₹{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                 </>
               ) : (

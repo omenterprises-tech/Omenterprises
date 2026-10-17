@@ -1106,7 +1106,7 @@ export default function QuotationDetailPage({
                             <td className="py-2.5 px-1 text-center font-bold text-gray-700 uppercase text-[11px] print:text-[9.5px]">
                               {unitName}
                             </td>
-                            <td className="py-2.5 px-1.5 text-right font-semibold text-emerald-700">
+                            <td className="py-2.5 px-1.5 text-right font-semibold text-gray-900 print:text-black">
                               {discPercent > 0 ? `${discPercent} %` : "-"}
                             </td>
                             <td className="py-2.5 px-2 text-right font-semibold text-gray-900">
@@ -1208,7 +1208,7 @@ export default function QuotationDetailPage({
                           <span className="font-semibold text-gray-600 uppercase text-xs print:text-[11px]">GROSS TOTAL</span>
                           <span className="font-bold text-gray-900">{formatRs(quotation.subtotal + totalDiscountAmount)}</span>
                         </div>
-                        <div className="flex justify-between py-0.5 text-emerald-700">
+                        <div className="flex justify-between py-0.5 text-gray-900 print:text-black">
                           <span className="font-semibold uppercase text-xs print:text-[11px]">TOTAL DISCOUNT</span>
                           <span className="font-bold">-{formatRs(totalDiscountAmount)}</span>
                         </div>
